@@ -19,6 +19,20 @@ class AGV:
         self.velocity: float = velocity
         self.operation: Optional[Operation] = None
 
+    def __repr__(self):
+        # 获取当前操作的名称（如果有）
+        operation_name = self.operation.id if self.operation else "None"
+
+        # 格式化坐标和速度，保留两位小数
+        return (
+            f"<{self.__class__.__name__} "
+            f"id={self.id} "
+            f"pos=({self.x:.2f}, {self.y:.2f}) "
+            f"v={self.velocity:.2f} "
+            f"timer={self.timer:.2f} "
+            f"operation={operation_name}>"
+        )
+
     def get_id(self) -> int:
         return self.id
 

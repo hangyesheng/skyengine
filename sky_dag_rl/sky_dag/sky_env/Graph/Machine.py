@@ -16,6 +16,9 @@ class Machine:
         self.timer: float = 0.0
         self.operation: Optional[Operation] = operation
 
+    def __repr__(self):
+        return f"<{self.__class__.__name__} id={self.agent_id} name={self.name}>"
+
     def get_id(self) -> int:
         return self.id
 

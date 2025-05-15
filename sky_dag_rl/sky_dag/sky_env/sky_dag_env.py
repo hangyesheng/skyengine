@@ -75,7 +75,7 @@ class SkyDagEnv(ParallelEnv):
 
         # === 1. Agent 动作处理（支持 Job 或 Central）===
         if actions:
-            self._apply_agent_actions(actions)
+            self.apply_agent_actions()
 
         # === 2. 处理 EventQueue 中的事件 ===
         current_event_list = self.event_queue.pop_ready_events(self.env_timeline)
@@ -101,10 +101,6 @@ class SkyDagEnv(ParallelEnv):
             infos[job_id] = {}
             if done:
                 self.done_flags[job_id] = True
-
-        # === 5. 判断是否需要自动重调度 ===
-        if self.should_trigger_reassign():
-            self.reschedule_operations()
 
         return obs, rewards, terminations, truncations, infos
 
@@ -219,7 +215,6 @@ class SkyDagEnv(ParallelEnv):
                     print(f"    ... 和其他 {len(self.agvs) - 3} 个AGV")
 
         print("=" * 50)
-
 
     def observation_space(self, agent):
         return self.observation_spaces[agent]
