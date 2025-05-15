@@ -88,32 +88,15 @@ class SkyDagEnv(ParallelEnv):
         infos = {}
 
         # === 0. Agent 决策动作（支持 Job 或 Central）===
-        decision, agent_sample_time = self.agent.sample()
+        decision, step_time = self.agent.sample()
 
         # === 1. 处理 EventQueue 中的事件 ===
         current_event_list = self.event_queue.pop_ready_events(self.env_timeline)
         self.deal_event(current_event_list)
 
         # === 2. 提取state,发送给状态转移函数并返回 ===
-        for node in self.nodes.values():
-            finished_ops = node.step(self.env_timeline)
-            for op in finished_ops:
-                self.event_queue.add_event(Event(
-                    timestamp=self.env_timeline,
-                    event_type="task_finish",
-                    payload=op
-                ))
-        # === 3. 提取state,发送给状态转移函数并返回 ===
         actions: List[Tuple[AGV, Operation, Machine]] = self.agent.step()
-        env_step(actions, step_time)
-
-        finished_ops = get_finished_ops(self.operations)
-        for op in finished_ops:
-            self.event_queue.add_event(Event(
-                timestamp=self.env_timeline,
-                event_type="task_finish",
-                payload=op
-            ))
+        self.env_step(actions, step_time)
 
         # === 3. 统计 Job 完成状态，计算奖励 ===
         for job in self.jobs:
@@ -128,7 +111,7 @@ class SkyDagEnv(ParallelEnv):
 
         # === 4. 处理全局时间 ===
         # step_time = max(currentTime + AgentExecuteTime, nextEventTime)
-        self.env_timeline += 1
+        self.env_timeline += step_time
 
         obs=self._get_obs()
 
