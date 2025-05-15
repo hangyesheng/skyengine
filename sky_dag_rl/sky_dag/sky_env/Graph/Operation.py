@@ -1,5 +1,7 @@
 from typing import List, Optional, Tuple
 
+from sky_dag.sky_env.Graph.Machine import Machine
+
 class Operation:
 
     def __init__(self, op_id: int, process_time: float, durations: List[Tuple[int, float]], cpu_req=0, mem_req=0):
@@ -12,6 +14,7 @@ class Operation:
         self.process_time: float = process_time
         self.durations: List[Tuple[int, float]] = durations
         self.next_operation: Optional['Operation'] = None
+        self.current_machine: Optional[Machine] = None
 
         self.cpu_req = cpu_req
         self.mem_req = mem_req
@@ -63,6 +66,12 @@ class Operation:
 
     def set_next_operation(self, next_operation: Optional['Operation']) -> None:
         self.next_operation = next_operation
+
+    def get_current_machine(self) -> Optional[Machine]:
+        return self.current_machine
+    
+    def set_current_machine(self, current_machine: Optional[Machine]) -> None:
+        self.current_machine = current_machine
 
     def add_dependency(self, op):
         """

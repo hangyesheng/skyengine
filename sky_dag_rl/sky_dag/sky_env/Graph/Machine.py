@@ -39,6 +39,9 @@ class Machine:
             duration = self.operation.get_duration(self.id)
             self.timer += duration
             self.operation.set_process_time(duration)
+            self.operation.set_current_machine(None)
             self.operation = self.operation.get_next_operation()
+            if self.operation is not None:
+                self.operation.set_current_machine(self)
         else:
             print(f"Machine {self.id} is idle")

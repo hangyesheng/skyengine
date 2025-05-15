@@ -47,7 +47,11 @@ class AGV:
         if self.operation is not None:
             print("AGV is already loading an operation")
             return
-
+        operation: Optional[Operation] = machine.get_operation()
+        if operation is None:
+            print("Machine is not loaded")
+            return
+        
         mx, my = machine.get_xy()
         distance = self.dist(mx, my)
         travel_time = distance / self.velocity
@@ -55,7 +59,8 @@ class AGV:
         self.timer = max(self.timer, machine.get_timer())
 
         self.set_xy(mx, my)
-        self.set_operation(machine.get_operation())
+        self.set_operation(operation)
+        operation.set_current_machine(None)
         machine.set_operation(None)
 
     def unload(self, machine: Machine) -> None:
@@ -70,14 +75,17 @@ class AGV:
 
         self.set_xy(mx, my)
 
-        if machine.get_operation() is None:
+        machine_operation: Optional[Operation] = machine.get_operation()
+        if machine_operation is None:
             machine.set_timer(self.timer)
             machine.set_operation(self.operation)
+            self.operation.set_current_machine(machine)
             self.set_operation(None)
         else:
             machine.set_timer(max(machine.get_timer(), self.timer))
-            machine_op = machine.get_operation()
+            machine_operation.set_current_machine(None)
             machine.set_operation(self.operation)
-            self.set_operation(machine_op)
+            self.operation.set_current_machine(machine)
+            self.set_operation(machine_operation)
 
         machine.work()
