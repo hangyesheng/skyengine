@@ -1,9 +1,34 @@
+from typing import List
+
+from sky_dag.sky_env.Graph.Operation import Operation
+
 class Job:
-    def __init__(self, job_id, target_count=None):
+    def __init__(self, job_id: int, operations: List[Operation], target_count=None):
+        """
+        :param operations: 构成作业的操作列表
+        """
         self.id = job_id
-        self.operations = []
+        self.operations: List[Operation] = operations
+        for i in range(len(self.operations)):
+            if i + 1 < len(self.operations):
+                self.operations[i].set_next_operation(self.operations[i + 1])
+            else:
+                self.operations[i].set_next_operation(None)
+
+                
         self.target_count = target_count  # 目标处理工件数，可选
 
+    def get_operation_count(self) -> int:
+        return len(self.operations)
+
+    def get_operation(self, index: int) -> Operation:
+        """
+        :param index: 操作索引
+        :return: 对应索引的操作，如果越界则返回 None
+        """
+        assert index >= 0 and index < len(self.operations), "Invalid index"
+
+        return self.operations[index]
     def add_operation(self, op):
         self.operations.append(op)
 
