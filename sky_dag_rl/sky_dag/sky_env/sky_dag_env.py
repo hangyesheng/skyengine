@@ -1,4 +1,4 @@
-from typing import Union
+from typing import Union, List, Tuple
 
 from pettingzoo import ParallelEnv
 import numpy as np
@@ -6,6 +6,7 @@ import numpy as np
 from sky_dag_rl.sky_dag.Agent import BaseAgent
 from .Graph.Node import Node
 from .Graph.Job import Job
+from .Graph.Machine import Machine
 from .Graph.Operation import Operation
 from .Graph.AGV import AGV
 from .Utils import util
@@ -63,6 +64,23 @@ class SkyDagEnv(ParallelEnv):
                 for node_id in event.payload['nodes']:
                     self.nodes[node_id].fail()
 
+    def env_step(self, actions: List[Tuple[AGV, Operation, Machine]], step_time: int) -> None:
+        current_time = self.env_timeline
+        final_time = current_time + step_time
+        # todo: 限制Timer不能超过final_time
+        for agv, operation, machine in actions:
+            last_machine = operation.get_current_machine()
+            if last_machine is None:
+                agv.set_operation(operation)
+                agv.unload(machine)
+            else:
+                agv.load(last_machine)
+                agv.unload(machine)
+
+            print(f"Operation {operation.id}: AGV={agv.get_id()}, Machine={machine.get_id()}, Duration={operation.get_duration(machine.get_id())}")
+
+        # todo: 将所有的AGV和Machine的Timer更新到final_time
+
     def step(self, actions=None):
         rewards = {}
         terminations = {}
@@ -85,6 +103,17 @@ class SkyDagEnv(ParallelEnv):
                     event_type="task_finish",
                     payload=op
                 ))
+        # === 3. 提取state,发送给状态转移函数并返回 ===
+        actions: List[Tuple[AGV, Operation, Machine]] = self.agent.step()
+        env_step(actions, step_time)
+
+        finished_ops = get_finished_ops(self.operations)
+        for op in finished_ops:
+            self.event_queue.add_event(Event(
+                timestamp=self.env_timeline,
+                event_type="task_finish",
+                payload=op
+            ))
 
         # === 3. 统计 Job 完成状态，计算奖励 ===
         for job in self.jobs:
