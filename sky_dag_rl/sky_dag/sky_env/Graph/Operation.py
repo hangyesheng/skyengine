@@ -15,6 +15,7 @@ class Operation:
         self.durations: List[Tuple[int, float]] = durations
         self.next_operation: Optional['Operation'] = None
         self.current_machine: Optional[Machine] = None
+        self.finished = False
 
         self.cpu_req = cpu_req
         self.mem_req = mem_req
@@ -89,6 +90,18 @@ class Operation:
                 return duration
         print(f"Machine {machine_id} not found")
         return 0.0
+    
+    def is_finished(self) -> bool:
+        """
+        :return: 该操作是否完成
+        """
+        return self.finished
+    
+    def set_finished(self, finished: bool) -> None:
+        """
+        :param finished: 该操作是否完成
+        """
+        self.finished = finished
 
     def get_next_operation(self) -> Optional['Operation']:
         return self.next_operation

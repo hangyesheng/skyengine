@@ -30,7 +30,7 @@ class SkyDagEnv(ParallelEnv):
         self.agvs = []
 
         # 环境本身的状态,向量指标,事件队列等
-        self.env_timeline = 0
+        self.env_timeline: float = 0
         self.reward = 0
         self.event_queue = EventQueue()
         self.critic_vector = []
@@ -64,18 +64,18 @@ class SkyDagEnv(ParallelEnv):
                 for node_id in event.payload['nodes']:
                     self.nodes[node_id].fail()
 
-    def env_step(self, actions: List[Tuple[AGV, Operation, Machine]], step_time: int) -> None:
+    def env_step(self, actions: List[Tuple[AGV, Operation, Machine]], step_time: float) -> None:
         current_time = self.env_timeline
         final_time = current_time + step_time
-        # todo: 限制Timer不能超过final_time
+        
         for agv, operation, machine in actions:
             last_machine = operation.get_current_machine()
             if last_machine is None:
                 agv.set_operation(operation)
-                agv.unload(machine)
+                agv.unload(machine, final_time)
             else:
-                agv.load(last_machine)
-                agv.unload(machine)
+                agv.load(last_machine, final_time)
+                agv.unload(machine, final_time)
 
             print(f"Operation {operation.id}: AGV={agv.get_id()}, Machine={machine.get_id()}, Duration={operation.get_duration(machine.get_id())}")
 

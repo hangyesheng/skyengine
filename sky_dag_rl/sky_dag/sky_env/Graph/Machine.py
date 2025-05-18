@@ -37,11 +37,19 @@ class Machine:
     def set_operation(self, operation: Optional[Operation]) -> None:
         self.operation = operation
 
-    def work(self) -> None:
+    def work(self, final_time: float) -> None:
         if self.operation is not None:
             duration = self.operation.get_duration(self.id)
-            self.timer += duration
+            work_time: float = duration - self.operation.process_time
+            if self.timer + work_time > final_time:
+                self.operation.process_time += final_time - self.timer
+                self.set_timer(final_time)
+                return
+
+            self.timer += work_time
             self.operation.set_process_time(duration)
+            self.operation.set_finished(True)
+            
             self.operation.set_current_machine(None)
             self.operation = self.operation.get_next_operation()
             if self.operation is not None:

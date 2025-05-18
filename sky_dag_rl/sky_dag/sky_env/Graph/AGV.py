@@ -45,6 +45,9 @@ class AGV:
 
     def get_timer(self) -> float:
         return self.timer
+    
+    def set_timer(self, timer: float) -> None:
+        self.timer = timer
 
     def get_operation(self) -> Optional[Operation]:
         return self.operation
@@ -57,27 +60,41 @@ class AGV:
         dy = self.y - target_y
         return math.sqrt(dx * dx + dy * dy)
 
-    def load(self, machine: Machine) -> None:
+    def load(self, machine: Machine, final_time: float) -> None:
         if self.operation is not None:
             print("AGV is already loading an operation")
             return
-        operation: Optional[Operation] = machine.get_operation()
-        if operation is None:
+        machine_operation: Optional[Operation] = machine.get_operation()
+        if machine_operation is None:
             print("Machine is not loaded")
             return
         
         mx, my = machine.get_xy()
         distance = self.dist(mx, my)
         travel_time = distance / self.velocity
-        self.timer += travel_time
-        self.timer = max(self.timer, machine.get_timer())
+
+        if self.get_timer() + travel_time > final_time:
+            agv_x, agv_y = self.get_xy()
+            dx: float = mx - agv_x
+            dy: float = my - agv_y
+            agv_x = agv_x + dx * (final_time - self.get_timer()) / travel_time
+            agv_y = agv_y + dy * (final_time - self.get_timer()) / travel_time
+            self.set_xy(agv_x, agv_y)
+            self.set_timer(final_time)
+            return
 
         self.set_xy(mx, my)
-        self.set_operation(operation)
-        operation.set_current_machine(None)
-        machine.set_operation(None)
+        self.timer += travel_time
+        if not machine_operation.is_finished():
+            machine.work(final_time)
+        self.timer = max(self.timer, machine.get_timer())
 
-    def unload(self, machine: Machine) -> None:
+        if machine_operation.is_finished():
+            self.set_operation(machine_operation)
+            machine_operation.set_current_machine(None)
+            machine.set_operation(None)
+
+    def unload(self, machine: Machine, final_time: float) -> None:
         if self.operation is None:
             print("AGV is not loaded")
             return
@@ -85,24 +102,38 @@ class AGV:
         mx, my = machine.get_xy()
         distance = self.dist(mx, my)
         travel_time = distance / self.velocity
-        self.timer += travel_time
+
+        if self.get_timer() + travel_time > final_time:
+            agv_x, agv_y = self.get_xy()
+            dx: float = mx - agv_x
+            dy: float = my - agv_y
+            agv_x = agv_x + dx * (final_time - self.get_timer()) / travel_time
+            agv_y = agv_y + dy * (final_time - self.get_timer()) / travel_time
+            self.set_xy(agv_x, agv_y)
+            self.set_timer(final_time)
+            return
 
         self.set_xy(mx, my)
+        self.timer += travel_time
 
         machine_operation: Optional[Operation] = machine.get_operation()
+
         if machine_operation is None:
-            machine.set_timer(self.timer)
+            machine.set_timer(max(machine.get_timer(), self.timer))
             machine.set_operation(self.operation)
             self.operation.set_current_machine(machine)
             self.set_operation(None)
         else:
+            if not machine_operation.is_finished():
+                machine.work(final_time)
             machine.set_timer(max(machine.get_timer(), self.timer))
-            machine_operation.set_current_machine(None)
-            machine.set_operation(self.operation)
-            self.operation.set_current_machine(machine)
-            self.set_operation(machine_operation)
+            if machine_operation.is_finished():
+                machine_operation.set_current_machine(None)
+                machine.set_operation(self.operation)
+                self.operation.set_current_machine(machine)
+                self.set_operation(machine_operation)
 
-        machine.work()
+        machine.work(final_time)
 
 
 if __name__ == '__main__':
