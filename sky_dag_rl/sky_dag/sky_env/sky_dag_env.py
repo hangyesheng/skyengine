@@ -31,9 +31,13 @@ class SkyDagEnv(ParallelEnv):
 
         # 环境本身的状态,向量指标,事件队列等
         self.env_timeline: float = 0
-        self.reward = 0
         self.event_queue = EventQueue()
-        self.critic_vector = []
+
+        self.limit = 200
+        self.critic_vector = []  # 评价指标
+        # self.reward = {}  # 每个Agent的奖励
+        # self.terminations = {}  # 是否完成任务
+        # self.truncations = {}  # 智能体是否提前截断
 
         # 智能体相关的状态
         self.agent = agent
@@ -76,65 +80,47 @@ class SkyDagEnv(ParallelEnv):
                 agv.load(last_machine, final_time)
                 agv.unload(machine, final_time)
 
-            print(f"Operation {operation.id}: AGV={agv.get_id()}, Machine={machine.get_id()}, Duration={operation.get_duration(machine.get_id())}")
+            print(
+                f"Operation {operation.id}: AGV={agv.get_id()}, Machine={machine.get_id()}, Duration={operation.get_duration(machine.get_id())}")
 
         for machine in self.machines:
             machine.work(final_time)
             machine.set_timer(final_time)
         for agv in self.agvs:
             agv.set_timer(final_time)
-        
 
     def step(self, actions=None):
-        rewards = {}
-        terminations = {}
-        truncations = {}
-        infos = {}
-
         # === 0. Agent 决策动作（支持 Job 或 Central）===
-        decision, step_time = self.agent.sample()
+        decision, step_time = self.agent.sample()  # type: List[Tuple[AGV, Operation, Machine]], float
 
         # === 1. 处理 EventQueue 中的事件 ===
+        # todo 第一阶段暂时没用到event
         current_event_list = self.event_queue.pop_ready_events(self.env_timeline)
         self.deal_event(current_event_list)
 
         # === 2. 提取state,发送给状态转移函数并返回 ===
-        actions: List[Tuple[AGV, Operation, Machine]] = self.agent.step()
-        self.env_step(actions, step_time)
+        self.env_step(decision, step_time)
 
-        # === 3. 统计 Job 完成状态，计算奖励 ===
-        for job in self.jobs:
-            done = job.is_finished()
-            job_id = job.id
-            rewards[job_id] = 1.0 if done and not self.done_flags.get(job_id, False) else 0.0
-            terminations[job_id] = done
-            truncations[job_id] = False
-            infos[job_id] = {}
-            if done:
-                self.done_flags[job_id] = True
+        # === 3. 统计完成状态，计算奖励 ===
+        # todo 计算状态/动作完成reward计算
+        rewards = {self.agent.agent_id: self.agent.reward()}
+        terminations = {self.agent}
+        truncations = {self.agent}
 
         # === 4. 处理全局时间 ===
-        # step_time = max(currentTime + AgentExecuteTime, nextEventTime)
         self.env_timeline += step_time
 
-        obs=self._get_obs()
+        obs = self._get_obs()
 
-        return obs, rewards, terminations, truncations, infos
+        return obs, rewards, terminations, truncations
 
     def _get_obs(self):
         """
-        获得环境观察的信息
+        获得Agent观察的环境信息
         :return: 物理节点的观察信息
         """
         obs = {}
-        for name, node in self.nodes.items():
-            cpu_load = sum(o.cpu_req for o in node.running_operations) / node.cpu_capacity
-            mem_load = sum(o.mem_req for o in node.running_operations) / node.mem_capacity
-            obs[name] = np.array([
-                min(cpu_load, 1.0),
-                min(mem_load, 1.0),
-                len(node.running_operations)
-            ], dtype=np.float32)
+        # todo 构建Agent对全局的观察
         return obs
 
     def reset(self, seed=None, options=None):
@@ -147,7 +133,8 @@ class SkyDagEnv(ParallelEnv):
         # ---------- 清理重建阶段 ----------
         self.set_env_timeline(0)
         self.refresh_status()
-        obs = self._get_obs()
+        # ---------- 获取Agent的观察 ----------
+        obs = self._get_obs()  # 本系统agent从外界定义因此不需要从内部获得agent信息
         return obs
 
     def render(self):
@@ -232,28 +219,6 @@ class SkyDagEnv(ParallelEnv):
                     print(f"    ... 和其他 {len(self.agvs) - 3} 个AGV")
 
         print("=" * 50)
-
-    def observation_space(self, agent):
-        return self.observation_spaces[agent]
-
-    def action_space(self, agent):
-        return self.action_spaces[agent]
-
-    def get_op_by_id(self, op_id):
-        for job in self.jobs:
-            for op in job.operations:
-                if op.id == op_id:
-                    return op
-        return None
-
-    def apply_agent_actions(self, actions):
-        """
-        执行 agent 提供的动作，支持集中式与 Job 式调度。
-        actions 格式：
-            - job-based: {"job_id1": {"op_id": "op1", "target_node": "node1"}, ...}
-            - centralized: {"scheduler": [{"op_id": "op1", "target_node": "node1"}, ...]}
-        """
-        pass
 
 
 if __name__ == '__main__':

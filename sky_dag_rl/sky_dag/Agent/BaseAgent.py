@@ -22,9 +22,10 @@ class BaseAgent(ABC):
         self.context = context
 
     @abstractmethod
-    def step(self, *args, **kwargs):
-        """Agent 的主要逻辑，每次环境更新时调用"""
+    def reward(self, *args, **kwargs):
+        """Agent 计算自身的reward"""
         pass
+
     @abstractmethod
     def sample(self, *args, **kwargs):
         """Agent 采样"""

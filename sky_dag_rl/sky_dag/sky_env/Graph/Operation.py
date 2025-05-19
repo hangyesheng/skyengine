@@ -1,6 +1,6 @@
 from typing import List, Optional, Tuple
 
-from sky_dag.sky_env.Graph.Machine import Machine
+from .Machine import Machine
 
 class Operation:
 
