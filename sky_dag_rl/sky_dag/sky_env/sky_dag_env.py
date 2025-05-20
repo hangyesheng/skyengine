@@ -85,7 +85,8 @@ class SkyDagEnv(ParallelEnv):
         # === 0. Agent 决策动作（支持 Job 或 Central）===
         decision, step_time = self.agent.sample(self.agvs, self.machines,
                                                 self.jobs)  # type: List[Tuple[AGV, Operation, Machine]], float
-
+        print(step_time)
+        print(decision)
         # === 1. 处理 EventQueue 中的事件 ===
         # todo 第一阶段暂时没用到event
         current_event_list = self.event_queue.pop_ready_events(self.env_timeline)

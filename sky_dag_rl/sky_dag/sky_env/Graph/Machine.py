@@ -10,6 +10,8 @@ class Machine:
         :param y: 坐标 Y
         :param operation: 当前正在执行的操作
         """
+        # todo 状态转移需要实现
+
         self.id: int = machine_id
         self.x: float = x
         self.y: float = y
@@ -17,7 +19,14 @@ class Machine:
         self.operation: Optional[Operation] = operation
 
     def __repr__(self):
-        return f"<{self.__class__.__name__} id={self.agent_id} name={self.name}>"
+        return f"<{self.__class__.__name__} id={self.id}>"
+
+    def is_available(self):
+        op = self.get_operation()
+        if op is None:
+            return True
+        else:
+            return op.is_finished()
 
     def get_id(self) -> int:
         return self.id

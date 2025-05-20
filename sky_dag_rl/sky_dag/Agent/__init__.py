@@ -1,4 +1,4 @@
 from .BaseAgent import *
 from .GreedyAgent import *
-
-__all__ = ['BaseAgent', 'GreedyAgent']
+from .RandomAgent import *
+__all__ = ['BaseAgent', 'GreedyAgent','RandomAgent']
