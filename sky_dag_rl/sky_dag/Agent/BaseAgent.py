@@ -16,10 +16,11 @@ class BaseAgent(ABC):
         self.name = name or self.__class__.__name__
         self.agent_id = agent_id
         self.context = context
+        self.alive = True  # 是否在线
+        self.turns = 0  # 存活轮次
 
-    def set_context(self, context):
-        """设置上下文"""
-        self.context = context
+    def is_alive(self):
+        return self.alive
 
     @abstractmethod
     def reward(self, *args, **kwargs):
@@ -28,7 +29,13 @@ class BaseAgent(ABC):
 
     @abstractmethod
     def sample(self, *args, **kwargs):
-        """Agent 采样"""
+        """Agent 推理采样"""
         pass
+
+    @abstractmethod
+    def train(self, *args, **kwargs):
+        """Agent 训练"""
+        pass
+
     def __repr__(self):
         return f"<{self.__class__.__name__} id={self.agent_id} name={self.name}>"
