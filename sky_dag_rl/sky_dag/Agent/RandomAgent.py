@@ -1,3 +1,5 @@
+from cmd import PROMPT
+
 from .BaseAgent import BaseAgent
 from typing import List, Optional, Tuple
 from sky_dag_rl.sky_dag.sky_env.Graph.Machine import Machine
@@ -45,11 +47,13 @@ class RandomAgent(BaseAgent):
 
             for j in range(job.get_operation_count()):
                 op = job.get_operation(j)
-
+                # todo to fix 状态转移需要调整
+                print(op.get_status())
                 if op.get_status()!="ready":
                     continue
 
                 # 随机选择可处理当前操作的机器
+                # todo to fix 均为ready状态没有决策
                 valid_machines = [m for m in machines if op.is_machine_capable(m.id) and m.is_available()]
                 machine = random.choice(valid_machines) if valid_machines else None
 
@@ -67,8 +71,8 @@ class RandomAgent(BaseAgent):
         time_end = time.time()
         if cnt == len(jobs):
             self.alive=False
-            return [],0
-        return current_sample, time_end - time_start
+            return [],233
+        return current_sample, (time_end - time_start)*500+1
 
     def __repr__(self):
         return f"<{self.__class__.__name__} id={self.agent_id} name={self.name}>"

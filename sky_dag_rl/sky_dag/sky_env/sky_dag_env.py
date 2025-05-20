@@ -76,7 +76,8 @@ class SkyDagEnv(ParallelEnv):
                 f"Operation {operation.id}: AGV={agv.get_id()}, Machine={machine.get_id()}, Duration={operation.get_duration(machine.get_id())}")
 
         for machine in self.machines:
-            machine.work(final_time)
+            if machine.operation is not None:
+                machine.work(final_time)
             machine.set_timer(final_time)
         for agv in self.agvs:
             agv.set_timer(final_time)
@@ -84,7 +85,7 @@ class SkyDagEnv(ParallelEnv):
     def step(self, actions=None):
         # === 0. Agent 决策动作（支持 Job 或 Central）===
         decision, step_time = self.agent.sample(self.agvs, self.machines,
-                                                self.jobs)  # type: List[Tuple[AGV, Operation, Machine]], float
+                                                self.jobs)  # type: List[Tuple[Operation, AGV,  Machine]], float
         print(step_time)
         print(decision)
         # === 1. 处理 EventQueue 中的事件 ===
