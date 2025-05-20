@@ -18,6 +18,7 @@ class AGV:
         self.timer: float = 0.0
         self.velocity: float = velocity
         self.operation: Optional[Operation] = None
+        # todo 状态转移需要实现
 
     def __repr__(self):
         # 获取当前操作的名称（如果有）
@@ -135,6 +136,12 @@ class AGV:
 
         machine.work(final_time)
 
+    def is_available(self):
+        op = self.get_operation()
+        if op is None:
+            return True
+        else:
+            return op.is_finished()
 
 if __name__ == '__main__':
     k=10

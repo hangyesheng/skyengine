@@ -21,7 +21,8 @@ class Operation:
         self.mem_req = mem_req
 
         # operation本身的状态
-        self.state = "blocked"
+        # todo 状态转移需要实现
+        self.status = "blocked"
         self.progress = 0.0
         self.dependencies = []
         self.successors = []
@@ -33,7 +34,6 @@ class Operation:
         self.current_progress = 0  # 当前物品的加工进度
         self.current_start_time = None
 
-        self.status = None
 
     def __repr__(self):
         # 格式化持续时间列表（最多显示前3个）
@@ -57,7 +57,7 @@ class Operation:
             f"id={self.id} "
             f"time={self.process_time:.1f} "
             f"durations={durations_str} "
-            f"state={self.state} "
+            f"state={self.status} "
             f"progress={progress_str} "
             f"items={items_count} "
             f"node={assigned_node}>"
@@ -70,7 +70,7 @@ class Operation:
     def set_process_time(self, process_time: float) -> None:
         self.process_time = process_time
 
-    def is_machine_available(self, machine_id: int) -> bool:
+    def is_machine_capable(self, machine_id: int) -> bool:
         """
         :param machine_id: 要检查的机器 ID
         :return: 是否该操作可以在该机器上执行
@@ -114,6 +114,17 @@ class Operation:
     
     def set_current_machine(self, current_machine) -> None:
         self.current_machine = current_machine
+
+    def get_status(self):
+        # todo 修改为状态转移版本
+        if self.current_machine is None and not self.is_finished():
+            self.status = "ready"
+        elif self.current_machine is None:
+            self.status = "finished"
+        else:
+            self.status = "running"
+        return self.status
+
 
     def add_dependency(self, op):
         """

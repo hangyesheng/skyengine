@@ -65,7 +65,7 @@ class Job:
         """
         self.target_count+=1
 
-    def get_job_status(self):
+    def is_finished(self):
         """
         计算当前Job是否已经完成
         """

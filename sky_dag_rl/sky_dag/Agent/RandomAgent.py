@@ -3,6 +3,7 @@ from typing import List, Optional, Tuple
 from sky_dag_rl.sky_dag.sky_env.Graph.Machine import Machine
 from sky_dag_rl.sky_dag.sky_env.Graph.Operation import Operation
 from sky_dag_rl.sky_dag.sky_env.Graph.AGV import AGV
+
 import time
 import random
 
@@ -36,13 +37,20 @@ class RandomAgent(BaseAgent):
         time_start = time.time()
         current_sample = []
 
+        cnt =0
         for i, job in enumerate(jobs):
-            selected_machine = None
+            if job.is_finished():
+                cnt+=1
+                continue
+
             for j in range(job.get_operation_count()):
                 op = job.get_operation(j)
 
+                if op.get_status()!="ready":
+                    continue
+
                 # 随机选择可处理当前操作的机器
-                valid_machines = [m for m in machines if op and m.can_process(op)]
+                valid_machines = [m for m in machines if op.is_machine_capable(m.id) and m.is_available()]
                 machine = random.choice(valid_machines) if valid_machines else None
 
                 # 随机选择可用AGV（考虑当前是否正在运输）
@@ -51,21 +59,15 @@ class RandomAgent(BaseAgent):
 
                 # 如果有机器和AGV则分配任务
                 if agv and op and machine:
-                    # 记录前一个操作的位置用于计算运输时间
-                    prev_location = selected_machine.get_id() if selected_machine else None
-
-                    # 更新AGV状态
-                    transport_time = self.calculate_transport_time(prev_location, machine.get_id())
-                    agv.assign_task(op, transport_time)
-
-                    # 更新机器状态
-                    process_time = op.get_duration(machine.get_id())
-                    machine.add_occupation(agv.available_time, process_time)
-                    selected_machine = machine
-
-                current_sample.append((op, agv, machine))
+                    # 都存在 添加该op的调度
+                    current_sample.append((op, agv, machine))
+                else:
+                    continue
 
         time_end = time.time()
+        if cnt == len(jobs):
+            self.alive=False
+            return [],0
         return current_sample, time_end - time_start
 
     def __repr__(self):
