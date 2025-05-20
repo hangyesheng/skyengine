@@ -60,6 +60,13 @@ class Job:
 
     def update_target_count(self):
         """
+        流数据
         在最后一个 Operation 完成处理后调用，用于统计任务完成度。
         """
         self.target_count+=1
+
+    def get_job_status(self):
+        """
+        计算当前Job是否已经完成
+        """
+        return self.operations[self.get_operation_count()-1].is_finished()

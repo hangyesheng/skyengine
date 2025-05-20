@@ -38,6 +38,10 @@ class GreedyAgent(BaseAgent):
         """Agent 计算自身的reward"""
         pass
 
+    def train(self, *args, **kwargs):
+        """GreedyAgent 不需训练"""
+        pass
+
     def sample(self, agvs, machines, jobs):
         """
         返回本次采样结果
