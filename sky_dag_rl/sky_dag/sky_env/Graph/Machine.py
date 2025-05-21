@@ -46,14 +46,16 @@ class Machine:
     def set_operation(self, operation: Optional[Operation]) -> None:
         self.operation = operation
 
-    def work(self, final_time: float) -> None:
+    def work(self, final_time: float) -> bool:
         if self.operation is not None:
+            if self.operation.get_status() != "running":
+                return False
             duration = self.operation.get_duration(self.id)
             work_time: float = duration - self.operation.process_time
             if self.timer + work_time > final_time:
                 self.operation.process_time += final_time - self.timer
                 self.set_timer(final_time)
-                return
+                return False
 
             self.timer += work_time
             self.operation.set_process_time(duration)
@@ -64,5 +66,7 @@ class Machine:
             self.operation = self.operation.get_next_operation()
             if self.operation is not None:
                 self.operation.set_current_machine(self)
+            return True
         else:
             print(f"Machine {self.id} is idle")
+            return False
