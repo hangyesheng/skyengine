@@ -1,9 +1,9 @@
 from pettingzoo import ParallelEnv
 
 
-class SkyDagEnvironment(ParallelEnv):
+class PacketFactoryEnvironment(ParallelEnv):
     metadata = {
-        "name": "sky_dag_v0",
+        "name": "packet_factory_vi",
     }
 
     def __init__(self):

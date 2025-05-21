@@ -5,12 +5,12 @@
 @Author  ：Skyrim
 @Date    ：2025/5/19 11:13 
 '''
-from sky_dag_rl.sky_dag import sky_dag_v0  # 替换为你的环境文件名
+from sky_simulator.packet_factory import packet_factory_v0  # 替换为你的环境文件名
 
 # 创建环境与智能体
 # greedy_Agent = sky_dag_v0.GreedyAgent(name='sky', agent_id='1')
-random_Agent = sky_dag_v0.RandomAgent(name='sky', agent_id='1')
-env = sky_dag_v0.SkyDagEnv(agent=random_Agent)
+random_Agent = packet_factory_v0.RandomAgent(name='sky', agent_id='1')
+env = packet_factory_v0.PacketFactoryEnv(agent=random_Agent)
 
 # 重置环境
 observations = env.reset()

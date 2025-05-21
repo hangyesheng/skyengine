@@ -3,20 +3,25 @@ from typing import Union, List, Tuple
 from pettingzoo import ParallelEnv
 import numpy as np
 
-from sky_dag_rl.sky_dag.Agent import BaseAgent
-from sky_dag_rl.sky_dag.sky_env.Graph.Machine import Machine
-from sky_dag_rl.sky_dag.sky_env.Graph.Operation import Operation
-from sky_dag_rl.sky_dag.sky_env.Graph.AGV import AGV
-from sky_dag_rl.sky_dag.sky_env.Utils import util
-from sky_dag_rl.sky_dag.sky_env.Event.Event import Event, EventQueue
+from sky_simulator.packet_factory.Agent import BaseAgent
+from sky_simulator.packet_factory.packet_factory_env.Graph.Machine import Machine
+from sky_simulator.packet_factory.packet_factory_env.Graph.Operation import Operation
+from sky_simulator.packet_factory.packet_factory_env.Graph.AGV import AGV
+from sky_simulator.packet_factory.packet_factory_env.Utils import util
+from sky_simulator.packet_factory.packet_factory_env.Event.Event import Event, EventQueue
 
 
-class SkyDagEnv(ParallelEnv):
-    metadata = {"render_modes": ["human"], "name": "sky_dag_env"}
+class PacketFactoryEnv(ParallelEnv):
+    metadata = {"render_modes": ["human"], "name": "packet_factory_env"}
 
     def __init__(self,
                  agent: BaseAgent = None,
                  ):
+
+        # 物料仓库与目标存储仓库
+        self.source=[]
+        self.destination=[]
+
         # 系统状态
         self.jobs = []
         self.machines = []

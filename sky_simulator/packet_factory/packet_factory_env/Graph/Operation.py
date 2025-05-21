@@ -1,6 +1,6 @@
 from typing import List, Optional, Tuple
+from .util import OperationStatus
 
-# from .Machine import Machine
 
 class Operation:
 
@@ -16,7 +16,7 @@ class Operation:
         self.next_operation: Optional['Operation'] = None
         self.current_machine = None
         self.finished = False
-        self.status = "ready"
+        self.status: OperationStatus = OperationStatus.WAITING
 
         self.cpu_req = cpu_req
         self.mem_req = mem_req
@@ -32,7 +32,6 @@ class Operation:
         self.processed_item_list = []
         self.current_progress = 0  # 当前物品的加工进度
         self.current_start_time = None
-
 
     def __repr__(self):
         # 格式化持续时间列表（最多显示前3个）
@@ -62,7 +61,6 @@ class Operation:
             # f"node={assigned_node}>"
         )
 
-
     def get_process_time(self) -> float:
         return self.process_time
 
@@ -89,13 +87,13 @@ class Operation:
                 return duration
         print(f"Operation {self.id}: Machine {machine_id} not found")
         return 0.0
-    
+
     def is_finished(self) -> bool:
         """
         :return: 该操作是否完成
         """
         return self.finished
-    
+
     def set_finished(self, finished: bool) -> None:
         """
         :param finished: 该操作是否完成
@@ -110,69 +108,20 @@ class Operation:
 
     def get_current_machine(self):
         return self.current_machine
-    
+
     def set_current_machine(self, current_machine) -> None:
         self.current_machine = current_machine
 
-    def get_status(self):
+    def get_status(self) -> OperationStatus:
         return self.status
-    
-    def set_status(self, status):
+
+    def set_status(self, status: OperationStatus):
         self.status = status
-
-
-    def add_dependency(self, op):
-        """
-        添加依赖节点
-        :param op:
-        :return:
-        """
-        self.dependencies.append(op)
-
-    def add_successor(self, op):
-        """
-        添加依赖节点
-        :param op:
-        :return:
-        """
-        self.successors.append(op)
 
     def is_ready(self):
         return all(dep.state == "finished" for dep in self.dependencies)
 
     # ----------正常运行阶段----------
-    def get_feature(self):
-        return {
-            "id": self.id,
-            "state": self.state,
-            "cpu": self.cpu_req,
-            "mem": self.mem_req,
-            "processed_item_list": self.processed_item_list,
-            "assigned_node": self.assigned_node.id if self.assigned_node else None
-        }
-    
-    def pause(self):
-        """
-        暂停operation运行
-        :return:
-        """
-        self.state = "paused"
-        self.save_status()
-
-    def resume(self):
-        """
-        重启运行
-        :return:
-        """
-        self.state = self.load_status()
-
-    def fail(self):
-        """
-        operation报错
-        :return:
-        """
-        self.state = "fail"
-
     def step(self, node_speed, env_time, packet=None, error_chance=0.0):
         """
         Operation 的执行周期逻辑。
@@ -226,7 +175,6 @@ class Operation:
         # 空闲状态，等待下一轮调度
         if self.state == "ready":
             return False
-
 
     def check_dependencies(self):
         """
