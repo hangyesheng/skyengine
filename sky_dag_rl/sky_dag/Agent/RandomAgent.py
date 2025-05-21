@@ -39,17 +39,17 @@ class RandomAgent(BaseAgent):
         time_start = time.time()
         current_sample = []
 
-        cnt =0
+        cnt: int = 0
         for i, job in enumerate(jobs):
             if job.is_finished():
-                cnt+=1
+                cnt += 1
                 continue
 
             for j in range(job.get_operation_count()):
                 op: Operation = job.get_operation(j)
                 if op.get_status() != "ready":
+                    print(f"Operation id={op.id} status={op.get_status()} is_finished={op.is_finished()}")
                     continue
-
 
                 # 随机选择可处理当前操作的机器
                 # todo to fix 均为ready状态没有决策
@@ -68,9 +68,10 @@ class RandomAgent(BaseAgent):
                     continue
 
         time_end = time.time()
+        print(f"Finished jobs: {cnt}")
         if cnt == len(jobs):
-            self.alive=False
-            return [],233
+            self.alive = False
+            return [],0
         return current_sample, (time_end - time_start)*500+1
 
     def __repr__(self):

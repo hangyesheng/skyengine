@@ -68,7 +68,7 @@ class SkyDagEnv(ParallelEnv):
             agv.todo_queue_push(("unload", machine))
 
             print(
-                f"Operation {operation.id}: AGV={agv.get_id()}, Machine={machine.get_id()}, Duration={operation.get_duration(machine.get_id())}")
+                f"Operation {operation.id}: AGV={agv.get_id()}, Machine={machine.get_id()}")
 
         for machine in self.machines:
             if machine.get_operation() is not None:

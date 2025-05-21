@@ -88,8 +88,10 @@ class AGV:
 
         self.set_xy(mx, my)
         self.timer += travel_time
-        if not machine_operation.is_finished():
-            machine.work(final_time)
+        if machine_operation.get_status() == "running":
+            success: bool = machine.work(final_time)
+            if not success:
+                return False
         self.timer = max(self.timer, machine.get_timer())
 
         if machine_operation.is_finished():
@@ -129,8 +131,11 @@ class AGV:
             self.operation.set_current_machine(machine)
             self.set_operation(None)
         else:
-            if not machine_operation.is_finished():
-                machine.work(final_time)
+            if machine_operation.get_status() == "running":
+                success: bool = machine.work(final_time)
+                if not success:
+                    return False
+            
             machine.set_timer(max(machine.get_timer(), self.timer))
             if machine_operation.is_finished():
                 machine_operation.set_current_machine(None)
