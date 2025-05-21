@@ -1,6 +1,8 @@
-from typing import Optional, Tuple
+from typing import Optional, Tuple, List
 
 from .Operation import Operation
+from .util import OperationStatus, MachineStatus
+
 
 class Machine:
     def __init__(self, machine_id: int, x: float, y: float, operation: Optional[Operation]):
@@ -18,9 +20,14 @@ class Machine:
         self.timer: float = 0.0
         self.operation: Optional[Operation] = operation
 
+        self.status: MachineStatus = MachineStatus.READY
+        # 缓存的Operation
+        self.todo_queue: List[Operation] = []
+
     def __repr__(self):
         return f"<{self.__class__.__name__} id={self.id}>"
 
+    # ---------- 模拟Machine运行 ----------
     def is_available(self):
         op = self.get_operation()
         if op is None:
@@ -46,6 +53,12 @@ class Machine:
     def set_operation(self, operation: Optional[Operation]) -> None:
         self.operation = operation
 
+    def get_status(self) -> MachineStatus:
+        return self.status
+
+    def set_status(self, status: MachineStatus):
+        self.status = status
+
     def work(self, final_time: float) -> bool:
         if self.operation is not None:
             if self.operation.get_status() != "running":
@@ -61,7 +74,7 @@ class Machine:
             self.operation.set_process_time(duration)
             self.operation.set_finished(True)
             self.operation.set_status("finished")
-            
+
             self.operation.set_current_machine(None)
             self.operation = self.operation.get_next_operation()
             if self.operation is not None:
@@ -70,3 +83,7 @@ class Machine:
         else:
             print(f"Machine {self.id} is idle")
             return False
+
+    # ---------- 模拟异常事件 ----------
+    def machine_fail(self):
+        self.status=MachineStatus.FAILED

@@ -1,8 +1,10 @@
 from typing import Optional, Tuple, List
 import math
 
-from sky_dag_rl.sky_dag.sky_env.Graph.Operation import Operation
-from sky_dag_rl.sky_dag.sky_env.Graph.Machine import Machine
+from util import AGVStatus,OperationStatus
+from sky_simulator.packet_factory.packet_factory_env.Graph.Operation import Operation
+from sky_simulator.packet_factory.packet_factory_env.Graph.Machine import Machine
+
 
 class AGV:
     def __init__(self, id_: int, x: float, y: float, velocity: float):
@@ -19,6 +21,8 @@ class AGV:
         self.velocity: float = velocity
         self.operation: Optional[Operation] = None
         self.todo_queue: List[Tuple[str, Machine | Operation]] = []
+
+        self.status = AGVStatus.READY
 
     def __repr__(self):
         # 获取当前操作的名称（如果有）
@@ -46,7 +50,7 @@ class AGV:
 
     def get_timer(self) -> float:
         return self.timer
-    
+
     def set_timer(self, timer: float) -> None:
         self.timer = timer
 
@@ -56,56 +60,60 @@ class AGV:
     def set_operation(self, operation: Optional[Operation]) -> None:
         self.operation = operation
         if operation is not None:
-            operation.set_status("running")
+            operation.set_status(OperationStatus.MOVING)
+        else:
+            print(f"Operation clear.")
+
+    def get_status(self) -> AGVStatus:
+        return self.status
+
+    def set_status(self, status: AGVStatus):
+        self.status = status
 
     def dist(self, target_x: float, target_y: float) -> float:
         dx = self.x - target_x
         dy = self.y - target_y
         return math.sqrt(dx * dx + dy * dy)
 
+    # ---------- ready态使用 ----------
     def load(self, machine: Machine, final_time: float) -> bool:
-        if self.operation is not None:
+        """
+        从machine上获得对应的operation
+        """
+        # if self.operation is not None:
+        if self.status != AGVStatus.READY:
             print(f"AGV id={self.id} is already loading an operation id={self.operation}")
             return False
+
         machine_operation: Optional[Operation] = machine.get_operation()
         if machine_operation is None:
             print(f"Machine id={machine.id} is not loaded")
             return False
-        
-        mx, my = machine.get_xy()
-        distance = self.dist(mx, my)
-        travel_time = distance / self.velocity
 
-        if self.get_timer() + travel_time > final_time:
-            agv_x, agv_y = self.get_xy()
-            dx: float = mx - agv_x
-            dy: float = my - agv_y
-            agv_x = agv_x + dx * (final_time - self.get_timer()) / travel_time
-            agv_y = agv_y + dy * (final_time - self.get_timer()) / travel_time
-            self.set_xy(agv_x, agv_y)
-            self.set_timer(final_time)
-            return False
+        self.heading(machine,final_time)
 
-        self.set_xy(mx, my)
-        self.timer += travel_time
-        if machine_operation.get_status() == "running":
+        # if machine_operation.get_status() == "running":
+        if machine_operation.get_status()==OperationStatus.WORKING:
             success: bool = machine.work(final_time)
             if not success:
                 return False
         self.timer = max(self.timer, machine.get_timer())
 
-        if machine_operation.is_finished():
+        # if machine_operation.is_finished():
+        if machine_operation.get_status()==OperationStatus.FINISHED:
+            # 上个阶段结束顺利获得物料
+            self.set_status(AGVStatus.MOVING)
             self.set_operation(machine_operation)
             machine_operation.set_current_machine(None)
             machine.set_operation(None)
 
         return True
 
-    def unload(self, machine: Machine, final_time: float) -> bool:
-        if self.operation is None:
-            print(f"AGV id={self.id} is not loaded")
+    # ---------- ready和moving态使用 ----------
+    def heading(self, machine: Machine, final_time: float) -> bool:
+        if self.status != AGVStatus.READY or self.status != AGVStatus.MOVING:
+            print(f"AGV id={self.id} can't go to machine={machine.id}")
             return False
-
         mx, my = machine.get_xy()
         distance = self.dist(mx, my)
         travel_time = distance / self.velocity
@@ -122,6 +130,18 @@ class AGV:
 
         self.set_xy(mx, my)
         self.timer += travel_time
+
+    # ---------- moving态使用 ----------
+    def unload(self, machine: Machine, final_time: float) -> bool:
+        """
+        将AGV上的operation卸载到对应machine上
+        """
+        # if self.operation is None:
+        if self.status is not AGVStatus.MOVING:
+            print(f"AGV id={self.id} is not loaded")
+            return False
+
+        self.heading(machine, final_time)
 
         machine_operation: Optional[Operation] = machine.get_operation()
 
@@ -130,42 +150,40 @@ class AGV:
             machine.set_operation(self.operation)
             self.operation.set_current_machine(machine)
             self.set_operation(None)
+            self.set_status(AGVStatus.READY)
         else:
-            if machine_operation.get_status() == "running":
+            if machine_operation.get_status() == OperationStatus.WORKING:
                 success: bool = machine.work(final_time)
                 if not success:
                     return False
-            
+
             machine.set_timer(max(machine.get_timer(), self.timer))
-            if machine_operation.is_finished():
+            # if machine_operation.is_finished():
+            if machine_operation.get_status() == OperationStatus.FINISHED:
                 machine_operation.set_current_machine(None)
                 machine.set_operation(self.operation)
                 self.operation.set_current_machine(machine)
                 self.set_operation(machine_operation)
 
         machine.work(final_time)
-        
+
         return True
 
     def is_available(self):
-        op = self.get_operation()
-        if op is None:
-            return True
-        else:
-            return False
-        
+        return self.status == AGVStatus.READY
+
     def todo_queue_push(self, todo: Tuple[str, Machine | Operation]):
         self.todo_queue.append(todo)
 
-    def todo_queue_pop(self)-> Optional[Tuple[str, Machine | Operation]]:
+    def todo_queue_pop(self) -> Optional[Tuple[str, Machine | Operation]]:
         if len(self.todo_queue) == 0:
             return None
         else:
             return self.todo_queue.pop(0)
-        
+
     def todo_queue_is_empty(self):
-            return len(self.todo_queue) == 0
-    
+        return len(self.todo_queue) == 0
+
     def work(self, final_time: float):
         while not self.todo_queue_is_empty():
             todo = self.todo_queue[0]
@@ -194,7 +212,7 @@ class AGV:
                 raise ValueError(f"Invalid todo type: {todo}")
 
 if __name__ == '__main__':
-    k=10
+    k = 10
     agvs = []
     for i in range(k):
         x = float(1)
