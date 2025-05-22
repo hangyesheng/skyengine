@@ -20,8 +20,8 @@ class PacketFactoryEnv(ParallelEnv):
                  ):
 
         # 物料仓库与目标存储仓库
-        self.source=[]
-        self.destination=[]
+        self.source = []
+        self.destination = []
 
         # 系统状态
         self.jobs = []
@@ -33,7 +33,7 @@ class PacketFactoryEnv(ParallelEnv):
         self.event_queue = EventQueue()
 
         self.limit = 200
-        self.critic_vector = []  # 评价指标
+        self.critic_vector = {}  # 评价指标
         # self.reward = {}  # 每个Agent的奖励
         # self.terminations = {}  # 是否完成任务
         # self.truncations = {}  # 智能体是否提前截断
@@ -53,6 +53,7 @@ class PacketFactoryEnv(ParallelEnv):
         刷新当前环境的graph和agv
         :return:
         """
+        # todo 修改为yaml数据读取
         self.jobs, self.machines, self.agvs = util.read_agv_instance_data("/brandimarte/simple_agv.txt")
         LOGGER.info("Environment Initialized Successfully.")
 
@@ -78,7 +79,7 @@ class PacketFactoryEnv(ParallelEnv):
 
         # ---------- 分配调度策略 ----------
         for operation, agv, machine in actions:
-            agv.work(action=(operation,machine))
+            agv.work(action=(operation, machine))
 
         # ---------- 执行调度策略 ----------
         for agv in self.agvs:
@@ -86,38 +87,41 @@ class PacketFactoryEnv(ParallelEnv):
             agv.work(final_time)
             agv.set_timer(final_time)
 
-        # ---------- 查看状态 ----------
-        self.render_observation()
-
-    def step(self, actions=None):
-        LOGGER.info(f"--------- 当前循环步为{self.env_timeline} ---------")
-        # === 0. Agent 决策动作（支持 Job 或 Central）===
-        decisions, step_time = self.agent.sample(self.agvs, self.machines,
-                                                self.jobs)  # type: List[Tuple[Operation, AGV,  Machine]], float
-        LOGGER.info(f"step_time: {step_time}")
-        LOGGER.info(f"decisions: {decisions}")
-
+        # todo 添加不确定事件
         # === 1. 处理 EventQueue 中的事件 ===
         # todo 第一阶段暂时没用到event
         current_event_list = self.event_queue.pop_ready_events(self.env_timeline)
         self.deal_event(current_event_list)
 
+        # ---------- 查看状态 ----------
+        self.render_observation()
+
+    def step(self, actions=None):
+        LOGGER.info(f"--------- 当前循环步为{self.env_timeline} ---------")
+        # === 0. Agent 决策动作（支持 Job 或 Central）=== todo Agent + action 放到外面
+        decisions, step_time = self.agent.sample(self.agvs, self.machines,
+                                                 self.jobs)  # type: List[Tuple[Operation, AGV,  Machine]], float
+        LOGGER.info(f"step_time: {step_time}")
+        LOGGER.info(f"decisions: {decisions}")
+
         # === 2. 提取state,发送给状态转移函数并返回 ===
-        self.env_step(decisions, step_time)
+        while True:
+            if self.env_step(decisions, step_time):
+                # todo
+                break
 
         # === 3. 统计完成状态，计算奖励 ===
         # todo 计算状态/动作完成reward计算
-        rewards = {self.agent.agent_id: self.agent.reward()}
+        rewards = {self.agent.agent_id: self.agent.reward(self.critic_vector)}
         terminations = {self.agent}
-        truncations = {self.agent}
 
-        # === 4. 处理全局时间 ===
+        # === 4. 处理全局时间 === todo 累加时间
         self.env_timeline += step_time
 
         obs = self._get_obs()
         LOGGER.info(f"--------- 结束当前循环步为 ---------")
 
-        return obs, rewards, terminations, truncations, {}
+        return obs, rewards, terminations, {}, {}
 
     def _get_obs(self):
         """
