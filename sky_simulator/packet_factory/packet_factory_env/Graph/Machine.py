@@ -13,7 +13,6 @@ class Machine:
         :param y: 坐标 Y
         :param operation: 当前正在执行的操作
         """
-        # todo 状态转移需要实现
 
         self.id: int = machine_id
         self.x: float = x
@@ -62,22 +61,24 @@ class Machine:
         self.status = status
 
     def work(self, final_time: float) -> bool:
-        if self.operation is not None:
+        # if self.operation is not None:
+        if self.get_status() == MachineStatus.READY:
             if self.operation.get_status() != "running":
                 return False
+
             duration = self.operation.get_duration(self.id)
             work_time: float = duration - self.operation.process_time
             if self.timer + work_time > final_time:
                 self.operation.process_time += final_time - self.timer
                 self.set_timer(final_time)
                 return False
-
             self.timer += work_time
-            self.operation.set_process_time(duration)
-            self.operation.set_finished(True)
-            self.operation.set_status("finished")
 
+            self.operation.set_process_time(duration)
+            self.operation.set_status(OperationStatus.FINISHED)
             self.operation.set_current_machine(None)
+            self.operation.get_next_operation().set_status(OperationStatus.READY)
+
             self.operation = self.operation.get_next_operation()
             if self.operation is not None:
                 self.operation.set_current_machine(self)
