@@ -44,10 +44,12 @@ class MachineStatus(Enum):
 
 
 class JobStatus(Enum):
+    # 该Job未开始
+    B4START = 0
     # 该Job是否已经开始
-    STARTED = 0
+    STARTED = 1
     # 该Job是否已经结束
-    FINISHED = 1
+    FINISHED = 2
 
     # 意外状态
     EXCEPTION = 99
