@@ -8,6 +8,7 @@ from sky_simulator.packet_factory.packet_factory_env.Graph.Node import Node
 from sky_simulator.packet_factory.packet_factory_env.Graph.AGV import AGV
 from sky_simulator.packet_factory.packet_factory_env.Graph.Operation import Operation
 from sky_simulator.packet_factory.packet_factory_env.Graph.Job import Job
+from sky_simulator.packet_factory.packet_factory_env.Graph.util import OperationStatus
 import dataset
 
 
@@ -41,7 +42,7 @@ def read_agv_instance_data(relative_file_path="/brandimarte/mk01_agv.txt"):
                 duration = float(data[idx])
                 idx += 1
                 durations.append((machine_id, duration))
-            operations.append(Operation(operation_count, 0.0, durations))
+            operations.append(Operation(operation_count, OperationStatus.WAITING, durations))
             operation_count += 1
         jobs.append(Job(job_id, operations))
 

@@ -74,6 +74,12 @@ class AGV:
         dx = self.x - target_x
         dy = self.y - target_y
         return math.sqrt(dx * dx + dy * dy)
+    
+    def load_from_warehouse(self, operation: Operation):
+        self.set_operation(operation)
+        self.status = AGVStatus.LOADED
+
+
 
     # ---------- ready态使用 ----------
     def load(self, machine: Machine, final_time: float) -> bool:
@@ -90,12 +96,12 @@ class AGV:
             LOGGER.info(f"Machine id={machine.id} is not loaded")
             return False
 
-        if not self.heading(machine,final_time):
+        if not self.heading(machine, final_time):
             return False
 
         self.timer = max(self.timer, machine.get_timer())
 
-        if machine.get_status()==MachineStatus.FINISHED:
+        if machine.get_status() == MachineStatus.FINISHED:
             # 上个阶段结束顺利获得物料
             self.set_status(AGVStatus.MOVING)
             self.set_operation(machine_operation)
@@ -106,9 +112,9 @@ class AGV:
 
     # ---------- moving和loaded态使用 ----------
     def heading(self, machine: Machine, final_time: float) -> bool:
-        if self.status != AGVStatus.READY or self.status != AGVStatus.MOVING:
-            LOGGER.info(f"AGV id={self.id} can't go to machine={machine.id}")
-            return False
+        # if self.status != AGVStatus.READY or self.status != AGVStatus.MOVING:
+        #     LOGGER.info(f"AGV id={self.id} can't go to machine={machine.id}")
+        #     return False
         mx, my = machine.get_xy()
         distance = self.dist(mx, my)
         travel_time = distance / self.velocity
@@ -145,6 +151,7 @@ class AGV:
         if machine_operation is None:
             machine.set_operation(self.operation)
             self.operation.set_current_machine(machine)
+            self.operation.set_status(OperationStatus.WORKING)
             self.set_operation(None)
             self.set_status(AGVStatus.READY)
         else:
@@ -152,6 +159,7 @@ class AGV:
                 machine_operation.set_current_machine(None)
                 machine.set_operation(self.operation)
                 self.operation.set_current_machine(machine)
+                self.operation.set_status(OperationStatus.WORKING)
                 self.set_operation(machine_operation)
                 # todo 修改为machine缓存版本
 
@@ -185,7 +193,7 @@ class AGV:
                 operation = todo[1]
                 last_machine = operation.get_current_machine()
                 if last_machine is None:
-                    self.set_operation(operation)
+                    self.load_from_warehouse(operation)
                     self.todo_queue_pop()
                 else:
                     if self.load(last_machine, final_time):

@@ -6,6 +6,7 @@ from sky_simulator.packet_factory.packet_factory_env.Graph.Machine import Machin
 from sky_simulator.packet_factory.packet_factory_env.Graph.Operation import Operation
 from sky_simulator.packet_factory.packet_factory_env.Graph.AGV import AGV
 from sky_simulator.packet_factory.packet_factory_env.Utils.logger import LOGGER
+from sky_simulator.packet_factory.packet_factory_env.Graph.util import OperationStatus
 
 import time
 import random
@@ -48,9 +49,9 @@ class RandomAgent(BaseAgent):
 
             for j in range(job.get_operation_count()):
                 op: Operation = job.get_operation(j)
-                if op.get_status() != "ready":
-                    LOGGER.info(f"Operation id={op.id} status={op.get_status()} is_finished={op.is_finished()}")
+                if op.get_status() != OperationStatus.READY:
                     continue
+                LOGGER.info(f"Operation id={op.id} status={op.get_status()} is_finished={op.is_finished()}")
 
                 # 随机选择可处理当前操作的机器
                 # todo to fix 均为ready状态没有决策
