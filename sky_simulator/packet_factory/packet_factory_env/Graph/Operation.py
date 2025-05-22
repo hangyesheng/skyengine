@@ -1,18 +1,18 @@
 from typing import List, Optional, Tuple
 from .util import OperationStatus
 from sky_simulator.packet_factory.packet_factory_env.Utils.logger import LOGGER
-
+from sky_simulator.packet_factory.packet_factory_env.Graph.util import OperationStatus
 
 class Operation:
 
-    def __init__(self, op_id: int, process_time: float, durations: List[Tuple[int, float]], cpu_req=0, mem_req=0):
+    def __init__(self, op_id: int, status: OperationStatus, durations: List[Tuple[int, float]], cpu_req=0, mem_req=0):
         """
         :param process_time: 操作的处理时间
         :param durations: 列表，每个元素是 (machine_id, duration) 表示该机器上执行所需时间
         """
         # operation本身的属性
         self.id: int = op_id
-        self.process_time: float = process_time
+        self.process_time: float = 0
         self.durations: List[Tuple[int, float]] = durations
         self.next_operation: Optional['Operation'] = None
         self.current_machine = None

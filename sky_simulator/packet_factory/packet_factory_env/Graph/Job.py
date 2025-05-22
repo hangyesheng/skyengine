@@ -1,6 +1,7 @@
 from typing import List
 
 from .Operation import Operation
+from sky_simulator.packet_factory.packet_factory_env.Graph.util import OperationStatus
 
 class Job:
     def __init__(self, job_id: int, operations: List[Operation], target_count=None):
@@ -9,6 +10,7 @@ class Job:
         """
         self.id = job_id
         self.operations: List[Operation] = operations
+        self.operations[0].set_status(OperationStatus.READY)
         for i in range(len(self.operations)):
             if i + 1 < len(self.operations):
                 self.operations[i].set_next_operation(self.operations[i + 1])
