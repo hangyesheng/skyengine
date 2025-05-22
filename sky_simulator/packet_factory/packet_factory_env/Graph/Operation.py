@@ -1,5 +1,6 @@
 from typing import List, Optional, Tuple
 from .util import OperationStatus
+from sky_simulator.packet_factory.packet_factory_env.Utils.logger import LOGGER
 
 
 class Operation:
@@ -77,7 +78,7 @@ class Operation:
         for m_id, duration in self.durations:
             if m_id == machine_id:
                 return duration
-        print(f"Operation {self.id}: Machine {machine_id} not found")
+        LOGGER.info(f"Operation {self.id}: Machine {machine_id} not found")
         return 0.0
 
     def is_finished(self) -> bool:

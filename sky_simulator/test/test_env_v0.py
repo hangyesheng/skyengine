@@ -6,6 +6,7 @@
 @Date    ：2025/5/19 11:13 
 '''
 from sky_simulator.packet_factory import packet_factory_v0  # 替换为你的环境文件名
+from sky_simulator.packet_factory.packet_factory_env.Utils.logger import LOGGER
 
 # 创建环境与智能体
 # greedy_Agent = sky_dag_v0.GreedyAgent(name='sky', agent_id='1')
@@ -26,4 +27,4 @@ while random_Agent.is_alive():
     # 更新 done 状态
     done = terminations
 
-print(f"total makespan: {env.env_timeline}s")
+LOGGER.info(f"total makespan: {env.env_timeline}s")
