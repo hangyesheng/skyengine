@@ -1,6 +1,8 @@
 from typing import List
 
 from .Operation import Operation
+from .util import JobStatus, OperationStatus
+
 
 class Job:
     def __init__(self, job_id: int, operations: List[Operation], target_count=None):
@@ -9,13 +11,16 @@ class Job:
         """
         self.id = job_id
         self.operations: List[Operation] = operations
+
         for i in range(len(self.operations)):
             if i + 1 < len(self.operations):
                 self.operations[i].set_next_operation(self.operations[i + 1])
             else:
                 self.operations[i].set_next_operation(None)
+        if len(self.operations)>=1:
+            self.operations[0].set_status(OperationStatus.READY)
 
-                
+        self.status=JobStatus.B4START
         self.target_count = target_count  # 目标处理工件数，可选
 
     def __repr__(self):
@@ -52,21 +57,19 @@ class Job:
         assert index >= 0 and index < len(self.operations), "Invalid index"
 
         return self.operations[index]
+
     def add_operation(self, op):
         self.operations.append(op)
 
-    def get_target_count(self):
-        return self.target_count
+    def set_status(self, status: JobStatus):
+        self.status = status
 
-    def update_target_count(self):
-        """
-        流数据
-        在最后一个 Operation 完成处理后调用，用于统计任务完成度。
-        """
-        self.target_count+=1
+    def get_status(self):
+        return self.status
 
     def is_finished(self):
         """
         计算当前Job是否已经完成
         """
-        return self.operations[self.get_operation_count()-1].is_finished()
+        return self.status == JobStatus.FINISHED
+        # return self.operations[self.get_operation_count()-1].is_finished()
