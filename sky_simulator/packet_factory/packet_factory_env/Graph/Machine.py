@@ -22,7 +22,8 @@ class Machine:
 
         self.status: MachineStatus = MachineStatus.READY
         # 缓存的Operation
-        self.todo_queue: List[Operation] = []
+        self.input_queue: List[Operation] = []
+        self.output_queue: List[Operation] = []
 
     def __repr__(self):
         return f"<{self.__class__.__name__} id={self.id}>"

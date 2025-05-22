@@ -1,7 +1,7 @@
 from typing import Optional, Tuple, List
 import math
 
-from util import AGVStatus,OperationStatus
+from util import AGVStatus, OperationStatus, MachineStatus
 from sky_simulator.packet_factory.packet_factory_env.Graph.Operation import Operation
 from sky_simulator.packet_factory.packet_factory_env.Graph.Machine import Machine
 
@@ -90,17 +90,19 @@ class AGV:
             print(f"Machine id={machine.id} is not loaded")
             return False
 
-        self.heading(machine,final_time)
+        if not self.heading(machine,final_time):
+            return False
 
         # if machine_operation.get_status() == "running":
-        if machine_operation.get_status()==OperationStatus.WORKING:
-            success: bool = machine.work(final_time)
-            if not success:
-                return False
+        # if machine_operation.get_status()==OperationStatus.WORKING:
+        #     success: bool = machine.work(final_time)
+        #     if not success:
+        #         return False
         self.timer = max(self.timer, machine.get_timer())
 
         # if machine_operation.is_finished():
-        if machine_operation.get_status()==OperationStatus.FINISHED:
+        # if machine_operation.get_status()==OperationStatus.FINISHED:
+        if machine.get_status()==MachineStatus.FINISHED:
             # 上个阶段结束顺利获得物料
             self.set_status(AGVStatus.MOVING)
             self.set_operation(machine_operation)
@@ -109,7 +111,7 @@ class AGV:
 
         return True
 
-    # ---------- ready和moving态使用 ----------
+    # ---------- moving和loaded态使用 ----------
     def heading(self, machine: Machine, final_time: float) -> bool:
         if self.status != AGVStatus.READY or self.status != AGVStatus.MOVING:
             print(f"AGV id={self.id} can't go to machine={machine.id}")
@@ -130,6 +132,7 @@ class AGV:
 
         self.set_xy(mx, my)
         self.timer += travel_time
+        return True
 
     # ---------- moving态使用 ----------
     def unload(self, machine: Machine, final_time: float) -> bool:
@@ -137,34 +140,35 @@ class AGV:
         将AGV上的operation卸载到对应machine上
         """
         # if self.operation is None:
-        if self.status is not AGVStatus.MOVING:
+        if self.status is not AGVStatus.LOADED:
             print(f"AGV id={self.id} is not loaded")
             return False
 
-        self.heading(machine, final_time)
+        if not self.heading(machine,final_time):
+            return False
 
         machine_operation: Optional[Operation] = machine.get_operation()
 
         if machine_operation is None:
-            machine.set_timer(max(machine.get_timer(), self.timer))
             machine.set_operation(self.operation)
             self.operation.set_current_machine(machine)
             self.set_operation(None)
             self.set_status(AGVStatus.READY)
         else:
-            if machine_operation.get_status() == OperationStatus.WORKING:
-                success: bool = machine.work(final_time)
-                if not success:
-                    return False
-
-            machine.set_timer(max(machine.get_timer(), self.timer))
+            # if machine_operation.get_status() == OperationStatus.WORKING:
+            #     success: bool = machine.work(final_time)
+            #     if not success:
+            #         return False
             # if machine_operation.is_finished():
-            if machine_operation.get_status() == OperationStatus.FINISHED:
+            # if machine_operation.get_status() == OperationStatus.FINISHED:
+            if machine.get_status()==MachineStatus.FINISHED:
                 machine_operation.set_current_machine(None)
                 machine.set_operation(self.operation)
                 self.operation.set_current_machine(machine)
                 self.set_operation(machine_operation)
+                # todo 修改为machine缓存版本
 
+        machine.set_timer(max(machine.get_timer(), self.timer))
         machine.work(final_time)
 
         return True

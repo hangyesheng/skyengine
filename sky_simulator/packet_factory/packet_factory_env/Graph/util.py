@@ -20,22 +20,28 @@ class OperationStatus(Enum):
 class AGVStatus(Enum):
     # AGV可以运送Operation
     READY = 0
-    # AGV正在运行
+    # AGV正在运行(不含Operation)
     MOVING = 1
+    # AGV正在运行(含Operation)
+    LOADED = 2
 
     # 意外状态
     EXCEPTION = 99
+
 
 class MachineStatus(Enum):
     # 当前机器可以接收Operation
     READY = 0
     # 当前机器正在运行Operation
     WORKING = 1
+    # 该任务执行就绪
+    FINISHED = 2
     # 当前机器宕机
-    FAILED = 2
+    FAILED = 3
 
     # 意外状态
     EXCEPTION = 99
+
 
 class JobStatus(Enum):
     # 该Job是否已经开始
