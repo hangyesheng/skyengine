@@ -2,6 +2,7 @@ from typing import Optional, Tuple, List
 
 from .Operation import Operation
 from .util import OperationStatus, MachineStatus
+from sky_simulator.packet_factory.packet_factory_env.Utils.logger import LOGGER
 
 
 class Machine:
@@ -82,7 +83,7 @@ class Machine:
                 self.operation.set_current_machine(self)
             return True
         else:
-            print(f"Machine {self.id} is idle")
+            LOGGER.info(f"Machine {self.id} is idle")
             return False
 
     # ---------- 模拟异常事件 ----------

@@ -32,7 +32,7 @@ def main():
     import sys
     input = sys.stdin.read
     data = input().split()
-    print(data)
+    LOGGER.info(data)
     idx = 0
 
     n = int(data[idx])
@@ -101,16 +101,16 @@ def main():
                     if new_machine:
                         min_agv.unload(new_machine)
                         machine = new_machine
-            print(
+            LOGGER.info(
                 f"Job {i}, Operation {j}: AGV={min_agv.get_id() if min_agv else -1}, Machine={machine.get_id() if machine else -1}, Duration={op.get_duration(machine.get_id()) if op and machine else 0}")
 
             if machine:
                 total_timer = max(total_timer, machine.get_timer())
 
     for machine in machines:
-        print(f"Machine {machine.get_id()}: {machine.get_timer()}")
+        LOGGER.info(f"Machine {machine.get_id()}: {machine.get_timer()}")
 
-    print(f"total makespan: {total_timer:.5f}")
+    LOGGER.info(f"total makespan: {total_timer:.5f}")
 
 
 if __name__ == "__main__":

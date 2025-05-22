@@ -1,10 +1,10 @@
 from typing import Optional, Tuple, List
 import math
 
-from util import AGVStatus, OperationStatus, MachineStatus
+from .util import AGVStatus, OperationStatus, MachineStatus
 from sky_simulator.packet_factory.packet_factory_env.Graph.Operation import Operation
 from sky_simulator.packet_factory.packet_factory_env.Graph.Machine import Machine
-
+from sky_simulator.packet_factory.packet_factory_env.Utils.logger import LOGGER
 
 class AGV:
     def __init__(self, id_: int, x: float, y: float, velocity: float):
@@ -62,7 +62,7 @@ class AGV:
         if operation is not None:
             operation.set_status(OperationStatus.MOVING)
         else:
-            print(f"Operation clear.")
+            LOGGER.info(f"Operation clear.")
 
     def get_status(self) -> AGVStatus:
         return self.status
@@ -82,12 +82,12 @@ class AGV:
         """
         # if self.operation is not None:
         if self.status != AGVStatus.READY:
-            print(f"AGV id={self.id} is already loading an operation id={self.operation}")
+            LOGGER.info(f"AGV id={self.id} is already loading an operation id={self.operation}")
             return False
 
         machine_operation: Optional[Operation] = machine.get_operation()
         if machine_operation is None:
-            print(f"Machine id={machine.id} is not loaded")
+            LOGGER.info(f"Machine id={machine.id} is not loaded")
             return False
 
         if not self.heading(machine,final_time):
@@ -107,7 +107,7 @@ class AGV:
     # ---------- moving和loaded态使用 ----------
     def heading(self, machine: Machine, final_time: float) -> bool:
         if self.status != AGVStatus.READY or self.status != AGVStatus.MOVING:
-            print(f"AGV id={self.id} can't go to machine={machine.id}")
+            LOGGER.info(f"AGV id={self.id} can't go to machine={machine.id}")
             return False
         mx, my = machine.get_xy()
         distance = self.dist(mx, my)
@@ -134,7 +134,7 @@ class AGV:
         """
         # if self.operation is None:
         if self.status is not AGVStatus.LOADED:
-            print(f"AGV id={self.id} is not loaded")
+            LOGGER.info(f"AGV id={self.id} is not loaded")
             return False
 
         if not self.heading(machine,final_time):
@@ -178,7 +178,7 @@ class AGV:
     def work(self, final_time: float):
         while not self.todo_queue_is_empty():
             todo = self.todo_queue[0]
-            print(f"AGV id={self.id} current todo: {todo}")
+            LOGGER.info(f"AGV id={self.id} current todo: {todo}")
             if todo[0] == "load":
                 if type(todo[1]) != Operation:
                     raise ValueError(f"Invalid todo type: {todo}")

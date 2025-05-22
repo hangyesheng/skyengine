@@ -5,6 +5,7 @@ from typing import List, Optional, Tuple
 from sky_simulator.packet_factory.packet_factory_env.Graph.Machine import Machine
 from sky_simulator.packet_factory.packet_factory_env.Graph.Operation import Operation
 from sky_simulator.packet_factory.packet_factory_env.Graph.AGV import AGV
+from sky_simulator.packet_factory.packet_factory_env.Utils.logger import LOGGER
 
 import time
 import random
@@ -48,7 +49,7 @@ class RandomAgent(BaseAgent):
             for j in range(job.get_operation_count()):
                 op: Operation = job.get_operation(j)
                 if op.get_status() != "ready":
-                    print(f"Operation id={op.id} status={op.get_status()} is_finished={op.is_finished()}")
+                    LOGGER.info(f"Operation id={op.id} status={op.get_status()} is_finished={op.is_finished()}")
                     continue
 
                 # 随机选择可处理当前操作的机器
@@ -68,7 +69,7 @@ class RandomAgent(BaseAgent):
                     continue
 
         time_end = time.time()
-        print(f"Finished jobs: {cnt}")
+        LOGGER.info(f"Finished jobs: {cnt}")
         if cnt == len(jobs):
             self.alive = False
             return [],0

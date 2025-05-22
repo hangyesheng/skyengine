@@ -9,6 +9,7 @@ from sky_simulator.packet_factory.packet_factory_env.Graph.Operation import Oper
 from sky_simulator.packet_factory.packet_factory_env.Graph.AGV import AGV
 from sky_simulator.packet_factory.packet_factory_env.Utils import util
 from sky_simulator.packet_factory.packet_factory_env.Event.Event import Event, EventQueue
+from sky_simulator.packet_factory.packet_factory_env.Utils.logger import LOGGER
 
 
 class PacketFactoryEnv(ParallelEnv):
@@ -53,12 +54,12 @@ class PacketFactoryEnv(ParallelEnv):
         :return:
         """
         self.jobs, self.machines, self.agvs = util.read_agv_instance_data()
-        print("Environment Initialized Successfully.")
+        LOGGER.info("Environment Initialized Successfully.")
 
     def deal_event(self, event_list):
         for event in event_list:
             if event.event_type == "just_test":
-                print(event.payload)
+                LOGGER.info(event.payload)
             elif event.event_type == "task_finish":
                 op = event.payload
             elif event.event_type == "machine_fail":
@@ -76,7 +77,7 @@ class PacketFactoryEnv(ParallelEnv):
             agv.todo_queue_push(("load", operation))
             agv.todo_queue_push(("unload", machine))
 
-            print(
+            LOGGER.info(
                 f"Operation {operation.id}: AGV={agv.get_id()}, Machine={machine.get_id()}")
 
         for agv in self.agvs:
@@ -90,10 +91,9 @@ class PacketFactoryEnv(ParallelEnv):
         # === 0. Agent 决策动作（支持 Job 或 Central）===
         decisions, step_time = self.agent.sample(self.agvs, self.machines,
                                                 self.jobs)  # type: List[Tuple[Operation, AGV,  Machine]], float
-        print(f"step_time: {step_time}")
-        print(f"decisions: {decisions}")
-        
-        
+        LOGGER.info(f"step_time: {step_time}")
+        LOGGER.info(f"decisions: {decisions}")
+
         # === 1. 处理 EventQueue 中的事件 ===
         # todo 第一阶段暂时没用到event
         current_event_list = self.event_queue.pop_ready_events(self.env_timeline)
@@ -140,41 +140,41 @@ class PacketFactoryEnv(ParallelEnv):
 
     def render_env(self):
         # 展示环境状态
-        print(f"\n🌍 环境状态:")
-        print(f"  - 当前时间: {self.env_timeline}")
+        LOGGER.info(f"\n🌍 环境状态:")
+        LOGGER.info(f"  - 当前时间: {self.env_timeline}")
 
     def render_observation(self):
         # 展示作业、机器和AGV数量
-        print(f"\n📊 系统资源状态:")
-        print(f"  - 作业数量: {len(self.jobs)}")
-        print(f"  - 机器数量: {len(self.machines)}")
-        print(f"  - AGV数量: {len(self.agvs)}")
+        LOGGER.info(f"\n📊 系统资源状态:")
+        LOGGER.info(f"  - 作业数量: {len(self.jobs)}")
+        LOGGER.info(f"  - 机器数量: {len(self.machines)}")
+        LOGGER.info(f"  - AGV数量: {len(self.agvs)}")
 
     def render_event(self):
         # 展示事件队列
-        print(f"\n📋 事件队列 ({len(self.event_queue)} 个待处理事件):")
+        LOGGER.info(f"\n📋 事件队列 ({len(self.event_queue)} 个待处理事件):")
 
     def render_critic(self):
         # 展示critic向量
-        print(f"\n📈 Critic向量 ({len(self.critic_vector)} 维):")
+        LOGGER.info(f"\n📈 Critic向量 ({len(self.critic_vector)} 维):")
         if len(self.critic_vector) > 0:
             # 缩短长向量显示
             vec_display = np.array(self.critic_vector)
             if len(self.critic_vector) > 10:
                 vec_display = np.concatenate([vec_display[:5], [np.nan], vec_display[-5:]])
-            print(f"  {np.array2string(vec_display, precision=2, max_line_width=100)}")
+            LOGGER.info(f"  {np.array2string(vec_display, precision=2, max_line_width=100)}")
         else:
-            print("  Critic向量为空")
+            LOGGER.info("  Critic向量为空")
 
     def render_agent(self):
         # 展示智能体状态
-        print(f"\n🤖 智能体状态:")
+        LOGGER.info(f"\n🤖 智能体状态:")
         if hasattr(self.agent, 'name'):
-            print(f"  - 智能体名称: {self.agent.name}")
+            LOGGER.info(f"  - 智能体名称: {self.agent.name}")
         if hasattr(self.agent, 'step_count'):
-            print(f"  - 执行步数: {self.agent.step_count}")
+            LOGGER.info(f"  - 执行步数: {self.agent.step_count}")
         if hasattr(self.agent, 'epsilon'):
-            print(f"  - 探索率 (ε): {self.agent.epsilon:.4f}")
+            LOGGER.info(f"  - 探索率 (ε): {self.agent.epsilon:.4f}")
 
     def render(self):
         """可视化系统当前状态 功能拆分到不同函数中"""
