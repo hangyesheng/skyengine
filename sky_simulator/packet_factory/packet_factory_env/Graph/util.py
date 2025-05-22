@@ -21,7 +21,7 @@ class AGVStatus(Enum):
     # AGV可以运送Operation
     READY = 0
     # AGV正在运行(不含Operation)
-    MOVING = 1  #!!!!!!!!改成LOADING
+    ASSIGNED = 1
     # AGV正在运行(含Operation)
     LOADED = 2
 

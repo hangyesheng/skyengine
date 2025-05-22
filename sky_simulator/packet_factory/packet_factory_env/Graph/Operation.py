@@ -23,11 +23,8 @@ class Operation:
         self.mem_req = mem_req
 
         # operation本身的状态
-        self.progress = 0.0
         self.dependencies = []
         self.successors = []
-        self.assigned_node = None
-        # self.duration = duration # 当前产品需要加工的进度条
 
         # operation处理item相关的状态
         self.processed_item_list = []
@@ -49,9 +46,6 @@ class Operation:
             f"time={self.process_time:.1f} "
             f"durations={durations_str} "
             f"state={self.status} "
-            # f"progress={progress_str} "
-            # f"items={items_count} "
-            # f"node={assigned_node}>"
         )
 
     def get_process_time(self) -> float:
@@ -80,18 +74,6 @@ class Operation:
                 return duration
         LOGGER.info(f"Operation {self.id}: Machine {machine_id} not found")
         return 0.0
-
-    def is_finished(self) -> bool:
-        """
-        :return: 该操作是否完成
-        """
-        return self.finished
-
-    def set_finished(self, finished: bool) -> None:
-        """
-        :param finished: 该操作是否完成
-        """
-        self.finished = finished
 
     def get_next_operation(self) -> Optional['Operation']:
         return self.next_operation
@@ -168,20 +150,3 @@ class Operation:
         # 空闲状态，等待下一轮调度
         if self.state == "ready":
             return False
-
-    def check_dependencies(self):
-        """
-        判断前置条件是否满足
-        :return:
-        """
-        if self.state == "pending" and self.is_ready():
-            self.state = "ready"
-
-    def cal_qos(self, current_time):
-        """
-        查看运行质量
-        :return:
-        """
-        if hasattr(self, "deadline"):
-            return 1 if current_time <= self.deadline else 0
-        return 1  # 默认不罚分

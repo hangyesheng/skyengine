@@ -59,9 +59,7 @@ class AGV:
 
     def set_operation(self, operation: Optional[Operation]) -> None:
         self.operation = operation
-        if operation is not None:
-            operation.set_status(OperationStatus.MOVING)
-        else:
+        if operation is None:
             LOGGER.info(f"Operation clear.")
 
     def get_status(self) -> AGVStatus:
@@ -86,7 +84,6 @@ class AGV:
         """
         从machine上获得对应的operation
         """
-        # if self.operation is not None:
         if self.status != AGVStatus.READY:
             LOGGER.info(f"AGV id={self.id} is already loading an operation id={self.operation}")
             return False
@@ -105,6 +102,7 @@ class AGV:
             # 上个阶段结束顺利获得物料
             self.set_status(AGVStatus.MOVING)
             self.set_operation(machine_operation)
+            machine_operation.set_status(OperationStatus.MOVING)
             machine_operation.set_current_machine(None)
             machine.set_operation(None)
 
@@ -138,7 +136,6 @@ class AGV:
         """
         将AGV上的operation卸载到对应machine上
         """
-        # if self.operation is None:
         if self.status is not AGVStatus.LOADED:
             LOGGER.info(f"AGV id={self.id} is not loaded")
             return False
