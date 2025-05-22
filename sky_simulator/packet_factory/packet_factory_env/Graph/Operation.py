@@ -42,14 +42,6 @@ class Operation:
             if len(self.durations) > 3:
                 durations_str += ", ..."
             durations_str = f"[{durations_str}]"
-
-        # # 获取已处理物品数量
-        # items_count = len(self.processed_item_list)
-
-        # # 格式化状态信息
-        # progress_str = f"{self.progress:.1%}"
-        # assigned_node = self.assigned_node if self.assigned_node is not None else "None"
-
         return (
             f"<{self.__class__.__name__} "
             f"id={self.id} "
@@ -192,29 +184,3 @@ class Operation:
         if hasattr(self, "deadline"):
             return 1 if current_time <= self.deadline else 0
         return 1  # 默认不罚分
-
-    # ----------重调度阶段----------
-    def request(self):
-        """
-        请求资源
-        :return:
-        """
-        return {"cpu": self.cpu_req, "mem": self.mem_req}
-
-    def choose(self, candidate_nodes):
-        """
-        进行物理机的选择
-        :return:
-        """
-        # 默认选择资源最多的节点，或在外部策略中完成
-        sorted_nodes = sorted(candidate_nodes, key=lambda n: n.cpu_capacity + n.mem_capacity, reverse=True)
-        return sorted_nodes[0] if sorted_nodes else None
-
-    def assign_to_node(self, node, time):
-        """
-        分配到节点上
-        :param node:
-        :return:
-        """
-        self.assigned_node = node
-        self.state = "paused"

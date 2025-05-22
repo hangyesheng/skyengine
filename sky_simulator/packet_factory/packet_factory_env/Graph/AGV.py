@@ -93,15 +93,8 @@ class AGV:
         if not self.heading(machine,final_time):
             return False
 
-        # if machine_operation.get_status() == "running":
-        # if machine_operation.get_status()==OperationStatus.WORKING:
-        #     success: bool = machine.work(final_time)
-        #     if not success:
-        #         return False
         self.timer = max(self.timer, machine.get_timer())
 
-        # if machine_operation.is_finished():
-        # if machine_operation.get_status()==OperationStatus.FINISHED:
         if machine.get_status()==MachineStatus.FINISHED:
             # 上个阶段结束顺利获得物料
             self.set_status(AGVStatus.MOVING)
@@ -155,12 +148,6 @@ class AGV:
             self.set_operation(None)
             self.set_status(AGVStatus.READY)
         else:
-            # if machine_operation.get_status() == OperationStatus.WORKING:
-            #     success: bool = machine.work(final_time)
-            #     if not success:
-            #         return False
-            # if machine_operation.is_finished():
-            # if machine_operation.get_status() == OperationStatus.FINISHED:
             if machine.get_status()==MachineStatus.FINISHED:
                 machine_operation.set_current_machine(None)
                 machine.set_operation(self.operation)
