@@ -66,7 +66,7 @@ class PacketFactoryEnv(ParallelEnv):
             elif event.event_type == "machine_fail":
                 pass
 
-    def env_step(self, actions: List[Tuple[Operation, AGV, Machine]], step_time: float) -> None:
+    def env_step(self, actions: List[Tuple[Operation, AGV, Machine]], step_time: float) -> bool:
         # ---------- 当前轮次时间 ----------
         current_time = self.env_timeline
         final_time = current_time + step_time
@@ -96,6 +96,8 @@ class PacketFactoryEnv(ParallelEnv):
         # ---------- 查看状态 ----------
         self.render_observation()
 
+        return True
+
     def step(self, actions=None):
         LOGGER.info(f"--------- 当前循环步为{self.env_timeline} ---------")
         # === 0. Agent 决策动作（支持 Job 或 Central）=== todo Agent + action 放到外面
@@ -107,7 +109,7 @@ class PacketFactoryEnv(ParallelEnv):
         # === 2. 提取state,发送给状态转移函数并返回 ===
         while True:
             if self.env_step(decisions, step_time):
-                # todo
+                # todo 轮询
                 break
 
         # === 3. 统计完成状态，计算奖励 ===

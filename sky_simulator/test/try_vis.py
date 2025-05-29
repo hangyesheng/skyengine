@@ -1,9 +1,29 @@
-from sky_simulator.packet_factory.env.Utils.dag_visualizer import visualize_env
-from sky_dag_env import SkyDagEnv
+from sky_simulator.packet_factory import packet_factory_v0 
+from sky_simulator.packet_factory.packet_factory_env.Utils.env_visualizer import Env_visualizer
+from sky_simulator.packet_factory.packet_factory_env.Utils.logger import LOGGER
 
-# 已创建并 load_from_config 的环境
-env = SkyDagEnv()
-env.reset()
+# 创建环境与智能体
+random_Agent = packet_factory_v0.RandomAgent(name='sky', agent_id='1')
+env = packet_factory_v0.PacketFactoryEnv(agent=random_Agent)
 
-# 启动可视化（每秒更新一次）
-visualize_env(env, scale=100, fps=1)
+# 重置环境
+observations = env.reset()
+
+env_visualizer = Env_visualizer(env)
+env_visualizer.visualize_env(fps=3)
+
+# 运行一个 episode（直到结束）
+while random_Agent.is_alive():
+    # 传入agent在内部决策,外部不需要主动传入action了
+    observations, rewards, terminations, truncations, infos = env.step()
+    
+    # 启动可视化（每step更新一次）
+    env_visualizer.visualize_env(fps=3)
+
+    # 渲染当前状态（控制台打印）
+    env.render()
+
+    # 更新 done 状态
+    done = terminations
+
+LOGGER.info(f"total makespan: {env.env_timeline}s")

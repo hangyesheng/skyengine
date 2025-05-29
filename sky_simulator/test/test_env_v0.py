@@ -1,11 +1,4 @@
-'''
-@Project ：tiangong 
-@File    ：test_env_v0.py
-@IDE     ：PyCharm 
-@Author  ：Skyrim
-@Date    ：2025/5/19 11:13 
-'''
-from sky_simulator.packet_factory import packet_factory_v0  # 替换为你的环境文件名
+from sky_simulator.packet_factory import packet_factory_v0
 from sky_simulator.packet_factory.packet_factory_env.Utils.logger import LOGGER
 
 # 创建环境与智能体
