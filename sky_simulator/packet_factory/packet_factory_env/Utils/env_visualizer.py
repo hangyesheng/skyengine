@@ -1,29 +1,22 @@
 import pygame
 
 from sky_simulator.packet_factory.packet_factory_env.packet_factory_env import PacketFactoryEnv
-from sky_simulator.packet_factory.packet_factory_env.Graph.util import OperationStatus, MachineStatus, AGVStatus, JobStatus
-
 from sky_simulator.packet_factory.packet_factory_env.Graph.Machine import Machine
 from sky_simulator.packet_factory.packet_factory_env.Graph.AGV import AGV
 from sky_simulator.packet_factory.packet_factory_env.Graph.Operation import Operation
+from sky_simulator.packet_factory.packet_factory_env.Graph.util import OperationStatus, MachineStatus, AGVStatus
 
 
-def scale(pos, scale=100):
-    return (int(pos[0] * scale + scale), int(pos[1] * scale + scale))
+def scale(pos, scale=(100, 100), shift=(100, 100)):
+    return (int(pos[0] * scale[0] + shift[0]), int(pos[1] * scale[1] + shift[1]))
 
-class Env_visualizer:
+class EnvVisualizer:
     # 配置
     WIDTH, HEIGHT = 800, 600
-
 
     # 颜色
     WHITE = (255, 255, 255)
     BLACK = (0, 0, 0)
-    GRAY = (200, 200, 200)
-    GREEN = (0, 200, 0)
-    BLUE = (0, 100, 255)
-    ORANGE = (255, 165, 0)
-    RED = (200, 0, 0)
 
     OPERATION_STATE_COLOR = {
         OperationStatus.WAITING: (230, 230, 230),   # 浅灰 - 等待
@@ -49,13 +42,6 @@ class Env_visualizer:
         MachineStatus.EXCEPTION: (100, 0, 100)       # 深紫 - 异常
     }
 
-    JOB_STATE_COLOR = {
-        JobStatus.B4START: (200, 200, 200),         # 灰色 - 未开始
-        JobStatus.STARTED: (255, 165, 0),           # 橙色 - 进行中
-        JobStatus.FINISHED: (0, 200, 0),            # 绿色 - 已完成
-        JobStatus.EXCEPTION: (200, 0, 0)            # 红色 - 异常
-    }
-
     def __init__(self, env: PacketFactoryEnv) -> None:
         self.env = env
 
@@ -68,7 +54,7 @@ class Env_visualizer:
         pos = scale(agv.get_xy())
         pygame.draw.circle(screen, color, pos, 15)
         font = pygame.font.SysFont(None, 24)
-        label = font.render(str(agv.id), True, self.BLACK)
+        label = font.render(str(agv.id), True, self.WHITE)
         screen.blit(label, (pos[0], pos[1]))
 
     def draw_machine(self, screen, machine: Machine):

@@ -1,5 +1,5 @@
 from sky_simulator.packet_factory import packet_factory_v0 
-from sky_simulator.packet_factory.packet_factory_env.Utils.env_visualizer import Env_visualizer
+from sky_simulator.packet_factory.packet_factory_env.Utils.env_visualizer import EnvVisualizer
 from sky_simulator.packet_factory.packet_factory_env.Utils.logger import LOGGER
 
 # 创建环境与智能体
@@ -9,7 +9,7 @@ env = packet_factory_v0.PacketFactoryEnv(agent=random_Agent)
 # 重置环境
 observations = env.reset()
 
-env_visualizer = Env_visualizer(env)
+env_visualizer = EnvVisualizer(env)
 env_visualizer.visualize_env(fps=3)
 
 # 运行一个 episode（直到结束）
