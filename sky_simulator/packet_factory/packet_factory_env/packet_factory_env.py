@@ -131,7 +131,7 @@ class PacketFactoryEnv(ParallelEnv):
         self.env_timeline += step_time
 
         obs = self._get_obs()
-        LOGGER.info(f"--------- 结束当前循环步为 ---------")
+        LOGGER.info(f"--------- 结束当前循环步 ---------")
 
         return obs, rewards, terminations, {}, {}
 

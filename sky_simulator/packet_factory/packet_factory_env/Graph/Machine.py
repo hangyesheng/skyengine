@@ -29,8 +29,8 @@ class Machine:
 
     def __repr__(self):
         return (f"<{self.__class__.__name__} "
-                f"id={self.id}>"
-                f"status={self.status}>"
+                f"id={self.id}> "
+                f"status={self.status}> "
                 )
 
     # ---------- 模拟Machine运行 ----------
