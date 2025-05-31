@@ -12,7 +12,7 @@ from sky_simulator.packet_factory.packet_factory_env.Event.Event import Event, E
 from sky_simulator.packet_factory.packet_factory_env.Utils.logger import LOGGER
 from sky_simulator.registry import register_component
 
-@register_component("packet_factory_env")
+@register_component("packet_factory")
 class PacketFactoryEnv(ParallelEnv):
     metadata = {"render_modes": ["human"], "name": "packet_factory_env"}
 

@@ -17,23 +17,9 @@ def load_config(config_path: str) -> dict:
     with open(config_path, "r", encoding="utf-8") as f:
         raw_config = yaml.safe_load(f)
 
-    if "sky" not in raw_config:
-        raise ValueError("Missing 'sky' section in configuration.")
+    if "config" not in raw_config:
+        raise ValueError("Missing 'config' section in configuration.")
 
-    sky_config = raw_config["sky"]
+    sky_config = raw_config["config"]
 
-    env_type = sky_config.get("env_type")
-    if env_type not in ("simulation", "real"):
-        raise ValueError(f"Invalid env_type: {env_type}. Must be 'simulation' or 'real'.")
-
-    common_config = sky_config.get("common", {})
-    env_specific_config = sky_config.get(env_type, {})
-
-    # 合并 common 和 env-specific
-    merged_config = {
-        "env_type": env_type,
-        **common_config,
-        **env_specific_config
-    }
-
-    return merged_config
+    return sky_config
