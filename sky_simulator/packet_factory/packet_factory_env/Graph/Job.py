@@ -20,7 +20,7 @@ class Job:
         if len(self.operations) >= 1:
             self.operations[0].set_status(OperationStatus.READY)
 
-        self.status=JobStatus.B4START
+        self.status = JobStatus.B4START
         self.target_count = target_count  # 目标处理工件数，可选
 
     def __repr__(self):
