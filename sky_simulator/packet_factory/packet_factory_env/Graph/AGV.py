@@ -37,8 +37,8 @@ class AGV:
             f"pos=({self.x:.2f}, {self.y:.2f}) "
             f"v={self.velocity:.2f} "
             f"timer={self.timer:.2f} "
-            f"operation={operation_name}>"
-            f"status={self.status}>"
+            f"operation={operation_name}> "
+            f"status={self.status}> "
         )
 
     def get_id(self) -> int:

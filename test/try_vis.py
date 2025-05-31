@@ -14,8 +14,11 @@ env_visualizer.visualize_env(fps=3)
 
 # 运行一个 episode（直到结束）
 while random_Agent.is_alive():
-    # 传入agent在内部决策,外部不需要主动传入action了
-    observations, rewards, terminations, truncations, infos = env.step()
+    # 输入获得环境状态并决策
+    actions = env.action_space(random_Agent)
+
+    # agent在外部决策
+    observations, rewards, terminations, truncations, infos = env.step(actions)
     
     # 启动可视化（每step更新一次）
     env_visualizer.visualize_env(fps=3)
