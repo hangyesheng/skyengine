@@ -6,8 +6,8 @@
 @Date    ：2025/5/31 1:30 
 '''
 from sky_simulator.utils import load_config
-
-config = load_config("../config/pf_examples/template.yaml")
+from config import PF_DIR
+config = load_config(f"{PF_DIR}/template.yaml")
 
 if __name__ == '__main__':
 

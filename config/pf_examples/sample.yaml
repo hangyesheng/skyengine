@@ -1,4 +1,4 @@
-sky:
+config:
   env_type: simulation  # simulation 或 real
 
   common:  # 仿真与实机共享配置
