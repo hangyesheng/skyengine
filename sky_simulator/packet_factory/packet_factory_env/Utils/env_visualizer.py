@@ -37,7 +37,6 @@ class EnvVisualizer:
     MACHINE_STATE_COLOR = {
         MachineStatus.READY: (100, 100, 255),        # 浅蓝 - 就绪
         MachineStatus.WORKING: (70, 70, 200),        # 中蓝 - 执行中
-        MachineStatus.FINISHED: (30, 30, 150),       # 深蓝 - 完成
         MachineStatus.FAILED: (139, 0, 139),         # 紫色 - 故障
         MachineStatus.EXCEPTION: (100, 0, 100)       # 深紫 - 异常
     }

@@ -30,12 +30,12 @@ class AGVStatus(Enum):
 
 
 class MachineStatus(Enum):
-    # 当前机器可以接收Operation
+    # todo: 由于无限缓冲池，当前机器可以在任意时间接收Operation
+    
+    # 当前机器不在运行Operation
     READY = 0
     # 当前机器正在运行Operation
     WORKING = 1
-    # 该任务执行就绪
-    FINISHED = 2
     # 当前机器宕机
     FAILED = 3
 
