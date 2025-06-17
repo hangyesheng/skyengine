@@ -11,6 +11,7 @@ from sky_simulator.packet_factory.packet_factory_env.Utils import util
 from sky_simulator.packet_factory.packet_factory_env.Event.Event import Event, EventQueue
 from sky_simulator.packet_factory.packet_factory_env.Utils.logger import LOGGER
 from sky_simulator.registry import register_component
+from sky_simulator.packet_factory.packet_factory_env.Utils.env_visualizer import EnvVisualizer
 
 @register_component("packet_factory")
 class PacketFactoryEnv(ParallelEnv):
@@ -31,7 +32,10 @@ class PacketFactoryEnv(ParallelEnv):
 
         # 环境本身的状态,向量指标,事件队列等
         self.env_timeline: float = 0
-        self.event_queue = EventQueue()
+
+        # 可视化
+        self.env_visualizer = EnvVisualizer(self)
+        self.env_visualizer.visualize_env(fps=3)
 
         self.limit = 200
         self.critic_vector = {}  # 评价指标
@@ -102,6 +106,9 @@ class PacketFactoryEnv(ParallelEnv):
 
         # ---------- 查看状态 ----------
         self.render_observation()
+
+        # 更新可视化（每env_step更新一次）
+        self.env_visualizer.visualize_env(fps=3)
 
         # === 处理全局时间 ===
         self.env_timeline += step_time

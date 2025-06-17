@@ -1,6 +1,5 @@
 import pygame
 
-from sky_simulator.packet_factory.packet_factory_env.packet_factory_env import PacketFactoryEnv
 from sky_simulator.packet_factory.packet_factory_env.Graph.Machine import Machine
 from sky_simulator.packet_factory.packet_factory_env.Graph.AGV import AGV
 from sky_simulator.packet_factory.packet_factory_env.Graph.Operation import Operation
@@ -41,7 +40,7 @@ class EnvVisualizer:
         MachineStatus.EXCEPTION: (100, 0, 100)       # 深紫 - 异常
     }
 
-    def __init__(self, env: PacketFactoryEnv) -> None:
+    def __init__(self, env) -> None:
         self.env = env
 
         pygame.init()
