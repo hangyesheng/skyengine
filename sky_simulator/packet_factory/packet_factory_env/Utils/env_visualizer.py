@@ -5,11 +5,13 @@ from sky_simulator.packet_factory.packet_factory_env.Graph.Machine import Machin
 from sky_simulator.packet_factory.packet_factory_env.Graph.AGV import AGV
 from sky_simulator.packet_factory.packet_factory_env.Graph.Operation import Operation
 from sky_simulator.packet_factory.packet_factory_env.Graph.util import OperationStatus, MachineStatus, AGVStatus
+from sky_simulator.registry import register_component
 
 
 def scale(pos, scale=(100, 100), shift=(100, 100)):
     return (int(pos[0] * scale[0] + shift[0]), int(pos[1] * scale[1] + shift[1]))
 
+@register_component("packet_factory.Visualizertemp")
 class EnvVisualizer:
     # 配置
     WIDTH, HEIGHT = 800, 600
