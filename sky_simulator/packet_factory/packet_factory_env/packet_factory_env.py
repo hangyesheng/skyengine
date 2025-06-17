@@ -2,6 +2,7 @@ from typing import Union, List, Tuple
 
 from pettingzoo import ParallelEnv
 import numpy as np
+from sky_simulator.packet_factory.packet_factory_env.Graph import graph_loader
 
 from sky_simulator.packet_factory.Agent import BaseAgent
 from sky_simulator.packet_factory.packet_factory_env.Graph.Machine import Machine
@@ -12,6 +13,9 @@ from sky_simulator.packet_factory.packet_factory_env.Event.Event import Event, E
 from sky_simulator.packet_factory.packet_factory_env.Utils.logger import LOGGER
 from sky_simulator.registry import register_component
 
+from sky_simulator.call_back.EnvCallback import EnvCallback
+
+
 @register_component("packet_factory")
 class PacketFactoryEnv(ParallelEnv):
     metadata = {"render_modes": ["human"], "name": "packet_factory_env"}
@@ -19,7 +23,6 @@ class PacketFactoryEnv(ParallelEnv):
     def __init__(self,
                  agent: BaseAgent = None,
                  ):
-
         # 物料仓库与目标存储仓库
         self.source = []
         self.destination = []
@@ -35,12 +38,14 @@ class PacketFactoryEnv(ParallelEnv):
 
         self.limit = 200
         self.critic_vector = {}  # 评价指标
-        # self.reward = {}  # 每个Agent的奖励
-        # self.terminations = {}  # 是否完成任务
-        # self.truncations = {}  # 智能体是否提前截断
 
         # 智能体相关的状态
         self.agent = agent
+
+        # env的回调函数组
+        self.callback = {
+            "load_graph": graph_loader.read_agv_instance_data("/brandimarte/simple_agv.txt")
+        }
 
     # ---------- 自定义状态更新函数 ----------
     def set_env_timeline(self, env_timeline: float):
@@ -49,13 +54,16 @@ class PacketFactoryEnv(ParallelEnv):
     def get_env_timeline(self) -> float:
         return self.env_timeline
 
+    def add_callback(self, callback_name: str, callback_function: EnvCallback):
+        assert callback_name in self.callback.keys()
+        self.callback[callback_name] = callback_function
+
     def refresh_status(self):
         """
         刷新当前环境的graph和agv
         :return:
         """
-        # todo 修改为yaml数据读取
-        self.jobs, self.machines, self.agvs = util.read_agv_instance_data("/brandimarte/mk01_agv.txt")
+        self.jobs, self.machines, self.agvs = self.callback['load_graph']()
         LOGGER.info("Environment Initialized Successfully.")
 
     def action_space(self, agent):

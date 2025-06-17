@@ -6,9 +6,10 @@
 @Date    ：2025/5/31 0:18 
 '''
 # bootstrap.py
-from sky_simulator.utils import load_config
-from sky_simulator.registry import scan_and_register_components
-from .context_creator import create_context,check_context
+from sky_simulator.registry import scan_and_register_components, load_config
+from .context_creator import create_context
+
+
 def bootstrap(config_path):
     # ---------- 读取配置 ----------
     print("[Bootstrap] Loading configuration...")
@@ -20,10 +21,9 @@ def bootstrap(config_path):
 
     # ---------- 创建环境 ----------
     print("[Bootstrap] Creating context...")
-    environment = create_context()
+    environment, agent, visualizer = create_context()
 
     # ---------- 检查环境 ----------
     print("[Bootstrap] Checking context...")
-    check_context(environment)
 
-    return environment, config
+    return environment, agent, visualizer

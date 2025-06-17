@@ -1,19 +1,27 @@
-import pygame
-
-from sky_simulator.packet_factory.packet_factory_env.packet_factory_env import PacketFactoryEnv
+'''
+@Project ：tiangong 
+@File    ：EnvMapLoader.py
+@IDE     ：PyCharm 
+@Author  ：Skyrim
+@Date    ：2025/5/30 0:14 
+'''
+from sky_simulator.call_back.EnvCallback import EnvCallback
+from sky_simulator.registry import register_component
 from sky_simulator.packet_factory.packet_factory_env.Graph.Machine import Machine
 from sky_simulator.packet_factory.packet_factory_env.Graph.AGV import AGV
+from sky_simulator.packet_factory.packet_factory_env.packet_factory_env import PacketFactoryEnv
 from sky_simulator.packet_factory.packet_factory_env.Graph.Operation import Operation
 from sky_simulator.packet_factory.packet_factory_env.Graph.util import OperationStatus, MachineStatus, AGVStatus
-from sky_simulator.registry import register_component
+import pygame
 
 
 def scale(pos, scale=(100, 100), shift=(100, 100)):
     return (int(pos[0] * scale[0] + shift[0]), int(pos[1] * scale[1] + shift[1]))
 
-@register_component("packet_factory.Visualizertemp")
-class EnvVisualizer:
-    # 配置
+
+# 仿真环境创建前的初始化
+@register_component("packet_factory.Visualizer")
+class EnvVisualizer(EnvCallback):
     WIDTH, HEIGHT = 800, 600
 
     # 颜色
@@ -21,34 +29,40 @@ class EnvVisualizer:
     BLACK = (0, 0, 0)
 
     OPERATION_STATE_COLOR = {
-        OperationStatus.WAITING: (230, 230, 230),   # 浅灰 - 等待
-        OperationStatus.READY: (255, 160, 0),       # 橙色 - 就绪
-        OperationStatus.MOVING: (255, 100, 0),      # 深橙 - 移动中
-        OperationStatus.WORKING: (255, 50, 0),      # 红橙 - 执行中
-        OperationStatus.FINISHED: (200, 0, 0),      # 暗红 - 完成
-        OperationStatus.EXCEPTION: (139, 0, 0)      # 深红 - 异常
+        OperationStatus.WAITING: (230, 230, 230),  # 浅灰 - 等待
+        OperationStatus.READY: (255, 160, 0),  # 橙色 - 就绪
+        OperationStatus.MOVING: (255, 100, 0),  # 深橙 - 移动中
+        OperationStatus.WORKING: (255, 50, 0),  # 红橙 - 执行中
+        OperationStatus.FINISHED: (200, 0, 0),  # 暗红 - 完成
+        OperationStatus.EXCEPTION: (139, 0, 0)  # 深红 - 异常
     }
 
     AGV_STATE_COLOR = {
-        AGVStatus.READY: (0, 180, 0),               # 鲜绿 - 可用
-        AGVStatus.ASSIGNED: (0, 140, 0),            # 中绿 - 已分配
-        AGVStatus.LOADED: (0, 100, 0),              # 深绿 - 已装载
-        AGVStatus.EXCEPTION: (0, 60, 0)             # 极深绿 - 异常
+        AGVStatus.READY: (0, 180, 0),  # 鲜绿 - 可用
+        AGVStatus.ASSIGNED: (0, 140, 0),  # 中绿 - 已分配
+        AGVStatus.LOADED: (0, 100, 0),  # 深绿 - 已装载
+        AGVStatus.EXCEPTION: (0, 60, 0)  # 极深绿 - 异常
     }
 
     MACHINE_STATE_COLOR = {
-        MachineStatus.READY: (100, 100, 255),        # 浅蓝 - 就绪
-        MachineStatus.WORKING: (70, 70, 200),        # 中蓝 - 执行中
-        MachineStatus.FAILED: (139, 0, 139),         # 紫色 - 故障
-        MachineStatus.EXCEPTION: (100, 0, 100)       # 深紫 - 异常
+        MachineStatus.READY: (100, 100, 255),  # 浅蓝 - 就绪
+        MachineStatus.WORKING: (70, 70, 200),  # 中蓝 - 执行中
+        MachineStatus.FAILED: (139, 0, 139),  # 紫色 - 故障
+        MachineStatus.EXCEPTION: (100, 0, 100)  # 深紫 - 异常
     }
 
-    def __init__(self, env: PacketFactoryEnv) -> None:
+    def __init__(self, env: PacketFactoryEnv, _fps=3) -> None:
+        super().__init__()
         self.env = env
+        self.fps = _fps
 
         pygame.init()
         self.screen = pygame.display.set_mode((self.WIDTH, self.HEIGHT))
         self.clock = pygame.time.Clock()
+
+    def __call__(self):
+        """使类的实例可以像函数一样被调用"""
+        self.visualize_env(self.fps)
 
     def draw_agv(self, screen, agv: AGV):
         color = self.AGV_STATE_COLOR.get(agv.status, self.BLACK)
@@ -69,11 +83,11 @@ class EnvVisualizer:
 
     def draw_operation(self, screen, operation: Operation, position):
         color = self.OPERATION_STATE_COLOR.get(operation.status, self.BLACK)
-        rect = pygame.Rect(position[0]+10, position[1]+10, 16, 16)
+        rect = pygame.Rect(position[0] + 10, position[1] + 10, 16, 16)
         pygame.draw.rect(screen, color, rect)
         font = pygame.font.SysFont(None, 24)
         label = font.render(str(operation.id), True, self.WHITE)
-        screen.blit(label, (position[0]+10, position[1]+10))
+        screen.blit(label, (position[0] + 10, position[1] + 10))
 
     def visualize_env(self, fps):
         # 渲染
