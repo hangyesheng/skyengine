@@ -1,11 +1,50 @@
 from typing import Optional, Tuple, List
 import math
+import numpy as np
 
 from .util import AGVStatus, OperationStatus, MachineStatus
 from sky_simulator.packet_factory.packet_factory_env.Graph.Operation import Operation
 from sky_simulator.packet_factory.packet_factory_env.Graph.Machine import Machine
 from sky_simulator.packet_factory.packet_factory_env.Utils.logger import LOGGER
 from sky_simulator.registry import register_component
+
+class AGVUncertaintySimulator:
+    def __init__(self, base_seed=None, probability=0.3):
+        """
+        :param base_seed: 基础种子, 用于初始化随机流, None 表示系统随机
+        :param probability: 不确定事件发生的概率 [0, 1]
+        """
+        self.base_seed = base_seed
+        self.probability = probability
+        self.cache = {}
+        # 创建一个独立的随机数生成器
+        self.seed_seq = np.random.SeedSequence(base_seed)
+        self.rng = np.random.Generator(np.random.PCG64(self.seed_seq))
+
+    def uncertain_event_ratio(self, agv_id, machine_id, operation_id):
+        """
+        :param agv_id: AGV ID
+        :param operation_id: 操作ID (unload步骤) 或者 None (load步骤)
+        :param machine_id: 机器ID
+        :return: 若随机事件发生, 返回实际agv移动时间和原始移动时间的比例, 否则返回1
+        """
+        key = (agv_id, machine_id, operation_id)
+        if key in self.cache:
+            return self.cache[key]
+
+        # 使用类内部的 rng 生成随机值
+        random_value = self.rng.random()
+        result = random_value < self.probability
+
+        if result:
+            LOGGER.info(f"AGV {agv_id} Machine {machine_id} operation {operation_id} has uncertain event")
+            # todo: 通过yaml配置随机事件后的具体影响
+            random_ratio = np.random.uniform(1, 1.5)
+        else:
+            random_ratio = 1
+
+        self.cache[key] = random_ratio
+        return random_ratio
 
 @register_component("packet_factory.Agv")
 class AGV:
@@ -26,7 +65,9 @@ class AGV:
         self.running_queue: List[Tuple[str, Machine | Operation]] = []
 
         self.status = AGVStatus.READY
-
+        
+        # todo: 通过yaml配置是否开启、随机种子、随机概率
+        self.uncertainty_simulator = AGVUncertaintySimulator()
     def __repr__(self):
         # 获取当前操作的名称（如果有）
         operation_name = self.operation.id if self.operation else "None"
@@ -137,6 +178,8 @@ class AGV:
         mx, my = machine.get_xy()
         distance = self.dist(mx, my)
         travel_time = distance / self.velocity
+        agv_operation_id = None if self.operation is None else self.operation.id
+        travel_time *= self.uncertainty_simulator.uncertain_event_ratio(self.id, agv_operation_id, machine.id)
 
         if self.get_timer() + travel_time > final_time:
             agv_x, agv_y = self.get_xy()
