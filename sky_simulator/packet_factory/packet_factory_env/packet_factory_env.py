@@ -7,20 +7,21 @@ from sky_simulator.packet_factory.Agent import BaseAgent
 from sky_simulator.packet_factory.packet_factory_env.Graph.Machine import Machine
 from sky_simulator.packet_factory.packet_factory_env.Graph.Operation import Operation
 from sky_simulator.packet_factory.packet_factory_env.Graph.AGV import AGV
-from sky_simulator.packet_factory.packet_factory_env.Utils import util
 from sky_simulator.packet_factory.packet_factory_env.Event.Event import Event, EventQueue
 from sky_simulator.packet_factory.packet_factory_env.Utils.logger import LOGGER
 from sky_simulator.registry import register_component
-from sky_simulator.packet_factory.packet_factory_env.Utils.env_visualizer import EnvVisualizer
+from sky_simulator.call_back.base_callback.EnvVisualizer import EnvVisualizer
+from sky_simulator.call_back.base_callback.EnvMapLoader import EnvMapLoader
+from sky_simulator.call_back.EnvCallback import EnvCallback
+
 
 @register_component("packet_factory")
 class PacketFactoryEnv(ParallelEnv):
     metadata = {"render_modes": ["human"], "name": "packet_factory_env"}
 
     def __init__(self,
-                 agent: BaseAgent = None,
+                 agent: BaseAgent
                  ):
-
         # 物料仓库与目标存储仓库
         self.source = []
         self.destination = []
@@ -33,18 +34,20 @@ class PacketFactoryEnv(ParallelEnv):
         # 环境本身的状态,向量指标,事件队列等
         self.env_timeline: float = 0
 
-        # 可视化
-        self.env_visualizer = EnvVisualizer(self)
-        self.env_visualizer.visualize_env(fps=3)
+        self.env_visualizer = None
 
         self.limit = 200
         self.critic_vector = {}  # 评价指标
-        # self.reward = {}  # 每个Agent的奖励
-        # self.terminations = {}  # 是否完成任务
-        # self.truncations = {}  # 智能体是否提前截断
 
         # 智能体相关的状态
         self.agent = agent
+
+        # env的回调函数组 
+        # todo: 现在还是写死的，不能传参！！！
+        self.callback = {
+            "load_graph": EnvMapLoader("/brandimarte/simple_agv.txt"),
+            "initialize_visualizer": EnvVisualizer(self)
+        }
 
     # ---------- 自定义状态更新函数 ----------
     def set_env_timeline(self, env_timeline: float):
@@ -53,13 +56,19 @@ class PacketFactoryEnv(ParallelEnv):
     def get_env_timeline(self) -> float:
         return self.env_timeline
 
+    def add_callback(self, callback_name: str, callback_function: EnvCallback):
+        assert callback_name in self.callback.keys()
+        self.callback[callback_name] = callback_function
+
     def refresh_status(self):
         """
         刷新当前环境的graph和agv
         :return:
         """
-        # todo 修改为yaml数据读取
-        self.jobs, self.machines, self.agvs = util.read_agv_instance_data("/brandimarte/mk01_agv.txt")
+        self.jobs, self.machines, self.agvs = self.callback['load_graph']()
+        # 可视化
+        self.env_visualizer = self.callback['initialize_visualizer']
+        self.env_visualizer.visualize_env(fps=3)
         LOGGER.info("Environment Initialized Successfully.")
 
     def action_space(self, agent):

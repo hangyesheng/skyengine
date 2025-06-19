@@ -1,0 +1,29 @@
+config:
+  env_type: simulation
+
+  simulation:
+    env_name: packet_factory
+
+    agent:
+      agent_name: packet_factory.RandomAgent
+      name: 1
+      id: 1
+
+    visualizer:
+      visualizer_name: packet_factory.Visualizer
+      fps: 3
+
+    factory_config:
+      file: .config_set/map_config.yaml
+
+    task_config:
+      file: .config_set/job_config.yaml
+
+    callback:
+      # todo 后续区分为map callback和agent callback
+      graph_loader:
+        name: base_callback.MapLoader
+        args: /brandimarte/mk01_agv.txt
+      visualizer:
+        name: packet_factory.Visualizer
+        args: 3     #  fps
