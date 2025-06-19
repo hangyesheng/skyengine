@@ -9,7 +9,7 @@
 
 from sky_simulator.lifecycle import context_creator
 from sky_simulator.registry import component_registry,scan_and_register_components
-from sky_simulator.utils import load_config
+from sky_simulator.registry.scanner import load_config
 from config import PF_DIR
 config = load_config(f"{PF_DIR}/sample.yaml")
 
