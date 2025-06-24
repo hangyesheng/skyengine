@@ -58,11 +58,11 @@ class EnvVisualizer(EnvCallback):
 
     def draw_agv(self, screen, agv: AGV):
         color = self.AGV_STATE_COLOR.get(agv.status, self.BLACK)
-        pos = scale(agv.get_xy(), shift=(100, 90))
-        pygame.draw.circle(screen, color, pos, 15)
+        position = scale(agv.get_xy(), shift=(100, 90))
+        pygame.draw.circle(screen, color, position, 15)
         font = pygame.font.SysFont(None, 24)
         label = font.render(str(agv.id), True, self.WHITE)
-        screen.blit(label, (pos[0], pos[1]))
+        screen.blit(label, (position[0], position[1]))
 
     def draw_machine(self, screen, machine: Machine):
         color = self.MACHINE_STATE_COLOR.get(machine.status, self.BLACK)
@@ -75,28 +75,44 @@ class EnvVisualizer(EnvCallback):
 
     def draw_operation(self, screen, operation: Operation, position):
         color = self.OPERATION_STATE_COLOR.get(operation.status, self.BLACK)
-        rect = pygame.Rect(position[0] + 10, position[1] + 10, 16, 16)
+        rect = pygame.Rect(position[0], position[1], 16, 16)
         pygame.draw.rect(screen, color, rect)
         font = pygame.font.SysFont(None, 24)
         label = font.render(str(operation.id), True, self.WHITE)
-        screen.blit(label, (position[0] + 10, position[1] + 10))
+        screen.blit(label, (position[0], position[1]))
+
+    def draw_point(self, screen, point):
+        pos = scale(point)
+        pygame.draw.circle(screen, self.BLACK, pos, 6)
+
+    def draw_link(self, screen, point1, point2):
+        pos1 = scale(point1)
+        pos2 = scale(point2)
+        pygame.draw.line(screen, self.BLACK, pos1, pos2, 2)
 
     def visualize_env(self):
         # 渲染
         self.screen.fill(self.WHITE)
+        
+        for point in self.env.points:
+            self.draw_point(self.screen, point)
+        
+        for link in self.env.links:
+            self.draw_link(self.screen, self.env.points[link[0]], self.env.points[link[1]])
 
         for machine in self.env.machines:
             self.draw_machine(self.screen, machine)
             for operation in machine.input_queue:
-                self.draw_operation(self.screen, operation, scale(machine.get_xy(), shift=(80, 100)))
+                self.draw_operation(self.screen, operation, scale(machine.get_xy(), shift=(90, 110)))
             for operation in machine.output_queue:
-                self.draw_operation(self.screen, operation, scale(machine.get_xy(), shift=(120, 100)))
+                self.draw_operation(self.screen, operation, scale(machine.get_xy(), shift=(130, 110)))
 
         for agv in self.env.agvs:
             self.draw_agv(self.screen, agv)
             agv_operation = agv.get_operation()
             if agv_operation is not None:
-                self.draw_operation(self.screen, agv_operation, scale(agv.get_xy(), shift=(100, 80)))
+                self.draw_operation(self.screen, agv_operation, scale(agv.get_xy(), shift=(110, 90)))
+
 
         pygame.display.flip()
         self.clock.tick(self.fps)
