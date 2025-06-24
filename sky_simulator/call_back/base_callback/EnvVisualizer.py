@@ -94,11 +94,13 @@ class EnvVisualizer(EnvCallback):
         # 渲染
         self.screen.fill(self.WHITE)
         
-        for point in self.env.points:
-            self.draw_point(self.screen, point)
+        for point in self.env.graph.points:
+            self.draw_point(self.screen, (point.x, point.y))
         
-        for link in self.env.links:
-            self.draw_link(self.screen, self.env.points[link[0]], self.env.points[link[1]])
+        for link in self.env.graph.links:
+            point1 = self.env.graph.get_point_by_id(link.point1)
+            point2 = self.env.graph.get_point_by_id(link.point2)
+            self.draw_link(self.screen, (point1.x, point1.y), (point2.x, point2.y))
 
         for machine in self.env.machines:
             self.draw_machine(self.screen, machine)

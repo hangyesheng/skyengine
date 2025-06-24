@@ -1,18 +1,13 @@
-'''
-@Project ：tiangong 
-@File    ：EnvMapLoader.py
-@IDE     ：PyCharm 
-@Author  ：Skyrim
-@Date    ：2025/5/30 0:14 
-'''
+from typing import List, Tuple
+
 from sky_simulator.call_back.EnvCallback import EnvCallback
 from sky_simulator.registry import register_component
-from typing import List, Tuple
 from sky_simulator.packet_factory.packet_factory_env.Graph.Machine import Machine
 from sky_simulator.packet_factory.packet_factory_env.Graph.AGV import AGV
 from sky_simulator.packet_factory.packet_factory_env.Graph.util import OperationStatus
 from sky_simulator.packet_factory.packet_factory_env.Graph.Operation import Operation
 from sky_simulator.packet_factory.packet_factory_env.Graph.Job import Job
+from sky_simulator.packet_factory.packet_factory_env.Graph.Graph import Point, Link, Graph
 import dataset
 
 
@@ -59,13 +54,13 @@ class EnvMapLoader(EnvCallback):
             jobs.append(Job(job_id, operations))
 
         machines: List[Machine] = []
-        points: List[Tuple[float, float]] = []
+        points: List[Point] = []
         for i in range(m):
             x = float(data[idx])
             idx += 1
             y = float(data[idx])
             idx += 1
-            points.append((x, y))
+            points.append(Point(i, x, y))
             machines.append(Machine(i, x, y))
 
         agvs: List[AGV] = []
@@ -78,12 +73,15 @@ class EnvMapLoader(EnvCallback):
             idx += 1
             agvs.append(AGV(i, x, y, velocity))
         
-        links: List[Tuple[int, int]] = []
+        links: List[Link] = []
+        link_count = 0
         for i in range(len(points)):
             for j in range(i + 1, len(points)):
-                links.append((i, j))
+                links.append(Link(link_count, i, j))
+        
+        graph = Graph(points, links)
 
-        return jobs, machines, agvs, points, links
+        return jobs, machines, agvs, graph
 
 
 if __name__ == '__main__':

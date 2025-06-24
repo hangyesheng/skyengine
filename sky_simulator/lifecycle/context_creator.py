@@ -38,10 +38,10 @@ def initialize_env(config, agent):
 
     # ---------- 创建工厂图 ----------
     env.add_callback("load_graph", create_component_by_id(callback_config.get('graph_loader').get('name'),
-                                                          callback_config.get('graph_loader').get('args')))
+                                                          *callback_config.get('graph_loader').get('args')))
     env.add_callback("initialize_visualizer", create_component_by_id(callback_config.get('visualizer').get('name'),
                                                                 env,
-                                                                callback_config.get('visualizer').get('args')))
+                                                                *callback_config.get('visualizer').get('args')))
 
     print(f"[Callback] 添加至 load_graph 环境上下文...")
 

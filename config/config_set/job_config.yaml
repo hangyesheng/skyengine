@@ -1,11 +1,9 @@
 # 当前machine的基本配置,说明其坐标与基本的资源
 
 config:
-  job_count: 1
   jobs:
     - job:
         id: 0
-        operation_count: 2
         operations:
           - operation:
               id: 0

@@ -23,7 +23,7 @@ config:
       # todo 后续区分为map callback和agent callback
       graph_loader:
         name: base_callback.MapLoader
-        args: /brandimarte/mk01_agv.txt
+        args: [/brandimarte/mk01_agv.txt]
       visualizer:
         name: packet_factory.Visualizer
-        args: 3     #  fps
+        args: [3]     #  fps
