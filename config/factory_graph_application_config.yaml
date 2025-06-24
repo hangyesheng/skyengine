@@ -22,8 +22,8 @@ config:
     callback:
       # todo 后续区分为map callback和agent callback
       graph_loader:
-        name: base_callback.MapLoader
-        args: [/brandimarte/mk01_agv.txt]
+        name: packet_factory_callback.MapLoader
+        args: [/brandimarte/mk01.txt, /map_config.yaml]
       visualizer:
         name: packet_factory.Visualizer
         args: [3]     #  fps
