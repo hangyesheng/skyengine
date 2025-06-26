@@ -43,11 +43,10 @@ class EnvVisualizer(EnvCallback):
         MachineStatus.EXCEPTION: (100, 0, 100)  # 深紫 - 异常
     }
 
-    def __init__(self, env, _fps=3) -> None:
+    def __init__(self, _fps=3) -> None:
         super().__init__()
-        self.env = env
         self.fps = _fps
-
+        self.env = None
         pygame.init()
         self.screen = pygame.display.set_mode((self.WIDTH, self.HEIGHT))
         self.clock = pygame.time.Clock()
@@ -90,8 +89,13 @@ class EnvVisualizer(EnvCallback):
         pos2 = scale(point2)
         pygame.draw.line(screen, self.BLACK, pos1, pos2, 2)
 
-    def visualize_env(self):
+    def visualize_env(self, env=None):
         # 渲染
+        if self.env is None and env is not None:
+            self.env = env
+        if self.env is None:
+            LOGGER.error("请先初始化环境")
+
         self.screen.fill(self.WHITE)
         
         for point in self.env.graph.points:
