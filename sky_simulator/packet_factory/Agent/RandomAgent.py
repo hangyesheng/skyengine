@@ -1,10 +1,5 @@
-from cmd import PROMPT
-
 from .BaseAgent import BaseAgent
-from typing import List, Optional, Tuple
-from sky_simulator.packet_factory.packet_factory_env.Graph.Machine import Machine
 from sky_simulator.packet_factory.packet_factory_env.Graph.Operation import Operation
-from sky_simulator.packet_factory.packet_factory_env.Graph.AGV import AGV
 from sky_simulator.packet_factory.packet_factory_env.Utils.logger import LOGGER
 from sky_simulator.packet_factory.packet_factory_env.Graph.util import OperationStatus
 
