@@ -5,13 +5,13 @@ config:
     env_name: packet_factory
 
     factory_config:
-      file: .config_set/map_config.yaml
+      file: ./config_set/map_config.yaml
 
     task_config:
-      file: .config_set/job_config.yaml
+      file: ./config_set/job_config.yaml
 
     event_config:
-      file: .config_set/event_config.yaml
+      file: ./config_set/event_config.yaml
 
 
     agent:
@@ -27,8 +27,8 @@ config:
         visualizer:
           name: base_callback.Visualizer
           args: [ 3 ]    #  fps
-        event_dealer:
-          name: base_callback.EventDealer
+        event_queue:
+          name: base_callback.EventQueue
           args: [ ]
       agent_callback:
         before_decision:

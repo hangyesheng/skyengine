@@ -1,27 +1,24 @@
 # 当前声明的额外不确定性事件以及对应的处理回调函数。
-#    TASK_FINISH = 100
-#
-#    MACHINE_FAIL = 200
-#
-#    AGV_REFRESH = 300
-#    AGV_FAIL = 301
-#    AGV_BLOCK = 302
-#
-#    OPERATION_DELAY = 400
-
 
 config:
-  events:
+  event_type: # 交给manager管理
+    - packet_factory.JUST_TEST
+    - packet_factory.AGV_FAIL
+  event_timeline: # 交给queue管理
     - event:
-        id: 0
-        type: normal
-        dealer: pass
+        timestamp: 1
+        type: packet_factory.JUST_TEST
+        args: ['trigger',{'data':233}]
     - event:
-        id: 1
-        type: agv
-        dealer: pass
+        timestamp: 2
+        type: packet_factory.AGV_FAIL
+        args: ['trigger',{'agv_id': 1}]
     - event:
-        id: 2
-        type: machine
-        dealer: pass
+        timestamp: 3
+        type: packet_factory.JUST_TEST
+        args: ['recover',{'data':'agv failed.'}]
+    - event:
+        timestamp: 4
+        type: packet_factory.AGV_FAIL
+        args: [ 'recover',{'agv_id': 1} ]
 
