@@ -10,9 +10,9 @@
 from sky_simulator.lifecycle import context_creator
 from sky_simulator.registry import component_registry,scan_and_register_components
 from sky_simulator.registry.scanner import load_config
-from config import PF_DIR
-config = load_config(f"{PF_DIR}/sample.yaml")
+
+config_path = '../../config/application_config.yaml'
 
 if __name__ == '__main__':
+    load_config(config_path)
     scan_and_register_components()
-    context_creator.create_context(config)
