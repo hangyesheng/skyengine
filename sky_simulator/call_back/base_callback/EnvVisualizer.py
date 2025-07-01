@@ -2,6 +2,7 @@ from typing import List
 import pygame
 
 from sky_simulator.call_back.EnvCallback import EnvCallback
+from sky_simulator.packet_factory.packet_factory_env.Utils.logger import LOGGER
 from sky_simulator.registry import register_component
 from sky_simulator.packet_factory.packet_factory_env.Graph.Job import Job
 from sky_simulator.packet_factory.packet_factory_env.Graph.Machine import Machine
@@ -133,7 +134,7 @@ class EnvVisualizer(EnvCallback):
         """
         pass
 
-    def isRunning() -> bool:
+    def isRunning(self) -> bool:
         """
         :return: True if env should running
         """

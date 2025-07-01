@@ -7,6 +7,7 @@
 '''
 import os
 import yaml
+from pettingzoo import ParallelEnv
 
 # 基本的事件管理类,作为实际上系统的特性,不应动态创建,事件本身动态创建即可。
 # 主要管理事件本身的合法性 与 调用相关事宜
@@ -19,8 +20,8 @@ class EventManager:
     def __init__(self):
         self.events = {
         }
-
         self.init_event=[] # 记录数据集初始化时的Event
+        self.history = [] # 已执行事件的历史记录
 
     def add_event(self, event_name):
         # 确保当前事件还没被记录
@@ -61,3 +62,10 @@ class EventManager:
         for event in event_timeline:
             self.init_event.append(event['event'])
 
+
+    def deal_event(self,event: BaseEvent,env:ParallelEnv):
+        self.history.append(event)
+        event(env)
+
+    def list_all_history(self):
+        return self.history

@@ -1,7 +1,9 @@
 # 该文件内提供预定义的一些事件类型和事件类，同时提供事件队列，所有的事件均需要依照这种方法添加
 # 具体的事件处理函数在回调中体现。
+from pettingzoo import ParallelEnv
 
 from sky_simulator.event.EventType import EventType
+
 
 class BaseEvent:
     event_type = EventType.BASE_EVENT
@@ -13,23 +15,23 @@ class BaseEvent:
     def __repr__(self):
         return f"[Event] {self.event_type.name} - Payload: {self.payload}"
 
-    def __call__(self):
+    def __call__(self,env:ParallelEnv):
         if self.status=="trigger":
-            self.trigger()
+            self.trigger(env)
         elif self.status=="recover":
-            self.recover()
+            self.recover(env)
         else:
             raise ValueError(f"[Event] {self.event_type} Event {self.status} Wrong!")
 
         print(f"[Event] {self.event_type} Event {self.status} | Payload: {self.payload}")
 
-    def trigger(self):
+    def trigger(self,env:ParallelEnv):
         """
         触发该事件
         """
         return self.event_type
 
-    def recover(self):
+    def recover(self,env:ParallelEnv):
         """
         恢复该事件的现场
         """
