@@ -36,6 +36,7 @@ class PacketFactoryEnv(ParallelEnv):
         self.env_visualizer = None
         self.event_queue = None
         self.agent = agent
+        self.hash_index={}
 
         # 回调管理
         self.callback_manager: CallbackManager = CallbackManager()
@@ -58,6 +59,8 @@ class PacketFactoryEnv(ParallelEnv):
         """
         # 环境创建 当场调用即可
         self.jobs, self.machines, self.agvs, self.graph = self.callback_manager.get('load_graph')()
+        self.createHashIndex()
+
         # 可视化组件赋值 不需要当场调用
         self.env_visualizer = self.callback_manager.get('initialize_visualizer')
         self.env_visualizer.visualize_env(env=self)
@@ -78,10 +81,16 @@ class PacketFactoryEnv(ParallelEnv):
         """
         调用event_queue取出队列中current_time之前的事件并调用.
         """
+        # todo：event有个函数判断是否有不确定事件发生过（包括三类：agv停止/释放，机器停止/释放，额外增加订单）
+        # 启动：bool变量变成True，暂停：bool变量变成False，
+        # 重启：从这里break出去，一路break到最外面，重置agent和env（可以设计状态，每个step的地方都检测状态，一路break出去）
+        # while (bool变量) sleep
+
         ready_event = self.event_queue.pop_ready_events(self.env_timeline)
         for event in ready_event:
             print(event)
-            event()
+            self.event_queue.event_manager.deal_event(event,self)
+
         if len(ready_event) == 0:
             return False
         else:
@@ -115,11 +124,7 @@ class PacketFactoryEnv(ParallelEnv):
         # ---------- 查看状态 ----------
         self.render_observation()
 
-        # todo: 添加事件处理
-        # todo：event有个函数判断是否有不确定事件发生过（包括三类：agv停止/释放，机器停止/释放，额外增加订单）
-        # 启动：bool变量变成True，暂停：bool变量变成False，
-        # 重启：从这里break出去，一路break到最外面，重置agent和env（可以设计状态，每个step的地方都检测状态，一路break出去）
-        #  while (bool变量) sleep
+        # ---------- 检测事件 ----------
         event_happen = self.deal_event()
 
         # 更新可视化（每env_step更新一次）
@@ -128,8 +133,10 @@ class PacketFactoryEnv(ParallelEnv):
         # === 处理全局时间 ===
         self.env_timeline += step_time
 
-        # 判断是否有不确定事件发生过，若有则返回True
         return event_happen
+
+        # 判断是否有不确定事件发生过，若有则返回True
+
         # for machine in self.machines:
         #     if machine.uncertainty_simulator.uncertain_event_occurred():
         #         return True
@@ -157,8 +164,6 @@ class PacketFactoryEnv(ParallelEnv):
             if self.env_step(decisions, step_time):
                 break
             else:
-                # todo：改成一个函数调用
-
                 # 分配完任务后，没有不确定性发生，那么仍执行原决策，不传入新决策
                 decisions = []
                 # 当全部任务执行完成时，也应该退出循环
@@ -171,7 +176,6 @@ class PacketFactoryEnv(ParallelEnv):
                     break
 
         # === 3. 统计完成状态，计算奖励 ===
-        # todo 计算状态/动作完成reward计算
         # rewards = {self.agent.agent_id: self.agent.reward(self.critic_vector)}
         rewards = {self.agent.agent_id: self.agent.reward({})}
         terminations = {self.agent}
@@ -187,7 +191,6 @@ class PacketFactoryEnv(ParallelEnv):
         :return: 物理节点的观察信息
         """
         obs = {}
-        # todo 构建Agent对全局的观察
         return obs
 
     def reset(self, seed=None, options=None):
@@ -238,6 +241,17 @@ class PacketFactoryEnv(ParallelEnv):
         """
         pass
 
+    def createHashIndex(self):
+        """
+        创建高效获取组件的结构
+        """
+        for agv in self.agvs:
+            self.hash_index['agvs'][agv.id]=agv
+        for job in self.jobs:
+            self.hash_index['jobs'][job.id]=job
+        for machine in self.machines:
+            self.hash_index['machines'][machine.id]=machine
+
     def getJobs(self) -> List[Job]:
         return self.jobs
 
@@ -249,6 +263,7 @@ class PacketFactoryEnv(ParallelEnv):
 
     def getGraph(self) -> Graph:
         return self.graph
+
 
 
 if __name__ == '__main__':

@@ -41,7 +41,7 @@ class EventQueue(EnvCallback):
             ready.append(event)
         return ready
 
-    def peek_next_event_time(self):
+    def peek_next_event(self):
         """查看下一个事件的时间"""
         if not self.queue:
             return None
@@ -49,4 +49,4 @@ class EventQueue(EnvCallback):
 
     def list_all_events(self):
         """调试用：列出当前所有事件"""
-        return [e for (_, _, e) in self.queue]
+        return self.queue

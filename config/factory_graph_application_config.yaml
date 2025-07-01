@@ -16,7 +16,6 @@ config:
       file: .config_set/job_config.yaml
 
     callback:
-      # todo: args用字典形式传入
       map_callback:
         graph_loader:
           name: packet_factory_callback.MapLoader

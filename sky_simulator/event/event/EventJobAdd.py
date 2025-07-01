@@ -9,13 +9,17 @@ class EventJobAdd(BaseEvent):
     def __init__(self,status:str="trigger",payload:dict=None):
         super().__init__(status,payload)
 
-    def trigger(self):
+        assert payload is not None, "payload不能为None"
+        assert 'job' in payload, "payload必须包含job字段"
+        self.job=payload['job']
+
+    def trigger(self,env):
         """
         触发该事件
         """
         return self.event_type
 
-    def recover(self):
+    def recover(self,env):
         """
         恢复该事件的现场
         """
