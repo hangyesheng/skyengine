@@ -21,5 +21,5 @@ if __name__ == '__main__':
     event_manager=EventManager()
     event_manager.load_event(target_path)
     event=event_manager.create_event('packet_factory.MACHINE_FAIL','trigger',payload={})
-    # print(event)
+    print(event_manager.init_event)
     event()
