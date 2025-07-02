@@ -10,14 +10,14 @@ class EventTest(BaseEvent):
         super().__init__(status, payload)
         self.payload = payload
 
-    def trigger(self, env):
+    def trigger(self):
         """
         触发该事件
         """
         print('EventTest.trigger()')
         return self.event_type
 
-    def recover(self, env):
+    def recover(self):
         """
         恢复该事件的现场
         """

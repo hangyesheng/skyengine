@@ -62,8 +62,10 @@ class EventManager:
 
 
     def deal_event(self,event: BaseEvent,env:ParallelEnv):
-        self.history.append(event)
-        event(env)
+        """
+        记录执行过的事件，同时说明该事件是否顺利执行
+        """
+        self.history.append((event,event(env)))
 
     def list_all_history(self):
         return self.history
