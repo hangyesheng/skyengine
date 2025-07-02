@@ -2,9 +2,9 @@ from typing import Optional, Tuple, List
 import math
 import numpy as np
 
-from .util import AGVStatus, OperationStatus, MachineStatus
-from sky_simulator.packet_factory.packet_factory_env.Graph.Operation import Operation
-from sky_simulator.packet_factory.packet_factory_env.Graph.Machine import Machine
+from sky_simulator.packet_factory.packet_factory_env.Utils.util import AGVStatus, OperationStatus
+from sky_simulator.packet_factory.packet_factory_env.Job.Operation import Operation
+from sky_simulator.packet_factory.packet_factory_env.Machine.Machine import Machine
 from sky_simulator.packet_factory.packet_factory_env.Graph.Graph import Graph
 from sky_simulator.packet_factory.packet_factory_env.Utils.logger import LOGGER
 from sky_simulator.registry import register_component

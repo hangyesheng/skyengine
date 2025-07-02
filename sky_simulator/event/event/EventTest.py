@@ -6,7 +6,6 @@ from sky_simulator.registry.registry import register_event
 @register_event('packet_factory.JUST_TEST')
 class EventTest(BaseEvent):
     event_type = EventType.JUST_TEST
-
     def __init__(self, status: str = "trigger", payload: dict = None):
         super().__init__(status, payload)
         self.payload = payload

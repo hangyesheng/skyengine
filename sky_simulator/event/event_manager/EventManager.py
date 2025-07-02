@@ -13,7 +13,6 @@ from pettingzoo import ParallelEnv
 # 主要管理事件本身的合法性 与 调用相关事宜
 
 from sky_simulator.event.event.BaseEvent import BaseEvent
-from sky_simulator.event.EventType import EventType
 from sky_simulator.registry.factory import get_event_class_by_id
 
 class EventManager:
@@ -32,7 +31,6 @@ class EventManager:
 
     def create_event(self,event_name,*args):
         """输入事件类型和参数,返回对应的事件实例"""
-        print(args)
         status=args[0]
         assert status in ["trigger","recover"]
         payload=args[1]
