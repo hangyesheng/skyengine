@@ -6,6 +6,7 @@ from sky_simulator.registry.registry import register_event
 @register_event('packet_factory.JOB_ADD')
 class EventJobAdd(BaseEvent):
     event_type = EventType.JOB_ADD
+
     def __init__(self,status:str="trigger",payload:dict=None):
         super().__init__(status,payload)
 

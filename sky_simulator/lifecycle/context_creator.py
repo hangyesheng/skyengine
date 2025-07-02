@@ -5,8 +5,6 @@
 @Author  ：Skyrim
 @Date    ：2025/5/31 1:28 
 '''
-from sky_simulator.call_back.callback_manager.CallbackManager import CallbackManager
-from sky_simulator.registry.factory import create_component_by_id
 from sky_simulator.registry.registry import component_registry
 from sky_simulator.lifecycle.initializer.env_initializer import initialize_env
 from sky_simulator.lifecycle.initializer.agent_initializer import initialize_agent
