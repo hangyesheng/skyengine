@@ -8,6 +8,8 @@ class EventType(Enum):
     BASE_EVENT = -1
 
     JUST_TEST = 0
+    ENV_FAIL=1
+
 
     JOB_FINISH = 100
     JOB_ADD = 101

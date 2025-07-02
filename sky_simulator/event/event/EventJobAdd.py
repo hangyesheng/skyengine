@@ -14,13 +14,13 @@ class EventJobAdd(BaseEvent):
         assert 'job' in payload, "payload必须包含job字段"
         self.job=payload['job']
 
-    def trigger(self,env):
+    def trigger(self):
         """
         触发该事件
         """
         return self.event_type
 
-    def recover(self,env):
+    def recover(self):
         """
         恢复该事件的现场
         """

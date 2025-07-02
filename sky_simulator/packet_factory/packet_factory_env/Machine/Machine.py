@@ -7,55 +7,6 @@ from sky_simulator.packet_factory.packet_factory_env.Utils.logger import LOGGER
 
 from sky_simulator.registry import register_component
 
-class MachineUncertaintySimulator:
-    def __init__(self, base_seed=None, probability=0.3):
-        """
-        :param base_seed: 基础种子, 用于初始化随机流, None 表示系统随机
-        :param probability: 不确定事件发生的概率 [0, 1]
-        """
-        self.base_seed = base_seed
-        self.probability = probability
-        self.cache = {}
-        # 创建一个独立的随机数生成器
-        self.seed_seq = np.random.SeedSequence(base_seed)
-        self.rng = np.random.Generator(np.random.PCG64(self.seed_seq))
-        # 从上次调用uncertain_event_occurred函数开始，是否发生过不确定事件
-        self.is_occurred = False
-
-    def uncertain_event_ratio(self, machine_id, operation_id):
-        """
-        :param machine_id: 机器 ID
-        :param operation_id: 操作 ID
-        :return: 若随机事件发生, 返回实际机器执行时间和原始执行时间的比例, 否则返回1
-        :rtype: float
-        """
-        key = (machine_id, operation_id)
-        if key in self.cache:
-            return self.cache[key]
-
-        # 使用类内部的 rng 生成随机值
-        random_value = self.rng.random()
-        result = random_value < self.probability
-
-        if result:
-            LOGGER.info(f"Machine {machine_id} operation {operation_id} has uncertain event")
-            self.is_occurred = True
-            # todo: 通过yaml配置随机事件后的具体影响
-            random_ratio = np.random.uniform(1, 1.5)
-        else:
-            random_ratio = 1
-
-        self.cache[key] = random_ratio
-        return random_ratio
-    
-    def uncertain_event_occurred(self):
-        """
-        :return: 若发生随机事件, 返回True, 否则返回False
-        :rtype: bool
-        """
-        result = self.is_occurred
-        self.is_occurred = False
-        return result
 
 @register_component("packet_factory.Machine")
 class Machine:
@@ -77,8 +28,8 @@ class Machine:
         self.input_queue: List[Operation] = []
         self.output_queue: List[Operation] = []
 
-        # todo: 通过yaml配置是否开启、随机种子、随机概率
-        self.uncertainty_simulator = MachineUncertaintySimulator()
+        # 事件相关
+        self.history_stack: List = []
 
     def __repr__(self):
         return (f"<{self.__class__.__name__} "
@@ -115,8 +66,7 @@ class Machine:
             return None
         else:
             return self.input_queue.pop(0)
-        
-        
+
     def output_push_operation(self, operation: Operation) -> None:
         self.output_queue.append(operation)
 
@@ -140,22 +90,13 @@ class Machine:
         模拟机器工作
         :param final_time: 模拟的截止时间
         """
-
-        
-        # todo: 维护一个machine的状态（event队列去修改的），如果当前machine状态=宕机，把self.timer变成final_time，但是不移动坐标
-
-        # todo: 现在的改成：随机生成宕机若干秒的事件
-
-        # update event
-        # check state
-
         LOGGER.info(f"Machine {self.id} is working")
         while len(self.input_queue) > 0:
             self.set_status(MachineStatus.WORKING)
 
             current_operation = self.input_queue[0]
             duration = current_operation.get_duration(self.id)
-            duration *= self.uncertainty_simulator.uncertain_event_ratio(self.id, current_operation.id)
+
             work_time: float = duration - current_operation.process_time
             if self.timer + work_time > final_time:
                 current_operation.process_time += final_time - self.timer
@@ -183,11 +124,29 @@ class Machine:
         判断机器是否处于正常状态，若正常则开始工作
         :param final_time: 模拟的截止时间
         """
+        # todo: 维护一个machine的状态（event队列去修改的），如果当前machine状态=宕机，把self.timer变成final_time，但是不移动坐标
+        self.check_event()
+
         if self.get_status() == MachineStatus.READY or self.get_status() == MachineStatus.WORKING:
             self.push_process(final_time)
         else:
             LOGGER.info(f"Machine {self.id} is failed")
 
-    # ---------- 模拟异常事件 ----------
-    def machine_fail(self):
-        self.status = MachineStatus.FAILED
+    # ---------- 修改状态的函数,便于事件使用 ----------
+    def record(self, ):
+        """
+        记录历史事件
+        """
+        pass
+
+    def recover(self):
+        """
+        从历史事件中回复
+        """
+        pass
+
+    def event_set_fail(self):
+        self.set_status(MachineStatus.FAILED)
+
+    def event_set_restart(self):
+        self.set_status(MachineStatus.WORKING)
