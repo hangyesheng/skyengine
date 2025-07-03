@@ -464,7 +464,7 @@ class EnvVisualizer(EnvCallback):
         """添加指定 Job"""
         for job in self.env.getJobs():
             if job.get_id() == job_id:
-                self.job_add_queue.append(job)
+                self.job_add_queue.append(job.clone())
                 self.insertNewUncertaintyEvent(f"Job {job_id} added!")
                 break
     

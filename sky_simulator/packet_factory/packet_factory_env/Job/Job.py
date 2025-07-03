@@ -91,3 +91,9 @@ class Job:
         # todo: 待完善job状态转移
         # return self.status == JobStatus.FINISHED
         return self.operations[self.get_operation_count()-1].get_status() == OperationStatus.FINISHED
+
+    # 赋值一个新的Job，状态完全处于最新状态
+    def clone(self):
+        operations = [op.clone() for op in self.operations]
+        job = Job(self.id, operations)
+        return job
