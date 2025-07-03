@@ -1,63 +1,13 @@
 from typing import Optional, Tuple, List
 import math
-import numpy as np
 
-from .util import AGVStatus, OperationStatus, MachineStatus
-from sky_simulator.packet_factory.packet_factory_env.Graph.Operation import Operation
-from sky_simulator.packet_factory.packet_factory_env.Graph.Machine import Machine
+from sky_simulator.packet_factory.packet_factory_env.Utils.util import AGVStatus, OperationStatus
+from sky_simulator.packet_factory.packet_factory_env.Job.Operation import Operation
+from sky_simulator.packet_factory.packet_factory_env.Machine.Machine import Machine
 from sky_simulator.packet_factory.packet_factory_env.Graph.Graph import Graph
 from sky_simulator.packet_factory.packet_factory_env.Utils.logger import LOGGER
 from sky_simulator.registry import register_component
 
-class AGVUncertaintySimulator:
-    def __init__(self, base_seed=None, probability=0.3):
-        """
-        :param base_seed: 基础种子, 用于初始化随机流, None 表示系统随机
-        :param probability: 不确定事件发生的概率 [0, 1]
-        """
-        self.base_seed = base_seed
-        self.probability = probability
-        self.cache = {}
-        # 创建一个独立的随机数生成器
-        self.seed_seq = np.random.SeedSequence(base_seed)
-        self.rng = np.random.Generator(np.random.PCG64(self.seed_seq))
-        # 从上次调用uncertain_event_occurred函数开始，是否发生过不确定事件
-        self.is_occurred = False
-
-    def uncertain_event_ratio(self, agv_id, machine_id, operation_id):
-        """
-        :param agv_id: AGV ID
-        :param operation_id: 操作ID (unload步骤) 或者 None (load步骤)
-        :param machine_id: 机器ID
-        :return: 若随机事件发生, 返回实际agv移动时间和原始移动时间的比例, 否则返回1
-        """
-        key = (agv_id, machine_id, operation_id)
-        if key in self.cache:
-            return self.cache[key]
-
-        # 使用类内部的 rng 生成随机值
-        random_value = self.rng.random()
-        result = random_value < self.probability
-
-        if result:
-            LOGGER.info(f"AGV {agv_id} Machine {machine_id} operation {operation_id} has uncertain event")
-            self.is_occurred = True
-            # todo: 通过yaml配置随机事件后的具体影响
-            random_ratio = np.random.uniform(1, 1.5)
-        else:
-            random_ratio = 1
-
-        self.cache[key] = random_ratio
-        return random_ratio
-    
-    def uncertain_event_occurred(self):
-        """
-        :return: 若发生随机事件, 返回True, 否则返回False
-        :rtype: bool
-        """
-        result = self.is_occurred
-        self.is_occurred = False
-        return result
 
 @register_component("packet_factory.Agv")
 class AGV:
@@ -81,9 +31,10 @@ class AGV:
         self.running_queue: List[Tuple[str, Machine | Operation]] = []
 
         self.status = AGVStatus.READY
-        
-        # todo: 通过yaml配置是否开启、随机种子、随机概率
-        self.uncertainty_simulator = AGVUncertaintySimulator()
+
+        # 事件相关 字段包括
+        self.history_stack: List = []
+
     def __repr__(self):
         # 获取当前操作的名称（如果有）
         operation_name = self.operation.id if self.operation else "None"
@@ -198,7 +149,6 @@ class AGV:
         # update event
         # check state
 
-
         if self.status != AGVStatus.ASSIGNED and self.status != AGVStatus.LOADED:
             LOGGER.info(f"AGV id={self.id} can't go to point {path[-1]}")
             return False
@@ -211,8 +161,8 @@ class AGV:
             nx, ny = point.get_xy()
             distance = self.dist(nx, ny)
             travel_time = distance / self.velocity
-            agv_operation_id = None if self.operation is None else self.operation.id
-            travel_time *= self.uncertainty_simulator.uncertain_event_ratio(self.id, machine.id, agv_operation_id)
+            # agv_operation_id = None if self.operation is None else self.operation.id
+            # travel_time *= self.uncertainty_simulator.uncertain_event_ratio(self.id, machine.id, agv_operation_id)
 
             if self.get_timer() + travel_time > final_time:
                 agv_x, agv_y = self.get_xy()
@@ -351,7 +301,6 @@ class AGV:
                 else:
                     return
 
-
     def work(self, final_time: float, action: Optional[Tuple[Operation, Machine]] = None):
         """
         向todo队列中加入任务, 执行队列中的任务
@@ -364,8 +313,24 @@ class AGV:
             LOGGER.info(f"AGV id={self.id} assigned todo: {action}")
         self.push_process(final_time)
 
+    # ---------- 修改状态的函数,便于事件使用 ----------
+    def record(self, ):
+        """
+        记录历史事件
+        """
+        pass
 
+    def recover(self):
+        """
+        从历史事件中回复
+        """
+        pass
 
+    def event_set_fail(self):
+        self.set_status(AGVStatus.EXCEPTION)
+
+    def event_set_restart(self):
+        self.set_status(AGVStatus.LOADED)
 
 if __name__ == '__main__':
     k = 10

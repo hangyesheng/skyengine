@@ -1,6 +1,5 @@
 from abc import ABC, abstractmethod
 
-from sky_simulator.call_back.callback_manager.CallbackManager import CallbackManager
 # Agent:
 # input: 状态
 # output: [(Operation, AGV, Machine), ...] （job可以混合）
@@ -23,8 +22,6 @@ class BaseAgent(ABC):
         self.context = context
         self.alive = True  # 是否在线
         self.turns = 0  # 存活轮次
-        self.callback_manager = CallbackManager()
-
 
 
     def is_alive(self):

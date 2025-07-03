@@ -9,13 +9,11 @@ if __name__ == '__main__':
     
     args = parser.parse_args()
     config_path = args.config
-    # config_path = '../config/application_config.yaml'
+    # config_path = '../../config/application_config.yaml'
 
     # 创建环境与智能体
     env, agent = bootstrap(config_path)
 
-    print(env)
-    print(agent)
     # 重置环境
     observations = env.reset()
 

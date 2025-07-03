@@ -1,7 +1,7 @@
 from .BaseAgent import BaseAgent
-from sky_simulator.packet_factory.packet_factory_env.Graph.Operation import Operation
+from sky_simulator.packet_factory.packet_factory_env.Job.Operation import Operation
 from sky_simulator.packet_factory.packet_factory_env.Utils.logger import LOGGER
-from sky_simulator.packet_factory.packet_factory_env.Graph.util import OperationStatus
+from sky_simulator.packet_factory.packet_factory_env.Utils.util import OperationStatus
 
 import time
 import random

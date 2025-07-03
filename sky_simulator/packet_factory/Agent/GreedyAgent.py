@@ -1,11 +1,13 @@
 from .BaseAgent import BaseAgent
-from typing import List, Optional, Tuple
-from sky_simulator.packet_factory.packet_factory_env.Graph.Machine import Machine
-from sky_simulator.packet_factory.packet_factory_env.Graph.Operation import Operation
-from sky_simulator.packet_factory.packet_factory_env.Graph.AGV import AGV
+from typing import List, Optional
+from sky_simulator.packet_factory.packet_factory_env.Machine.Machine import Machine
+from sky_simulator.packet_factory.packet_factory_env.Job.Operation import Operation
+from sky_simulator.packet_factory.packet_factory_env.Agv.AGV import AGV
 import time
 
 from sky_simulator.registry import register_component
+from ..packet_factory_env.Utils.logger import LOGGER
+
 
 @register_component("packet_factory.GreedyAgent")
 class GreedyAgent(BaseAgent):

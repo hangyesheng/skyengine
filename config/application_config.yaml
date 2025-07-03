@@ -5,14 +5,13 @@ config:
     env_name: packet_factory
 
     factory_config:
-      file: .config_set/map_config.yaml
+      file: ./config_set/map_config.yaml
 
     task_config:
-      file: .config_set/job_config.yaml
+      file: ./config_set/job_config.yaml
 
     event_config:
-      file: .config_set/event_config.yaml
-
+      file: ./config_set/event_config.yaml
 
     agent:
       agent_name: packet_factory.RandomAgent
@@ -22,13 +21,13 @@ config:
     callback:
       map_callback:
         graph_loader:
-          name: base_callback.MapLoader
-          args: [ /brandimarte/mk01_agv.txt ]
+          name: packet_factory_callback.MapLoader
+          args: [ /brandimarte/mk01.txt, /map_config.yaml ]
         visualizer:
           name: base_callback.Visualizer
-          args: [ 3 ]    #  fps
-        event_dealer:
-          name: base_callback.EventDealer
+          args: [ 24 ]    #  fps
+        event_queue:
+          name: base_callback.EventQueue
           args: [ ]
       agent_callback:
         before_decision:
