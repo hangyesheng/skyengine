@@ -94,3 +94,6 @@ class Operation:
     def set_status(self, status: OperationStatus):
         self.status = status
 
+    def clone(self):
+        op = Operation(self.id, OperationStatus.WAITING, self.durations)
+        return op
