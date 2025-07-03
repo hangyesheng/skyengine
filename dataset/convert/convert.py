@@ -2,8 +2,6 @@ from xml.sax import parse
 
 import yaml
 
-from sky_simulator.packet_factory.packet_factory_env.Utils.util import generate_random_node_config
-
 
 def parse_brandimarte_data(filepath):
     with open(filepath, 'r', encoding="utf-8") as f:

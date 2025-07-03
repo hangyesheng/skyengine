@@ -1,7 +1,7 @@
 from typing import List
 
-from .Operation import Operation
-from .util import JobStatus, OperationStatus
+from sky_simulator.packet_factory.packet_factory_env.Job.Operation import Operation
+from sky_simulator.packet_factory.packet_factory_env.Utils.util import JobStatus, OperationStatus
 from sky_simulator.registry import register_component
 
 @register_component("packet_factory.Job")

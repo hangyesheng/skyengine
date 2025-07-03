@@ -5,13 +5,14 @@ from pygame_gui import UIManager
 from pygame_gui.elements import UIButton, UIDropDownMenu, UILabel, UITextBox, UIProgressBar, UIScrollingContainer
 
 from sky_simulator.call_back.EnvCallback import EnvCallback
-from sky_simulator.registry import register_component
-from sky_simulator.packet_factory.packet_factory_env.Graph.Job import Job
-from sky_simulator.packet_factory.packet_factory_env.Graph.Machine import Machine
-from sky_simulator.packet_factory.packet_factory_env.Graph.AGV import AGV
-from sky_simulator.packet_factory.packet_factory_env.Graph.Operation import Operation
-from sky_simulator.packet_factory.packet_factory_env.Graph.util import OperationStatus, MachineStatus, AGVStatus
 from sky_simulator.packet_factory.packet_factory_env.Utils.logger import LOGGER
+from sky_simulator.registry import register_component
+from sky_simulator.packet_factory.packet_factory_env.Utils.logger import LOGGER
+from sky_simulator.packet_factory.packet_factory_env.Job.Job import Job
+from sky_simulator.packet_factory.packet_factory_env.Machine.Machine import Machine
+from sky_simulator.packet_factory.packet_factory_env.Agv.AGV import AGV
+from sky_simulator.packet_factory.packet_factory_env.Job.Operation import Operation
+from sky_simulator.packet_factory.packet_factory_env.Utils.util import OperationStatus, MachineStatus, AGVStatus
 
 
 def scale(pos, scale=(80, 100), shift=(100, 100)):

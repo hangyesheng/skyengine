@@ -1,19 +1,16 @@
-from typing import Union, List, Tuple
+from typing import List, Tuple
 
 from pettingzoo import ParallelEnv
-import numpy as np
 
-from sky_simulator.call_back.base_callback import EventDealer
 from sky_simulator.packet_factory.Agent import BaseAgent
-from sky_simulator.packet_factory.packet_factory_env.Graph.Job import Job
-from sky_simulator.packet_factory.packet_factory_env.Graph.Machine import Machine
-from sky_simulator.packet_factory.packet_factory_env.Graph.Operation import Operation
-from sky_simulator.packet_factory.packet_factory_env.Graph.AGV import AGV
+from sky_simulator.packet_factory.packet_factory_env.Job.Job import Job
+from sky_simulator.packet_factory.packet_factory_env.Machine.Machine import Machine
+from sky_simulator.packet_factory.packet_factory_env.Job.Operation import Operation
+from sky_simulator.packet_factory.packet_factory_env.Agv.AGV import AGV
 from sky_simulator.packet_factory.packet_factory_env.Graph.Graph import Graph
 from sky_simulator.packet_factory.packet_factory_env.Utils.logger import LOGGER
 from sky_simulator.registry import register_component
 from sky_simulator.call_back.callback_manager.CallbackManager import CallbackManager
-from sky_simulator.event.Event import Event, EventQueue
 
 
 @register_component("packet_factory")
@@ -33,14 +30,16 @@ class PacketFactoryEnv(ParallelEnv):
         self.agvs = []
         self.graph = None
 
-        # 环境本身的状态,事件队列等
+        # 环境本身的状态,事件队列,智能体相关的状态等
         self.env_timeline: float = 0
         self.env_visualizer = None
-        self.event_queue = EventQueue()
-        self.event_dealer = None
-
-        # 智能体相关的状态
+        self.event_queue = None
         self.agent = agent
+        self.hash_index={
+            'agvs':{},
+            'machines':{},
+            'jobs':{},
+        }
 
         # 回调管理
         self.callback_manager: CallbackManager = CallbackManager()
@@ -64,13 +63,18 @@ class PacketFactoryEnv(ParallelEnv):
         刷新当前环境的graph和agv
         :return:
         """
-        # 环境创建
+        # 环境创建 当场调用即可
         self.jobs, self.machines, self.agvs, self.graph = self.callback_manager.get('load_graph')()
-        # 可视化
+        self.createHashIndex()
+
+        # 可视化组件赋值 不需要当场调用
         self.env_visualizer = self.callback_manager.get('initialize_visualizer')
         self.env_visualizer.visualize_env(env=self)
-        # 事件处理器
-        self.event_dealer = self.callback_manager.get('event_dealer')
+
+        # 事件队列 不需要当场调用
+        self.event_queue = self.callback_manager.get('event_queue')
+        self.event_queue.set_env(env=self)
+
         LOGGER.info("Environment Initialized Successfully.")
 
     def action_space(self, agent):
@@ -81,8 +85,24 @@ class PacketFactoryEnv(ParallelEnv):
             "step_time": step_time
         }
 
-    def deal_event(self, event):
-        self.event_dealer(event)
+    def deal_event(self):
+        """
+        调用event_queue取出队列中current_time之前的事件并调用.
+        """
+        # todo：event有个函数判断是否有不确定事件发生过（包括三类：agv停止/释放，机器停止/释放，额外增加订单）
+        # 启动：bool变量变成True，暂停：bool变量变成False，
+        # 重启：从这里break出去，一路break到最外面，重置agent和env（可以设计状态，每个step的地方都检测状态，一路break出去）
+        # while (bool变量) sleep
+
+        ready_event = self.event_queue.pop_ready_events(self.env_timeline)
+        for event in ready_event:
+            print(event)
+            self.event_queue.event_manager.deal_event(event,self)
+
+        if len(ready_event) == 0:
+            return False
+        else:
+            return True
 
     def env_step(self, actions: List[Tuple[Operation, AGV, Machine]], step_time: float) -> bool:
         # ---------- 当前轮次时间 ----------
@@ -112,13 +132,8 @@ class PacketFactoryEnv(ParallelEnv):
         # ---------- 查看状态 ----------
         self.render_observation()
 
-        # todo: 添加事件处理
-        # todo：event有个函数判断是否有不确定事件发生过（包括三类：agv停止/释放，机器停止/释放，额外增加订单）
-        # 启动：bool变量变成True，暂停：bool变量变成False，
-        # 重启：从这里break出去，一路break到最外面，重置agent和env（可以设计状态，每个step的地方都检测状态，一路break出去）
-        #  while (bool变量) sleep
-        event=self.event_queue.pop_ready_events()
-        self.deal_event(event)
+        # ---------- 检测事件 ----------
+        event_happen = self.deal_event()
 
         # 更新可视化（每env_step更新一次）
         self.env_visualizer.visualize_env()
@@ -126,17 +141,9 @@ class PacketFactoryEnv(ParallelEnv):
         # === 处理全局时间 ===
         self.env_timeline += step_time
 
-        # 判断是否有不确定事件发生过，若有则返回True
-        if event is not None:
-            return True
-        # for machine in self.machines:
-        #     if machine.uncertainty_simulator.uncertain_event_occurred():
-        #         return True
-        # for agv in self.agvs:
-        #     if agv.uncertainty_simulator.uncertain_event_occurred():
-        #         return True
+        return event_happen
 
-        return False
+        # 判断是否有不确定事件发生过，若有则返回True
 
     def step(self, actions=None):
         LOGGER.info(f"--------- 当前循环步为{self.env_timeline} ---------")
@@ -156,8 +163,6 @@ class PacketFactoryEnv(ParallelEnv):
             if self.env_step(decisions, step_time):
                 break
             else:
-                # todo：改成一个函数调用
-
                 # 分配完任务后，没有不确定性发生，那么仍执行原决策，不传入新决策
                 decisions = []
                 # 当全部任务执行完成时，也应该退出循环
@@ -170,8 +175,8 @@ class PacketFactoryEnv(ParallelEnv):
                     break
 
         # === 3. 统计完成状态，计算奖励 ===
-        # todo 计算状态/动作完成reward计算
-        rewards = {self.agent.agent_id: self.agent.reward(self.critic_vector)}
+        # rewards = {self.agent.agent_id: self.agent.reward(self.critic_vector)}
+        rewards = {self.agent.agent_id: self.agent.reward({})}
         terminations = {self.agent}
 
         obs = self._get_obs()
@@ -185,7 +190,6 @@ class PacketFactoryEnv(ParallelEnv):
         :return: 物理节点的观察信息
         """
         obs = {}
-        # todo 构建Agent对全局的观察
         return obs
 
     def reset(self, seed=None, options=None):
@@ -216,18 +220,6 @@ class PacketFactoryEnv(ParallelEnv):
         # 展示事件队列
         LOGGER.info(f"\n📋 事件队列 ({len(self.event_queue)} 个待处理事件):")
 
-    def render_critic(self):
-        # 展示critic向量
-        LOGGER.info(f"\n📈 Critic向量 ({len(self.critic_vector)} 维):")
-        if len(self.critic_vector) > 0:
-            # 缩短长向量显示
-            vec_display = np.array(self.critic_vector)
-            if len(self.critic_vector) > 10:
-                vec_display = np.concatenate([vec_display[:5], [np.nan], vec_display[-5:]])
-            LOGGER.info(f"  {np.array2string(vec_display, precision=2, max_line_width=100)}")
-        else:
-            LOGGER.info("  Critic向量为空")
-
     def render_agent(self):
         # 展示智能体状态
         LOGGER.info(f"\n🤖 智能体状态:")
@@ -251,17 +243,29 @@ class PacketFactoryEnv(ParallelEnv):
             return []
         return [f"{self.rubbish_counter} uncertainty events occurred"]
 
+    def createHashIndex(self):
+        """
+        创建高效获取组件的结构
+        """
+        for agv in self.agvs:
+            self.hash_index['agvs'][agv.id]=agv
+        for job in self.jobs:
+            self.hash_index['jobs'][job.id]=job
+        for machine in self.machines:
+            self.hash_index['machines'][machine.id]=machine
+
     def getJobs(self) -> List[Job]:
         return self.jobs
-    
+
     def getMachines(self) -> List[Machine]:
         return self.machines
-    
+
     def getAGVs(self) -> List[AGV]:
         return self.agvs
-    
+
     def getGraph(self) -> Graph:
         return self.graph
+
 
 
 if __name__ == '__main__':

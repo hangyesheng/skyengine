@@ -1,8 +1,8 @@
-from typing import Dict, Any
+from typing import Dict
 from sky_simulator.call_back.EnvCallback import EnvCallback
 from sky_simulator.call_back.base_callback.EnvMapLoader import EnvMapLoader
 from sky_simulator.call_back.base_callback.EnvVisualizer import EnvVisualizer
-from sky_simulator.call_back.base_callback.EventDealer import EventDealer
+from sky_simulator.call_back.base_callback.EventQueue import EventQueue
 
 
 class CallbackManager:
@@ -10,7 +10,7 @@ class CallbackManager:
         self._callbacks: Dict[str, EnvCallback] = {
             'load_graph': EnvMapLoader("/brandimarte/simple_agv.txt"),
             'initialize_visualizer': EnvVisualizer(),
-            'event_dealer':EventDealer()
+            'event_queue': EventQueue()
         }
 
     def register(self, name: str, callback: EnvCallback):
@@ -23,14 +23,12 @@ class CallbackManager:
         self._callbacks[name] = callback
 
     def get(self, name: str) -> EnvCallback:
-        """获取回调对象"""
+        """获取回调对象 有时候需要当场调用 有的时候不需要"""
         if name not in self._callbacks:
             raise KeyError(f"[CallbackManager] 未找到名为 '{name}' 的回调")
         return self._callbacks[name]
 
     def has(self, name: str) -> bool:
-        print(name)
-        print(name in self._callbacks.keys())
         return name in self._callbacks.keys()
 
     def list_all(self) -> Dict[str, EnvCallback]:
