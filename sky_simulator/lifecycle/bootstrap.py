@@ -26,4 +26,5 @@ def bootstrap(config_path):
     # ---------- 检查环境 ----------
     print("[Bootstrap] Checking context...")
 
+    print("[Bootstrap] Env, Agent Created Successfully...")
     return environment, agent

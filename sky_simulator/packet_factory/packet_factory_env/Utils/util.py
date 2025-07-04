@@ -31,7 +31,7 @@ class AGVStatus(Enum):
 
 class MachineStatus(Enum):
     # todo: 由于无限缓冲池，当前机器可以在任意时间接收Operation
-    
+
     # 当前机器不在运行Operation
     READY = 0
     # 当前机器正在运行Operation
@@ -65,6 +65,8 @@ class EnvStatus(Enum):
 
     # 环境正常结束
     FINISHED = 3
+    # 环境等待后续指令
+    WAITING = 4
     # 意外状态
     EXCEPTION = 99
 

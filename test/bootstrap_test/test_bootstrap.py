@@ -13,12 +13,14 @@ if __name__ == '__main__':
 
     # 创建环境与智能体
     env, agent = bootstrap(config_path)
+    import sky_simulator.packet_factory.packet_factory_env.packet_factory_env as packet_factory_env
+    env:packet_factory_env
 
     # 重置环境
     observations = env.reset()
 
     # 运行一个 episode（直到结束）
-    while agent.is_alive():
+    while not env.env_is_finished():
         # 输入获得环境状态并决策
         actions = env.action_space(agent)
 
