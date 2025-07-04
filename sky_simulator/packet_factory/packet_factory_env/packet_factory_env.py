@@ -95,7 +95,7 @@ class PacketFactoryEnv(ParallelEnv):
             res = False
             if cnt == len(self.jobs):
                 self.agent.alive = False
-                self.status = EnvStatus.FINISHED
+                self.status = EnvStatus.WAITING
                 res = True
         return res
 
@@ -112,7 +112,6 @@ class PacketFactoryEnv(ParallelEnv):
 
         # ---------- 翻译创建事件 ----------
         for command in command_list:
-            print(command)
             payload = {}
             if command['type'] == 'AGV':
                 current_agv: AGV = command['data']
@@ -126,13 +125,11 @@ class PacketFactoryEnv(ParallelEnv):
             else:
                 pass
 
-            print(payload)
             current_event = self.event_queue.event_manager.create_event(command['event_type'],
                                                                         *[command['event_method'], payload])
             self.event_queue.add_event(self.env_timeline, event=current_event)
 
         # ---------- 执行事件 ----------
-        print(f"当前事件:{self.event_queue.queue}")
         ready_event = self.event_queue.pop_ready_events(self.env_timeline)
         for event in ready_event:
             self.event_queue.event_manager.deal_event(event, self)
@@ -146,14 +143,21 @@ class PacketFactoryEnv(ParallelEnv):
         """
         环境的单时间片执行,返回当前有无事件发生
         """
+        print('23333')
         event_happen = False
-        print("当前环境执行中...")
-        if self.status == EnvStatus.PAUSED:
+        if self.status == EnvStatus.WAITING:
+            print("waiting")
+            # ---------- 更新可视化 ----------
+            self.env_visualizer.visualize_env()
+            # ---------- 触发事件队列相关机制 ----------
+            event_happen = self.deal_event()
+        elif self.status == EnvStatus.PAUSED:
             # ---------- 更新可视化 ----------
             self.env_visualizer.visualize_env()
             # ---------- 触发事件队列相关机制 ----------
             event_happen = self.deal_event()
         elif self.status == EnvStatus.RUNNING:
+            print("running")
             # ---------- 当前轮次时间 ----------
             current_time = self.env_timeline
             final_time = current_time + step_time
@@ -237,7 +241,6 @@ class PacketFactoryEnv(ParallelEnv):
     def reset(self, seed=None, options=None):
         # ---------- 清理重建阶段 ----------
         self.set_env_timeline(0)
-        self.status = EnvStatus.RUNNING
         self.refresh_status()
 
     # ---------- 渲染函数 ----------
@@ -274,6 +277,9 @@ class PacketFactoryEnv(ParallelEnv):
 
     def getGraph(self) -> Graph:
         return self.graph
+
+    def env_is_finished(self) -> bool:
+        return self.status == EnvStatus.FINISHED
 
     def event_set_paused(self):
         self.status = EnvStatus.PAUSED
