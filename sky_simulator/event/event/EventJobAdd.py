@@ -18,13 +18,12 @@ class EventJobAdd(BaseEvent):
         """
         触发该事件
         """
-        return self.event_type
+        from sky_simulator.packet_factory.packet_factory_env.packet_factory_env import PacketFactoryEnv
+        self.judge_env(PacketFactoryEnv)
+        self.env: PacketFactoryEnv
 
-    def recover(self):
-        """
-        恢复该事件的现场
-        """
-        return self.event_type
+        self.env.jobs.append(self.job)
+
 
 
 
