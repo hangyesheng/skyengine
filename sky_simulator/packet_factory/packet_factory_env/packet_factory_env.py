@@ -143,10 +143,8 @@ class PacketFactoryEnv(ParallelEnv):
         """
         环境的单时间片执行,返回当前有无事件发生
         """
-        print('23333')
         event_happen = False
         if self.status == EnvStatus.WAITING:
-            print("waiting")
             # ---------- 更新可视化 ----------
             self.env_visualizer.visualize_env()
             # ---------- 触发事件队列相关机制 ----------
@@ -157,7 +155,6 @@ class PacketFactoryEnv(ParallelEnv):
             # ---------- 触发事件队列相关机制 ----------
             event_happen = self.deal_event()
         elif self.status == EnvStatus.RUNNING:
-            print("running")
             # ---------- 当前轮次时间 ----------
             current_time = self.env_timeline
             final_time = current_time + step_time
@@ -225,6 +222,12 @@ class PacketFactoryEnv(ParallelEnv):
         rewards = {self.agent.agent_id: self.agent.reward({})}
         terminations = {self.agent}
         obs = self._get_obs()
+
+        # ---------- 更新可视化 ----------
+        self.env_visualizer.visualize_env()
+    
+        # ---------- 触发事件队列相关机制 ----------
+        event_happen = self.deal_event()
 
         LOGGER.info(f"--------- 结束当前循环步 ---------")
 

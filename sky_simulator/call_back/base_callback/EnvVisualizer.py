@@ -63,10 +63,9 @@ class EnvVisualizer(EnvCallback):
 
         self.clock = pygame.time.Clock()
 
-        self.running = False
         self.restart = False
         self.should_pause = False
-        self.should_run =False
+        self.should_run = False
 
         self.agv_pause_queue = []
         self.agv_resume_queue = []
@@ -210,8 +209,12 @@ class EnvVisualizer(EnvCallback):
             self.job_progress_labels.append(label)
             self.job_progress_bars.append(bar)
 
-        # 设置滚动容器的内容大小（必须设置，否则无法滚动）
-        self.job_progress_scroll_container.set_scrollable_area_dimensions((500, len(self.job_progress_bars) * 30))
+        # 设置滚动容器的内容大小
+        content_height = len(self.job_progress_bars) * 30
+        self.job_progress_scroll_container.set_scrollable_area_dimensions((500, content_height))
+
+        # 滚动到底部
+        self.job_progress_scroll_container.vert_scroll_bar.set_scroll_from_start_percentage(1)
 
     def update_job_progress(self, jobs: List[Job]):
         """
@@ -306,18 +309,17 @@ class EnvVisualizer(EnvCallback):
         # 处理GUI事件
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
-                self.running = False
+                # TODO: 插入退出环境的事件
+                pass
             self.ui_manager.process_events(event)
 
             if event.type == pygame.USEREVENT:
                 if event.user_type == pygame_gui.UI_BUTTON_PRESSED:
                     if event.ui_element == self.start_button:
-                        # self.running = True
-                        self.should_run=True
+                        self.should_run = True
                         self.insertNewUncertaintyEvent("Start!")
                     elif event.ui_element == self.pause_button:
-                        # self.running = False
-                        self.should_pause=True
+                        self.should_pause = True
                         self.insertNewUncertaintyEvent("Pause!")
                     elif event.ui_element == self.restart_button:
                         self.restart = True
@@ -407,12 +409,6 @@ class EnvVisualizer(EnvCallback):
         run = self.should_run
         self.should_run = False
         return run
-
-    def isRunning(self) -> bool:
-        """
-        :return: True if env should running
-        """
-        return self.running
 
     def pause_agv(self, agv_id: int):
         """暂停指定AGV运行"""
