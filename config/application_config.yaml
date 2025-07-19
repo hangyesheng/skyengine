@@ -25,6 +25,8 @@ config:
           args: [ /brandimarte/mk01.txt, /map_config.yaml ]
         visualizer:
           name: base_callback.Visualizer
+          # name: packet_factory_callback.InteractiveVisualizer
+          # name: packet_factory_callback.AutoRunVisualizer
           args: [ 24 ]    #  fps
         event_queue:
           name: base_callback.EventQueue
