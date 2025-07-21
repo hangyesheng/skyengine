@@ -11,9 +11,6 @@ from backend_core import BackendCore
 
 class BackendServer:
     def __init__(self):
-
-        self.server = BackendCore()
-
         # 初始化 FastAPI 实例
         handler = APIHandler()
 
@@ -96,40 +93,54 @@ class BackendServer:
 
 
 class APIHandler:
+    def __init__(self):
+        self.server = BackendCore()
+
     async def handle_factory_start(self):
+        self.server.factory_start()
         return JSONResponse({"action": "start"})
 
     async def handle_factory_pause(self):
+        self.server.factory_pause()
         return JSONResponse({"action": "pause"})
 
     async def handle_factory_reset(self):
+        self.server.factory_reset()
         return JSONResponse({"action": "reset"})
 
     async def handle_factory_speed(self, speedLevel: int):
         return JSONResponse({"speedLevel": speedLevel})
 
     async def handle_agvs(self):
-        return JSONResponse({"agvs": [{"id": "1"}, {"id": "2"}]})
+        agv_list = self.server.get_agvs()
+        return JSONResponse({"agvs": agv_list})
 
     async def handle_agv_pause(self, agvId):
-        return JSONResponse({"agvId": agvId})
+        self.server.pause_agv(int(agvId))
+        return JSONResponse({'state': 'success', 'msg': f'pause agv id={agvId} success'})
 
     async def handle_agv_resume(self, agvId):
-        return JSONResponse({"agvId": agvId})
+        self.server.resume_agv(int(agvId))
+        return JSONResponse({'state': 'success', 'msg': f'resume agv id={agvId} success'})
 
     async def handle_machines(self):
-        return JSONResponse({"machines": [{"id": "1"}, {"id": "2"}]})
+        machine_list = self.server.get_machines()
+        return JSONResponse({"machines": machine_list})
 
     async def handle_machine_pause(self, machineId):
+        self.server.pause_machine(int(machineId))
         return JSONResponse({"machineId": machineId})
 
     async def handle_machine_resume(self, machineId):
+        self.server.resume_machine(int(machineId))
         return JSONResponse({"machineId": machineId})
 
     async def handle_jobs(self):
-        return JSONResponse({"jobs": [{"id": "1"}, {"id": "2"}]})
+        job_list = self.server.get_jobs()
+        return JSONResponse({"jobs": job_list})
 
     async def handle_job_add(self, jobId):
+        self.server.add_job(int(jobId))
         return JSONResponse({"jobId": jobId})
 
     async def handle_jobs_progress(self):
