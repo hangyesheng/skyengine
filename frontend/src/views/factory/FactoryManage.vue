@@ -139,18 +139,90 @@
             </VueFlow>
           </div>
         </ElCol>
+
         <ElCol :span="1">
 
         </ElCol>
+
         <ElCol :span="5">
+          <!-- Start/Pause/Reset 控制按钮 -->
           <el-card style="max-width: 480px">
-            <el-button type="warning" @click="draw">Draw</el-button>
+            <el-button type="warning" @click="handleFactoryStart">开始模拟</el-button>
           </el-card>
           <el-card style="max-width: 480px">
-            <el-button type="warning" @click="draw">Draw</el-button>
+            <el-button type="warning" @click="handleFactoryPause">暂停模拟</el-button>
           </el-card>
-                    <el-card style="max-width: 480px">
-            <el-button type="warning" @click="draw">Draw</el-button>
+          <el-card style="max-width: 480px">
+            <el-button type="warning" @click="handleFactoryReset">重置</el-button>
+          </el-card>
+
+          <!-- 速度调节 -->
+          <el-card style="max-width: 480px; margin-top: 10px">
+            <div style="text-align: center; margin-bottom: 10px;">请选择速度 (当前: {{ speedLevel }})</div>
+            <el-slider v-model="speedLevel" :min="1" :max="10" show-input></el-slider>
+          </el-card>
+
+          <!-- AGV 控制 -->
+          <el-card style="max-width: 480px; margin-top: 10px">
+            <el-row :gutter="10">
+              <el-col :span="14">
+                <el-select v-model="selectedAgv" placeholder="选择 AGV" style="width: 100%">
+                  <el-option
+                    v-for="agv in agvList"
+                    :key="agv.id"
+                    :label="'AGV' + agv.id"
+                    :value="agv.id"
+                  />
+                </el-select>
+              </el-col>
+              <el-col :span="5">
+                <el-button @click="pauseAgv" type="primary" style="width: 100%">暂停</el-button>
+              </el-col>
+              <el-col :span="5">
+                <el-button @click="resumeAgv" type="success" style="width: 100%">恢复</el-button>
+              </el-col>
+            </el-row>
+          </el-card>
+
+          <!-- 机器控制 -->
+          <el-card style="max-width: 480px; margin-top: 10px">
+            <el-row :gutter="10">
+              <el-col :span="14">
+                <el-select v-model="selectedMachine" placeholder="选择机器" style="width: 100%">
+                  <el-option
+                    v-for="machine in machineList"
+                    :key="machine.id"
+                    :label="'机器' + machine.id"
+                    :value="machine.id"
+                  />
+                </el-select>
+              </el-col>
+              <el-col :span="5">
+                <el-button @click="pauseMachine" type="primary" style="width: 100%">暂停</el-button>
+              </el-col>
+              <el-col :span="5">
+                <el-button @click="resumeMachine" type="success" style="width: 100%">恢复</el-button>
+              </el-col>
+            </el-row>
+          </el-card>
+
+          <!-- Job 控制 -->
+          <el-card style="max-width: 480px; margin-top: 10px">
+            <el-row :gutter="10">
+              <el-col :span="14">
+                <el-select v-model="selectedJob" placeholder="选择任务" style="width: 100%">
+                  <el-option
+                    v-for="job in jobList"
+                    :key="job.id"
+                    :label="'任务' + job.id"
+                    :value="job.id"
+                  />
+                </el-select>
+              </el-col>
+              <el-col :span="10">
+                <el-button @click="addJob" type="primary" style="width: 100%">添加任务</el-button>
+              </el-col>
+            </el-row>
           </el-card>
         </ElCol>
       </ElRow>
@@ -174,6 +246,7 @@ import Icon from "./Icon.vue";
 import {useLayout} from "./useLayout";
 import {Connection, Link, MagicStick, Right} from '@element-plus/icons-vue';
 import {UploadFilled} from '@element-plus/icons-vue'
+import axios from "axios";
 
 export default {
   name: "DagManage",
@@ -251,6 +324,39 @@ export default {
       flowNodeMap.value[connection.target].data.prev.push(connection.source);
     });
 
+    const factoryStart = async () => {
+      console.log("FactoryStart")
+      try {
+        const response = await axios.post('/api/factory/start');
+        console.log('Response: ', response.data);
+      } catch (error) {
+        console.error('API request failed:', error.response ? error.response.data : error.message);
+        throw error;
+      }
+    }
+
+    const factoryPause = async () => {
+      console.log("FactoryPause")
+      try {
+        const response = await axios.post('/api/factory/pause');
+        console.log('Response: ', response.data);
+      } catch (error) {
+        console.error('API request failed:', error.response ? error.response.data : error.message);
+        throw error;
+      }
+    }
+
+    const factoryReset = async () => { 
+      console.log("FactoryReset")
+      try {
+        const response = await axios.post('/api/factory/reset');
+        console.log('Response: ', response.data);
+      } catch (error) {
+        console.error('API request failed:', error.response ? error.response.data : error.message);
+        throw error;
+      }
+    }
+
     return {
       onDragOver,
       onDrop,
@@ -261,6 +367,9 @@ export default {
       flowNodes,
       flowEdges,
       flowNodeMap,
+      factoryStart,
+      factoryPause,
+      factoryReset,
       ...layoutMethods,
     };
   },
@@ -278,7 +387,14 @@ export default {
 
       // drawing flag
       drawing: false,
-      dagList: [],
+
+      speedLevel: null,
+      selectedAgv: null,
+      agvList: [],
+      selectedMachine: null,
+      machineList: [],
+      selectedJob: null,
+      jobList: [],
 
       activeDag: null,
       hoverPosition: {x: 0, y: 0},
@@ -300,303 +416,135 @@ export default {
       this.newInputDagId = "";
       this.flushDrawData();
     },
-    // delete dag
-    deleteWorkflow(index, dag_id) {
-      this.dagList.splice(index, 1);
-      const content = {
-        dag_id: dag_id,
-      };
-      fetch("/api/dag_workflow", {
-        method: "DELETE",
-        body: JSON.stringify(content),
-      })
-          .then((response) => response.json())
-          .then((data) => {
-            const state = data["state"];
-            let msg = data["msg"];
-            msg += ". Refreshing..";
-            this.showMsg(state, msg);
-            setTimeout(() => {
-              location.reload();
-            }, 500);
-          })
-          .catch((error) => {
-            ElMessage.error("Network error");
-            console.error(error);
-          });
+    
+    handleFactoryStart() {
+      this.factoryStart();
     },
 
-    handleNewSubmit() {
-      if (this.newInputName === "" || this.newInputName === null) {
-        ElMessage.error("Please fill the dag name");
-        return;
-      }
-      if (this.flowNodes === undefined || this.flowNodes.length === 0) {
-        ElMessage.error("Please choose services");
-        return;
-      }
-
-      // get graph
-      const constructDagGraph = () => {
-        const graph = {_start: []};
-        for (const flowNode of this.flowNodes) {
-
-          const serviceId = flowNode.id;
-          if (graph[serviceId]) {
-            throw new Error(`Duplicate service_id: ${serviceId}`);
-          }
-          const prev = flowNode.data?.prev ? [...flowNode.data.prev] : [];
-          const succ = flowNode.data?.succ ? [...flowNode.data.succ] : [];
-          graph[serviceId] = {service_id: serviceId, prev, succ};
-          graph[serviceId] = {
-            id: serviceId,
-            prev: prev,
-            succ: flowNode.data?.succ ?? [],
-          };
-
-          if (prev.length === 0) {
-            graph._start.push(serviceId);
-          }
-        }
-
-        return graph;
-      };
-      const graph = constructDagGraph();
-      const newData = {
-        dag_name: this.newInputName,
-        dag: graph,
-      };
-      // update all Daglist
-      this.updateDagList(newData);
-    },
-    // get dag from backen
-    getDagList() {
-      fetch("/api/dag_workflow")
-          .then((response) => response.json())
-          .then((data) => {
-            this.dagList = data.map(dag => {
-              const nodeList = this.parseDag(dag.dag);
-              const lineList = this.generateEdges(dag.dag);
-
-              const layoutNodes = this.layout(
-                  nodeList,
-                  lineList,
-                  "LR"
-              );
-
-              return {
-                ...dag,
-                nodeList: layoutNodes,  // 添加布局后的节点
-                lineList               // 添加边数据
-              };
-            });
-          })
-          .catch((error) => {
-            console.error('Error fetching data:', error);
-            // console.error("Error fetching data");
-          });
-    },
-    fetchData() {
-      this.getDagList();
-    },
-    showMsg(state, msg) {
-      if (state === "success") {
-        ElMessage({
-          message: msg,
-          showClose: true,
-          type: "success",
-          duration: 3000,
-        });
-      } else {
-        ElMessage({
-          message: msg,
-          showClose: true,
-          type: "error",
-          duration: 3000,
-        });
-      }
-    },
-    // update dag to backen
-    updateDagList(data) {
-      fetch("/api/dag_workflow", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(data),
-      })
-          .then((response) => response.json())
-          .then((data) => {
-            const state = data["state"];
-            const msg = data["msg"];
-            this.showMsg(state, msg);
-            if (state === "success") {
-              this.getDagList();
-              location.reload();
-              this.clearInput()
-            }
-          })
-          .catch((error) => {
-            console.error("Error sending data:", error);
-          });
-    },
-    async getServiceList() {
-      const response = await fetch("/api/service");
-      this.services = await response.json();
+    handleFactoryPause() {
+      this.factoryPause();
     },
 
+    handleFactoryReset() {
+      this.factoryReset();
+    },
 
-    async layoutGraph(direction) {
+    async loadAgvs() {
       try {
-        const layoutNodes = this.layout(
-            [...this.flowNodes],
-            [...this.flowEdges],
-            direction
-        )
-
-        this.flowNodes = [...layoutNodes]
-
-      } catch (e) {
-        console.error("Layout failed:", e);
-        ElMessage.error("DAG layout error");
-      }
-    },
-
-    /*methods for dag view*/
-    async showDagDetail(row, event) {
-      if (!row || !event) {
-        console.warn('Invalid parameters');
-        return;
-      }
-
-      try {
-        this.activeDag = row.dag_id;
-
-        const baseX = event.clientX || 0;
-        const baseY = event.clientY || 0;
-
-        const SAFE_MARGIN = 20;
-        const cardWidth = 400;
-        const cardHeight = 300;
-
-        let posX = baseX + 20;
-        let posY = baseY - 50;
-
-        if (posX + cardWidth > window.innerWidth) {
-          posX = window.innerWidth - cardWidth - SAFE_MARGIN;
-        }
-
-        if (posY + cardHeight > window.innerHeight) {
-          posY = window.innerHeight - cardHeight - SAFE_MARGIN;
-        }
-
-        this.hoverPosition = {x: posX, y: posY};
-
-
-        if (!row.nodeList) {
-          const nodeList = this.parseDag(row.dag);
-          const lineList = this.generateEdges(row.dag);
-
-
-          const layoutNodes = this.layout(
-              nodeList.map(n => ({
-                ...n,
-                dimensions: {width: 160, height: 40}
-              })),
-              lineList,
-              'LR'
-          )
-
-          Object.assign(row, {
-            nodeList: layoutNodes,
-            lineList
-          });
-        }
+        const res = await axios.get('/api/agvs');
+        this.agvList = res.data.agvs;
       } catch (error) {
-        console.error('DAG detail error:', error);
-        this.activeDag = null;
+        this.$message.error('加载 AGV 列表失败');
+        console.error('加载 AGV 失败:', error);
       }
     },
 
-    hideDagDetail() {
-      this.activeDag = null;
-    },
-    countEdges(dag) {
-      let count = 0
-      for (const node of Object.values(dag)) {
-        if (node.succ && Array.isArray(node.succ)) {
-          count += node.succ.length
-        }
+    async pauseAgv() {
+      if (this.selectedAgv === null) {
+        this.$message.warning('请先选择一个 AGV');
+        return;
       }
-      return count
-    },
-
-    randomColor() {
-      const colors = [
-        "#F0F4F8", "#E3F2FD", "#E8F5E9", "#F3E5F5",
-        "#FFF3E0", "#FBE9E7", "#E0F7FA", "#F1F8E9",
-        "#FCE4EC", "#EDE7F6", "#E8F5E6", "#FFEBEE",
-        "#E0F2F1", "#F5F5F5", "#FFF8E1", "#EFEBE9"
-      ];
-      return colors[Math.floor(Math.random() * colors.length)];
-    },
-
-
-    parseDag(dag) {
-      return Object.keys(dag)
-          .filter(k => k !== '_start')
-          .map(key => ({
-            id: key,
-            data: {label: key},
-            dimensions: {width: 200, height: 50},
-            style: {
-              backgroundColor: this.randomColor(),
-              border: '1px solid #e2e8f0'
-            }
-          }));
-    },
-
-
-    generateEdges(dag) {
-      const edges = []
-      for (const [source, node] of Object.entries(dag)) {
-        if (node.succ) {
-          node.succ.forEach(target => {
-            edges.push({
-              id: `${source}-${target}`,
-              source,
-              target,
-              markerEnd: MarkerType.ArrowClosed
-            })
-          })
-        }
+      try {
+        await axios.post(`/api/agv/pause/${this.selectedAgv}`, {
+          agvId: this.selectedAgv
+        });
+        this.$message.success(`AGV ${this.selectedAgv} 已暂停`);
+      } catch (error) {
+        console.error('暂停 AGV 失败:', error);
+        this.$message.error('暂停 AGV 失败');
       }
-      return edges
+    },
+
+    async resumeAgv() {
+      if (this.selectedAgv === null) {
+        this.$message.warning('请先选择一个 AGV');
+        return;
+      }
+      try {
+        await axios.post(`/api/agv/resume/${this.selectedAgv}`, {
+          agvId: this.selectedAgv
+        });
+        this.$message.success(`AGV ${this.selectedAgv} 已恢复`);
+      } catch (error) {
+        console.error('恢复 AGV 失败:', error);
+        this.$message.error('恢复 AGV 失败');
+      }
+    },
+
+    async loadMachines() {
+      try {
+        const res = await axios.get('/api/machines');
+        this.machineList = res.data.machines;
+      } catch (error) {
+        console.error('加载机器失败:', error);
+        this.$message.error('加载机器列表失败');
+      }
+    },
+
+    async pauseMachine() {
+      if (this.selectedMachine === null) {
+        this.$message.warning('请先选择一个机器');
+        return;
+      }
+      try {
+        await axios.post(`/api/machine/pause/${this.selectedMachine}`, {
+          machineId: this.selectedMachine
+        });
+        this.$message.success(`机器 ${this.selectedMachine} 已暂停`);
+      } catch (error) {
+        console.error('暂停机器失败:', error);
+        this.$message.error('暂停机器失败');
+      }
+    },
+
+    async resumeMachine() {
+      if (this.selectedMachine === null) {
+        this.$message.warning('请先选择一个机器');
+        return;
+      }
+      try {
+        await axios.post(`/api/machine/resume/${this.selectedMachine}`, {
+          machineId: this.selectedMachine
+        });
+        this.$message.success(`机器 ${this.selectedMachine} 已恢复`);
+      } catch (error) {
+        console.error('恢复机器失败:', error);
+        this.$message.error('恢复机器失败');
+      }
+    },
+
+    async loadJobs() {
+      try {
+        const res = await axios.get('/api/jobs');
+        this.jobList = res.data.jobs;
+      } catch (error) {
+        console.error('加载任务失败:', error);
+        this.$message.error('加载任务列表失败');
+      }
+    },
+
+    async addJob() {
+      if (this.selectedJob === null) {
+        this.$message.warning('请先选择一个任务');
+        return;
+      }
+      try {
+        await axios.post(`/api/job/add/${this.selectedJob}`, {
+          jobId: this.selectedJob
+        });
+        this.$message.success(`任务 ${this.selectedJob} 已添加`);
+      } catch (error) {
+        console.error('添加任务失败:', error);
+        this.$message.error('添加任务失败');
+      }
     },
   }
   ,
   mounted() {
-    // init dag data list
-    this.fetchData();
-
-    const getServiceInterval = () => {
-      let timer;
-      if (timer !== undefined) {
-        clearInterval(timer);
-      }
-      timer = setInterval(() => {
-        this.fetchData();
-      }, 5000);
-    };
-    getServiceInterval();
-
-    this.getServiceList();
-
-    // this.$nextTick(() => {
-    //   if (this.flowNodes.length > 0) {
-    //     this.layoutGraph('LR')
-    //   }
-    // })
+    // init agv, machine, job data list
+    this.loadAgvs();
+    this.loadMachines();
+    this.loadJobs();
   }
   ,
 }
