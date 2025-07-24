@@ -55,6 +55,10 @@ class BackendCore:
         print("factory_reset")
         self.env.env_visualizer.restart()
 
+    def change_factory_speed(self, speed_level: int):
+        print(f"change_factory_speed: {speed_level}")
+        self.env.env_visualizer.change_speed(speed_level)
+
     def get_agvs(self):
         agvs: List[AGV] = self.env.getAGVs()
         agv_list = [{"id" : agv.id} for agv in agvs]

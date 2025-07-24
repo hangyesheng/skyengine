@@ -159,7 +159,7 @@
           <!-- 速度调节 -->
           <el-card style="max-width: 480px; margin-top: 10px">
             <div style="text-align: center; margin-bottom: 10px;">请选择速度 (当前: {{ speedLevel }})</div>
-            <el-slider v-model="speedLevel" :min="1" :max="10" show-input></el-slider>
+            <el-slider v-model="speedLevel" :min="1" :max="10" show-input @change="changeSpeed"></el-slider>
           </el-card>
 
           <!-- AGV 控制 -->
@@ -388,7 +388,7 @@ export default {
       // drawing flag
       drawing: false,
 
-      speedLevel: null,
+      speedLevel: 3,
       selectedAgv: null,
       agvList: [],
       selectedMachine: null,
@@ -427,6 +427,19 @@ export default {
 
     handleFactoryReset() {
       this.factoryReset();
+    },
+
+    async changeSpeed(value) {
+      try {
+        const res = await axios.post('/api/factory/speed', {
+          speedLevel: value
+        });
+        this.$message.success(`速度已调整为 ${value}`);
+        console.log('速度调整成功:', res.data);
+      } catch (error) {
+        console.error('速度调整失败:', error);
+        this.$message.error('速度调整失败');
+      }
     },
 
     async loadAgvs() {
