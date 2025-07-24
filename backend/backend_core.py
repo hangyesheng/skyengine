@@ -93,3 +93,8 @@ class BackendCore:
     def add_job(self, job_id: int):
         print(f"Job {job_id} added")
         self.env.env_visualizer.add_job(job_id)
+
+    def get_jobs_progress(self):
+        jobs: List[Job] = self.env.getJobs()
+        job_list = [{"id" : job.id, "status": job.get_status().name, "progress" : round(job.get_progress() * 100.0, 2)} for job in jobs]
+        return job_list
