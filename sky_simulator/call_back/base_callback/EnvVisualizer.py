@@ -217,6 +217,9 @@ class EnvVisualizer(EnvCallback):
         should_run = self.should_run
         self.should_run = False
         return should_run
+    
+    def change_speed(self, speed: int):
+        self.fps = speed
 
     def pause_agv(self, agv_id: int):
         """暂停指定AGV运行"""

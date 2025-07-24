@@ -1,13 +1,10 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, Body
 from fastapi.routing import APIRoute
 from starlette.responses import JSONResponse
-
 from fastapi.middleware.cors import CORSMiddleware
 
 from core.lib.network import NetworkAPIMethod, NetworkAPIPath
-
 from backend_core import BackendCore
-
 
 class BackendServer:
     def __init__(self):
@@ -108,8 +105,10 @@ class APIHandler:
         self.server.factory_reset()
         return JSONResponse({"action": "reset"})
 
-    async def handle_factory_speed(self, speedLevel: int):
-        return JSONResponse({"speedLevel": speedLevel})
+    async def handle_factory_speed(self, data=Body(...)):
+        speedLevel = data["speedLevel"]
+        self.server.change_factory_speed(speedLevel)
+        return JSONResponse({'state': 'success', 'msg': f'change factory speed={speedLevel} success'})
 
     async def handle_agvs(self):
         agv_list = self.server.get_agvs()
