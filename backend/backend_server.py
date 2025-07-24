@@ -143,10 +143,6 @@ class APIHandler:
         return JSONResponse({"jobId": jobId})
 
     async def handle_jobs_progress(self):
-        return JSONResponse({
-            "jobs": [
-                {"id": "1", "status": "STARTED", "progress": 75},
-                {"id": "2", "status": "FINISHED", "progress": 100},
-            ]
-        })
+        job_progress_list = self.server.get_jobs_progress()
+        return JSONResponse({"jobs": job_progress_list})
 
