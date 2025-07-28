@@ -99,7 +99,7 @@ export default {
         newGo: 'Go to the notification center',
         newDesc: 'No notice',
         logOutTitle: 'Tips',
-        logOutMessage: 'You will logout dayu system. Continue?',
+        logOutMessage: 'You will logout tiangong system. Continue?',
         logOutConfirm: 'ok',
         logOutCancel: 'cancel',
         logOutExit: 'Exiting',
