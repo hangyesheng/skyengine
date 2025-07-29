@@ -36,7 +36,7 @@ class Logger:
         self.logger.propagate = False
 
 
-# 提供的默认LOGGER会存储到temp中去
+# 提供的默认LOGGER会存储到system中去
 LOGGER = Logger(log_path=config.SYSTEM_LOG_DIR, name="system").logger
 
 if __name__ == '__main__':
