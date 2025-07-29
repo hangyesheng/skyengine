@@ -100,6 +100,8 @@ class BackendCore:
         self.env.env_visualizer.change_speed(speed_level)
 
     def get_agvs(self):
+        if self.env is None:
+            return []
         agvs: List[AGV] = self.env.getAGVs()
         agv_list = [{"id": agv.id} for agv in agvs]
         return agv_list
@@ -113,6 +115,8 @@ class BackendCore:
         self.env.env_visualizer.resume_agv(agv_id)
 
     def get_machines(self):
+        if self.env is None:
+            return []
         machines: List[Machine] = self.env.getMachines()
         machine_list = [{"id": machine.id} for machine in machines]
         return machine_list
@@ -126,6 +130,8 @@ class BackendCore:
         self.env.env_visualizer.resume_machine(machine_id)
 
     def get_jobs(self):
+        if self.env is None:
+            return []
         jobs: List[Job] = self.env.getJobs()
         job_list = [{"id": job.id} for job in jobs]
         return job_list
@@ -135,6 +141,8 @@ class BackendCore:
         self.env.env_visualizer.add_job(job_id)
 
     def get_jobs_progress(self):
+        if self.env is None:
+            return []
         jobs: List[Job] = self.env.getJobs()
         job_list = [{"id": job.id, "status": job.get_status().name, "progress": round(job.get_progress() * 100.0, 2)}
                     for job in jobs]
