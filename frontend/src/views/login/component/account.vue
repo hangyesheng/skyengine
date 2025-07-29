@@ -3,7 +3,7 @@
     <el-form-item class="login-animation1">
       <div class="platform-description">
         <h3>Welcome to TianGong System</h3>
-        <p>Provide infrastructure for cloud-edge collaborative stream data analysis.</p>
+        <p>Provide infrastructure for flexible manufacturing data analysis.</p>
         <el-tag type="success">System Version: {{ dayuVersion }}</el-tag>
       </div>
     </el-form-item>

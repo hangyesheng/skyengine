@@ -319,7 +319,6 @@ export default {
     let intervalId = null;
     const stores = useFactoryState()
 
-
     const agvList = ref([]);
     const machineList = ref([]);
     const jobList = ref([]);
@@ -534,7 +533,6 @@ export default {
             retries++;
             console.warn(`Received empty AGV list (attempt ${retries}/${MAX_RETRIES})`);
 
-            return;
             if (retries >= MAX_RETRIES) {
               ElMessage.warning('Loaded AGV list is empty after multiple attempts');
               return;
@@ -694,7 +692,7 @@ export default {
 
   data() {
     return {
-      speedLevel: parseInt(sessionStorage.getItem('speedLevel')) || 3, // 默认值为 3,
+      speedLevel: parseInt(sessionStorage.getItem('speedLevel')) || 3, 
       selectedAgv: null,
       selectedMachine: null,
       selectedJob: null,
