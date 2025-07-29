@@ -124,10 +124,10 @@
                 <ElCol :span="16">
                   <el-select v-model="selectedFactory" placeholder="Select Factory" size="small" style="width: 100%">
                     <el-option
-                        v-for="agv in agvList"
-                        :key="agv.id"
-                        :label="'AGV' + agv.id"
-                        :value="agv.id"
+                        v-for="factory in stores.factoryList"
+                        :key="factory.id"
+                        :label="'Factory: ' + factory.id"
+                        :value="factory.id"
                     />
                   </el-select>
                 </ElCol>
@@ -268,12 +268,10 @@ import {
 } from "element-plus";
 
 import {nextTick, ref, onMounted, onUnmounted} from "vue";
-import {ControlButton, Controls} from "@vue-flow/controls";
-import {Background} from "@vue-flow/background";
-import {MiniMap} from "@vue-flow/minimap";
 import {Connection, Link, MagicStick, Right, Picture as IconPicture} from '@element-plus/icons-vue';
 import {UploadFilled} from '@element-plus/icons-vue'
 import axios from "axios";
+import {useFactoryState} from "/@/stores/factoryState.ts"
 
 export default {
   name: "FactoryManage",
@@ -289,10 +287,6 @@ export default {
     ElCol,
     ElRow,
     ElMessage,
-    Background,
-    MiniMap,
-    ControlButton,
-    Controls,
     Connection,
     Link,
     Right,
@@ -307,7 +301,11 @@ export default {
     const target_url = ref('');
     const map_src = ref("");
     const fps = ref(1);
+    const factoryList = ref([]);
+    const selectedFactory = ref('template_config_set');
     let intervalId = null;
+    const stores = useFactoryState()
+
 
     function updateMapSrcBuffered() {
       const preloadImg = new Image();
@@ -320,6 +318,7 @@ export default {
     }
 
     onMounted(() => {
+      updateCurrentFactoryMapList()
     });
     onUnmounted(() => {
       clearInterval(intervalId);
@@ -327,6 +326,7 @@ export default {
 
     const handleChange = (uploadFile, uploadFiles) => {
       fileList.value.push(uploadFile)
+      updateCurrentFactoryMapList
     }
     const getStandardConfig = () => {
       fetch("/api/standard/get", {
@@ -383,15 +383,17 @@ export default {
     }
 
     const updateCurrentFactoryMapList = () => {
-      fetch("/api/test", {
-        method: "POST",
-        body: JSON.stringify({}),
-      })
-          .then((response) => {
-            console.log(response)
-          })
+      fetch("/api/factory/list", {
+        method: "GET",
+      }).then((response) => {
+            if (!response.ok) {
+              throw new Error(`HTTP error! status: ${response.status}`);
+            }
+            return response.json();
+          }
+      )
           .then((data) => {
-
+            stores.factoryList = data.factory_list;
           })
           .catch((error) => {
           });
@@ -498,11 +500,15 @@ export default {
       factoryReset,
       downloadLog,
       map_src,
-      fps
+      fps,
+      factoryList,
+      selectedFactory,
+      stores
     };
   },
 
-  data() {
+  data
+      () {
     return {
       speedLevel: parseInt(sessionStorage.getItem('speedLevel')) || 3, // 默认值为 3,
       selectedAgv: null,
@@ -512,20 +518,24 @@ export default {
       selectedJob: null,
       jobList: [],
     };
-  },
+  }
+  ,
 
   methods: {
     handleFactoryStart() {
       this.factoryStart();
-    },
+    }
+    ,
 
     handleFactoryPause() {
       this.factoryPause();
-    },
+    }
+    ,
 
     handleFactoryReset() {
       this.factoryReset();
-    },
+    }
+    ,
 
     async changeSpeed(value) {
       try {
@@ -539,7 +549,8 @@ export default {
         console.error('Speed adjustment failed:', error);
         this.$message.error('Speed adjustment failed');
       }
-    },
+    }
+    ,
 
     async loadAgvs() {
       try {
@@ -549,7 +560,8 @@ export default {
         this.$message.error('Failed to load AGV list');
         console.error('Failed to load AGV:', error);
       }
-    },
+    }
+    ,
 
     async pauseAgv() {
       if (this.selectedAgv === null) {
@@ -565,7 +577,8 @@ export default {
         console.error('Failed to pause AGV:', error);
         this.$message.error('Failed to pause AGV');
       }
-    },
+    }
+    ,
 
     async resumeAgv() {
       if (this.selectedAgv === null) {
@@ -581,7 +594,8 @@ export default {
         console.error('Failed to resume AGV:', error);
         this.$message.error('Failed to resume AGV');
       }
-    },
+    }
+    ,
 
     async loadMachines() {
       try {
@@ -591,7 +605,8 @@ export default {
         console.error('Failed to load machine:', error);
         this.$message.error('Failed to load machine list');
       }
-    },
+    }
+    ,
 
     async pauseMachine() {
       if (this.selectedMachine === null) {
@@ -607,7 +622,8 @@ export default {
         console.error('Failed to pause machine:', error);
         this.$message.error('Failed to pause machine');
       }
-    },
+    }
+    ,
 
     async resumeMachine() {
       if (this.selectedMachine === null) {
@@ -623,7 +639,8 @@ export default {
         console.error('Failed to resume machine:', error);
         this.$message.error('Failed to resume machine');
       }
-    },
+    }
+    ,
     async loadJobs() {
       // 检查 sessionStorage 是否已经有缓存数据
       const cachedJobs = sessionStorage.getItem('jobList');
@@ -645,7 +662,8 @@ export default {
         console.error('Failed to load task:', error);
         this.$message.error('Failed to load task list');
       }
-    },
+    }
+    ,
 
     async addJob() {
       if (this.selectedJob === null) {
@@ -661,7 +679,8 @@ export default {
         console.error('Failed to add task:', error);
         this.$message.error('Failed to add task');
       }
-    },
+    }
+    ,
   }
   ,
   mounted() {
