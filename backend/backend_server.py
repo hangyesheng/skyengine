@@ -248,7 +248,13 @@ class APIHandler:
     async def handle_file_list(self):
         # 返回图片
         config_list = file_service.get_config_list()
+        factory_list = []
+        for config_name in config_list:
+            data = {
+                'id': config_name
+            }
+            factory_list.append(data)
         return JSONResponse({
-            config_list: config_list,
+            "factory_list": factory_list,
             "success": True
         })
