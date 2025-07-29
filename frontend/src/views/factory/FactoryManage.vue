@@ -315,7 +315,7 @@ export default {
     const map_src = ref("");
     const fps = ref(1);
     const factoryList = ref([]);
-    const selectedFactory = ref('template_config_set');
+    const selectedFactory = ref('');
     let intervalId = null;
     const stores = useFactoryState()
 
