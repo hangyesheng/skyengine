@@ -243,6 +243,19 @@
               </el-col>
             </el-row>
           </el-card>
+
+
+          <el-card style="max-width: 480px; margin-top: 10px">
+            <div style="font-size: 16px; font-weight: bold; margin-bottom: 10px">Job Process</div>
+            <div v-for="job in jobProgressList" :key="job.id" style="margin-bottom: 15px">
+              <div style="display: flex; justify-content: space-between; align-items: center;">
+                <span>Job {{ job.id }}</span>
+                <span v-if="job.status === 'FINISHED'" style="color: green;">Finished</span>
+                <span v-else style="color: blue;">Processing...</span>
+              </div>
+              <el-progress :percentage="job.progress" :status="job.status === 'FINISHED' ? 'success' : undefined" />
+            </div>
+          </el-card>
         </el-col>
 
         <ElCol :span="2"></ElCol>
@@ -307,6 +320,10 @@ export default {
     const stores = useFactoryState()
 
 
+    const agvList = ref([]);
+    const machineList = ref([]);
+    const jobList = ref([]);
+
     function updateMapSrcBuffered() {
       const preloadImg = new Image();
       const newSrc = `/api/map/update?_t=${Date.now()}`;
@@ -326,7 +343,7 @@ export default {
 
     const handleChange = (uploadFile, uploadFiles) => {
       fileList.value.push(uploadFile)
-      updateCurrentFactoryMapList
+      updateCurrentFactoryMapList()
     }
     const getStandardConfig = () => {
       fetch("/api/standard/get", {
@@ -406,7 +423,11 @@ export default {
         body: JSON.stringify({}),
       })
           .then((response) => {
-            console.log(response)
+            loadAgvs();
+            loadMachines();
+            loadJobs();
+
+            console.log(response);
             // 启动成功,则每隔 0.2 秒更新一次图片
             intervalId = setInterval(updateMapSrcBuffered, 200);
           })
@@ -486,6 +507,114 @@ export default {
       }
     }
 
+    const loadAgvs = async () => {
+      const MAX_RETRIES = 5;
+      const RETRY_DELAY = 2000;
+
+      let retries = 0;
+
+      while (retries < MAX_RETRIES) {
+        try {
+          const res = await axios.get('/api/agvs');
+
+          agvList.value = res.data.agvs;
+          console.log('AGV data:', res.data.agvs);
+
+          return;
+        } catch (error) {
+          retries++;
+          console.error(`Failed to load AGV (attempt ${retries}/${MAX_RETRIES}):`, error);
+
+          if (retries >= MAX_RETRIES) {
+            ElMessage.error('Failed to load AGV list after multiple attempts');
+            return;
+          }
+
+          // 等待后重试
+          await new Promise(resolve => setTimeout(resolve, RETRY_DELAY));
+        }
+      }
+    };
+
+    const loadMachines = async () => {
+      const MAX_RETRIES = 5;
+      const RETRY_DELAY = 2000;
+
+      let retries = 0;
+
+      while (retries < MAX_RETRIES) {
+        try {
+          const res = await axios.get('/api/machines');
+          machineList.value = res.data.machines;
+          console.log('Machine data:', res.data.machines);
+          return;
+        } catch (error) {
+          retries++;
+          console.error(`Failed to load machine (attempt ${retries}/${MAX_RETRIES}):`, error);
+
+          if (retries >= MAX_RETRIES) {
+            ElMessage.error('Failed to load machine list after multiple attempts');
+            return;
+          }
+
+          // 等待后重试
+          await new Promise(resolve => setTimeout(resolve, RETRY_DELAY));
+        }
+      }
+    };
+
+     const loadJobs = async () => {
+      const MAX_RETRIES = 5;
+      const RETRY_DELAY = 2000;
+
+      // 检查 sessionStorage 是否已经有缓存数据
+      const cachedJobs = sessionStorage.getItem('jobList');
+
+      if (cachedJobs) {
+        try {
+          // 如果有缓存数据，直接使用
+          jobList.value = JSON.parse(cachedJobs);
+          console.log('Job list loaded from cache');
+          return; // 直接返回，不进行网络请求
+        } catch (parseError) {
+          console.warn('Failed to parse cached job list, fetching from server...', parseError);
+          // 如果解析缓存失败，继续从服务器获取
+        }
+      }
+
+      // 如果没有缓存或解析失败，则从服务器获取
+      let retries = 0;
+      while (retries < MAX_RETRIES) {
+        try {
+          const res = await axios.get('/api/jobs');
+          jobList.value = res.data.jobs;
+          console.log('Job data:', res.data.jobs);
+
+          // 将成功获取的数据保存到 sessionStorage，供下次使用
+          try {
+            sessionStorage.setItem('jobList', JSON.stringify(jobList.value));
+          } catch (storageError) {
+            console.warn('Failed to save job list to sessionStorage', storageError);
+            // 可选：清理失效缓存
+            // sessionStorage.removeItem('jobList');
+          }
+
+          return; // 成功后退出
+        } catch (error) {
+          retries++;
+          console.error(`Failed to load task (attempt ${retries}/${MAX_RETRIES}):`, error);
+
+          if (retries >= MAX_RETRIES) {
+            ElMessage.error('Failed to load task list after multiple attempts');
+            return;
+          }
+
+          // 等待后重试
+          await new Promise(resolve => setTimeout(resolve, RETRY_DELAY));
+        }
+      }
+    };
+
     return {
       uploadConfigSet,
       getStandardConfig,
@@ -498,6 +627,9 @@ export default {
       factoryStart,
       factoryPause,
       factoryReset,
+      agvList,
+      machineList,
+      jobList,
       downloadLog,
       map_src,
       fps,
@@ -507,35 +639,29 @@ export default {
     };
   },
 
-  data
-      () {
+  data() {
     return {
       speedLevel: parseInt(sessionStorage.getItem('speedLevel')) || 3, // 默认值为 3,
       selectedAgv: null,
-      agvList: [],
       selectedMachine: null,
-      machineList: [],
       selectedJob: null,
-      jobList: [],
+      jobProgressList: [],
+      progressInterval: null, // 用于保存定时器引用
     };
-  }
-  ,
+  },
 
   methods: {
     handleFactoryStart() {
       this.factoryStart();
-    }
-    ,
+    },
 
     handleFactoryPause() {
       this.factoryPause();
-    }
-    ,
+    },
 
     handleFactoryReset() {
       this.factoryReset();
-    }
-    ,
+    },
 
     async changeSpeed(value) {
       try {
@@ -549,19 +675,7 @@ export default {
         console.error('Speed adjustment failed:', error);
         this.$message.error('Speed adjustment failed');
       }
-    }
-    ,
-
-    async loadAgvs() {
-      try {
-        const res = await axios.get('/api/agvs');
-        this.agvList = res.data.agvs;
-      } catch (error) {
-        this.$message.error('Failed to load AGV list');
-        console.error('Failed to load AGV:', error);
-      }
-    }
-    ,
+    },
 
     async pauseAgv() {
       if (this.selectedAgv === null) {
@@ -577,8 +691,7 @@ export default {
         console.error('Failed to pause AGV:', error);
         this.$message.error('Failed to pause AGV');
       }
-    }
-    ,
+    },
 
     async resumeAgv() {
       if (this.selectedAgv === null) {
@@ -594,19 +707,7 @@ export default {
         console.error('Failed to resume AGV:', error);
         this.$message.error('Failed to resume AGV');
       }
-    }
-    ,
-
-    async loadMachines() {
-      try {
-        const res = await axios.get('/api/machines');
-        this.machineList = res.data.machines;
-      } catch (error) {
-        console.error('Failed to load machine:', error);
-        this.$message.error('Failed to load machine list');
-      }
-    }
-    ,
+    },
 
     async pauseMachine() {
       if (this.selectedMachine === null) {
@@ -622,8 +723,7 @@ export default {
         console.error('Failed to pause machine:', error);
         this.$message.error('Failed to pause machine');
       }
-    }
-    ,
+    },
 
     async resumeMachine() {
       if (this.selectedMachine === null) {
@@ -639,31 +739,7 @@ export default {
         console.error('Failed to resume machine:', error);
         this.$message.error('Failed to resume machine');
       }
-    }
-    ,
-    async loadJobs() {
-      // 检查 sessionStorage 是否已经有缓存数据
-      const cachedJobs = sessionStorage.getItem('jobList');
-
-      if (cachedJobs) {
-        // 如果有缓存数据，直接使用
-        this.jobList = JSON.parse(cachedJobs);
-        return;
-      }
-
-      // 如果没有缓存数据，则从服务器获取
-      try {
-        const res = await axios.get('/api/jobs');
-        this.jobList = res.data.jobs;
-
-        // 将数据保存到 sessionStorage，下次刷新时可以直接使用
-        sessionStorage.setItem('jobList', JSON.stringify(this.jobList));
-      } catch (error) {
-        console.error('Failed to load task:', error);
-        this.$message.error('Failed to load task list');
-      }
-    }
-    ,
+    },
 
     async addJob() {
       if (this.selectedJob === null) {
@@ -679,24 +755,27 @@ export default {
         console.error('Failed to add task:', error);
         this.$message.error('Failed to add task');
       }
+    },
+
+    async fetchJobProgress() {
+      try {
+        const res = await fetch("/api/jobs/progress");
+        if (!res.ok) {
+          throw new Error("Failed to retrieve progress");
+        }
+        const data = await res.json();
+        this.jobProgressList = data.jobs;
+      } catch (error) {
+        console.error("Failed to retrieve task progress:", error);
+      }
     }
-    ,
   }
   ,
   mounted() {
-    // const getServiceInterval = () => {
-    //   let timer;
-    //   if (timer !== undefined) {
-    //     clearInterval(timer);
-    //   }
-    //   timer = setInterval(() => {
-    //   }, 5000);
-    // };
-    // getServiceInterval();
-    // init agv, machine, job data list
-    this.loadAgvs();
-    this.loadMachines();
-    this.loadJobs();
+    this.fetchJobProgress(); // 首次加载
+    this.progressInterval = setInterval(() => {
+      this.fetchJobProgress();
+    }, 1000); // 每 1 秒刷新一次
   }
   ,
 }
