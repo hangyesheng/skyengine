@@ -139,7 +139,7 @@ export default {
 
         machineNumber: 5,
         agvNumber: 2,
-        factorySize: '30*20',
+        factorySize: '20*30',
         factoryInfo: 'Pipeline',
         description: 'Single Pipeline Job.'
       },
@@ -152,7 +152,7 @@ export default {
 
         machineNumber: 6,
         agvNumber: 4,
-        factorySize: '30*20',
+        factorySize: '20*30',
         factoryInfo: 'Cycle',
         description: 'Single Cycle Job.'
       },
