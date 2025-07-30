@@ -8,40 +8,82 @@
       <div class="new-dag-font-style">Standard Config Sets</div>
       <div class="upload-config-box">
 
-        <el-card 
-          v-for="(config, index) in configs" 
-          :key="index" 
+        <el-card
+            v-for="(config, index) in configs"
+            :key="index"
         >
           <template #header>
             <div class="card-header">
               <el-tag>Config Set {{ index + 1 }}</el-tag>
             </div>
           </template>
-          <el-row :gutter="20" type="flex" justify="center" align="middle" style="height: 100%;">
-            <el-col :span="16" style="display: flex; justify-content: center; align-items: center;">
+          <el-row type="flex" justify="center" align="middle" style="height: 100%;">
+            <el-col :span="12" style="display: flex; justify-content: center; align-items: center;">
               <div class="block" style="width: 100%; height: 80%;">
                 <!-- 使用 mapSrcs[index] 绑定图片源 -->
-                <el-image 
-                  :src="mapSrcs[index]" 
-                  style="width: 100%; height: 100%;" 
-                  fit="cover"
+                <el-image
+                    :src="mapSrcs[index]"
+                    style="width: 100%; height: 100%;"
+                    fit="cover"
                 ></el-image>
               </div>
             </el-col>
             <el-col :span="1"></el-col>
-            <el-col :span="5" style="display: flex; justify-content: center; align-items: center;">
+            <el-col :span="11" style="display: flex; justify-content: center; align-items: center;">
               <!-- 按钮点击时传入对应的参数 -->
-              <el-button 
-                type="success" 
-                icon="el-icon-download" 
-                plain 
-                @click="getStandardConfig(config.buttonParam)" 
-                style="width: 100%;"
-              >
-                {{ config.buttonText }}
-              </el-button>
+              <el-row>
+                <el-col>
+                  <el-card>
+                    <template #header>
+                      <div>
+                        <el-row>
+                          <el-col :span="12">
+                            <el-tag>Factory Name {{ config.buttonText }}</el-tag>
+                          </el-col>
+                          <el-col :span="2">
+
+                          </el-col>
+                          <el-col :span="10">
+                            <el-button
+                                type="success"
+                                icon="el-icon-download"
+                                plain
+                                @click="getStandardConfig(config.buttonParam)"
+                                style="width: 100%;"
+                            >
+                              {{ config.buttonText }}
+                            </el-button>
+                          </el-col>
+                        </el-row>
+
+                      </div>
+                    </template>
+                    <el-descriptions
+                        title="Scenario Info"
+                        direction="vertical"
+                        :column="4"
+                        border
+                    >
+                      <el-descriptions-item label="MachineNumber">6</el-descriptions-item>
+                      <el-descriptions-item label="AGVNumber">4</el-descriptions-item>
+                      <el-descriptions-item label="FactorySize" :span="2">30*20</el-descriptions-item>
+                      <el-descriptions-item label="FactoryInfo">
+                        <el-tag size="small">Circle</el-tag>
+                      </el-descriptions-item>
+                      <el-descriptions-item label="description">
+                        Single Pipeline Job.
+                      </el-descriptions-item>
+                    </el-descriptions>
+                  </el-card>
+
+
+                </el-col>
+
+              </el-row>
+
             </el-col>
           </el-row>
+          <br/>
         </el-card>
 
       </div>
@@ -88,19 +130,19 @@ export default {
   },
   setup() {
     const configs = ref([
-      { 
+      {
         mapParam: 'map1', // 用于生成图片URL的参数
-        buttonText: 'Get Standard Config 1', 
+        buttonText: 'Get Standard Config 1',
         buttonParam: {type: 'custom_config_1'} // 传给下载函数的参数
       },
-      { 
-        mapParam: 'map2', 
-        buttonText: 'Get Standard Config 2', 
-        buttonParam: {type: 'custom_config_2'} 
+      {
+        mapParam: 'map2',
+        buttonText: 'Get Standard Config 2',
+        buttonParam: {type: 'custom_config_2'}
       },
       // 可以添加更多配置
     ]);
-    
+
     const mapSrcs = ref([]);
 
     configs.value.forEach((config, index) => {
@@ -160,12 +202,10 @@ export default {
   },
 
   data() {
-    return {
-    };
+    return {};
   },
 
-  methods: {
-  }
+  methods: {}
   ,
   mounted() {
   }
