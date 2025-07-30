@@ -91,10 +91,10 @@ class BackendServer:
                      methods=[NetworkAPIMethod.MACHINE_RESUME]),
 
             # Job 控制
-            APIRoute(NetworkAPIPath.JOBS,
-                     handler.handle_jobs,
+            APIRoute(NetworkAPIPath.JOB_TEMPLATES,
+                     handler.handle_job_templates,
                      response_class=JSONResponse,
-                     methods=[NetworkAPIMethod.JOBS]),
+                     methods=[NetworkAPIMethod.JOB_TEMPLATES]),
 
             APIRoute(NetworkAPIPath.JOB_ADD,
                      handler.handle_job_add,
@@ -211,8 +211,8 @@ class APIHandler:
         self.server.resume_machine(int(machineId))
         return JSONResponse({"machineId": machineId})
 
-    async def handle_jobs(self):
-        job_list = self.server.get_jobs()
+    async def handle_job_templates(self):
+        job_list = self.server.get_job_templates()
         return JSONResponse({"jobs": job_list})
 
     async def handle_job_add(self, jobId):

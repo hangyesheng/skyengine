@@ -638,21 +638,6 @@ export default {
       const MAX_RETRIES = 5;
       const RETRY_DELAY = 2000;
 
-      // 检查 sessionStorage 是否已经有缓存数据
-      const cachedJobs = sessionStorage.getItem('jobList');
-
-      if (cachedJobs) {
-        try {
-          // 如果有缓存数据，直接使用
-          jobList.value = JSON.parse(cachedJobs);
-          console.log('Job list loaded from cache');
-          return; // 直接返回，不进行网络请求
-        } catch (parseError) {
-          console.warn('Failed to parse cached job list, fetching from server...', parseError);
-          // 如果解析缓存失败，继续从服务器获取
-        }
-      }
-
       // 如果没有缓存或解析失败，则从服务器获取
       let retries = 0;
       while (retries < MAX_RETRIES) {
@@ -663,14 +648,6 @@ export default {
           if (res.data && Array.isArray(res.data.jobs) && res.data.jobs.length > 0) {
             jobList.value = res.data.jobs;
             console.log('Job data:', res.data.jobs);
-
-            // 将成功获取的数据保存到 sessionStorage，供下次使用
-            try {
-              sessionStorage.setItem('jobList', JSON.stringify(jobList.value));
-            } catch (storageError) {
-              console.warn('Failed to save job list to sessionStorage', storageError);
-              sessionStorage.removeItem('jobList');
-            }
 
             return; // 成功获取非空数据，退出重试循环
           } else {
