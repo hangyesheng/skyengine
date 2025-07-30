@@ -428,6 +428,9 @@ export default {
         body: JSON.stringify({target_factory: selectedFactory.value}),
       })
           .then((response) => {
+            loadAgvs();
+            loadMachines();
+            loadJobs();
             console.log(response);
           })
           .catch((error) => {
