@@ -17,7 +17,7 @@ class NetworkAPIPath:
     MACHINE_RESUME = '/machine/resume/{machineId}'
 
     # 接口：Job 控制
-    JOBS = '/jobs'
+    JOB_TEMPLATES = '/jobs'
     JOB_ADD = '/job/add/{jobId}'
 
     # 接口：信息展示
@@ -58,7 +58,7 @@ class NetworkAPIMethod:
     MACHINE_RESUME = 'POST'
 
     # 接口：Job 控制
-    JOBS = 'GET'
+    JOB_TEMPLATES = 'GET'
     JOB_ADD = 'POST'
 
     # 接口：信息展示

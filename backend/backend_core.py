@@ -132,10 +132,10 @@ class BackendCore:
         print("resume_machine")
         self.env.env_visualizer.resume_machine(machine_id)
 
-    def get_jobs(self):
+    def get_job_templates(self):
         if self.env is None:
             return []
-        jobs: List[Job] = self.env.getJobs()
+        jobs: List[Job] = self.env.getJobTemplates()
         job_list = [{"id": job.id} for job in jobs]
         return job_list
 

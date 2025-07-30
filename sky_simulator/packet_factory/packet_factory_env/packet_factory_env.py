@@ -1,4 +1,5 @@
 from typing import List, Tuple
+import copy
 
 from pettingzoo import ParallelEnv
 
@@ -30,6 +31,8 @@ class PacketFactoryEnv(ParallelEnv):
         self.machines = []
         self.agvs = []
         self.graph = None
+
+        self.job_templates = []
 
         # 环境本身的状态,事件队列,智能体相关的状态等
         self.env_timeline: float = 0
@@ -63,6 +66,7 @@ class PacketFactoryEnv(ParallelEnv):
         """
         # 环境创建 当场调用即可
         self.jobs, self.machines, self.agvs, self.graph = self.callback_manager.get('load_graph')()
+        self.job_templates = copy.deepcopy(self.jobs)
         self.createHashIndex()
 
         # 可视化组件赋值 不需要当场调用
@@ -271,6 +275,9 @@ class PacketFactoryEnv(ParallelEnv):
 
     def getJobs(self) -> List[Job]:
         return self.jobs
+    
+    def getJobTemplates(self) -> List[Job]:
+        return self.job_templates
 
     def getMachines(self) -> List[Machine]:
         return self.machines
