@@ -39,7 +39,7 @@ class ThreadPool:
         except Exception as e:
             LOGGER.error(e)
 
-    def shutdown(self, wait=False):
+    def shutdown(self, wait=True):
         """请求线程退出（通过事件标志）"""
         self.stop_event.set()  # 通知线程退出
         if wait:

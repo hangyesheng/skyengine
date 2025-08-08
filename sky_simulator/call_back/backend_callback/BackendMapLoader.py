@@ -44,7 +44,8 @@ class FactoryMapLoader(EnvCallback):
         for job_entry in job_config.get('jobs', []):
             job_data = job_entry['job']
             operations: List[Operation] = []
-            for op_data in job_data.get('operations', []):
+            for op_entry in job_data.get('operations', []):
+                op_data = op_entry['operation']
                 durations = [
                     (int(m['id']), float(m['time']))
                     for m in op_data.get('machines', [])
