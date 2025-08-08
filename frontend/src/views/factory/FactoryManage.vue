@@ -354,7 +354,7 @@ export default {
       updateCurrentFactoryMapList()
     }
     const getStandardConfig = () => {
-      fetch("/api/standard/get", {
+      fetch(`/api/standard/get?t=${Date.now()}`, {
         method: "GET"
       })
           .then(response => {
@@ -389,7 +389,7 @@ export default {
     }
 
     const uploadConfigSet = () => {
-      target_url.value = '/api/' + config_name.value + `/yaml/upload`
+      target_url.value = '/api/' + config_name.value + `/yaml/upload?t=${Date.now()}`
       uploadRef.value.submit()
       fileList.value = []
       ElMessage.success("Upload success!");
@@ -483,7 +483,7 @@ export default {
     const downloadLog = (file_type) => {
       console.log(file_type)
       console.log("start download")
-      fetch("/api/log/download", {
+      fetch(`/api/log/download?t=${Date.now()}`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -576,7 +576,7 @@ export default {
             console.warn(`Received empty AGV list (attempt ${retries}/${MAX_RETRIES})`);
 
             if (retries >= MAX_RETRIES) {
-              ElMessage.warning('Loaded AGV list is empty after multiple attempts');
+              // ElMessage.warning('Loaded AGV list is empty after multiple attempts');
               return;
             }
 
@@ -585,10 +585,10 @@ export default {
           }
         } catch (error) {
           retries++;
-          // console.error(`Failed to load AGV (attempt ${retries}/${MAX_RETRIES}):`, error);
+          console.error(`Failed to load AGV (attempt ${retries}/${MAX_RETRIES}):`, error);
 
           if (retries >= MAX_RETRIES) {
-            ElMessage.error('Failed to load AGV list after multiple attempts');
+            // ElMessage.error('Failed to load AGV list after multiple attempts');
             return;
           }
 
@@ -619,7 +619,7 @@ export default {
             console.warn(`Received empty machine list (attempt ${retries}/${MAX_RETRIES})`);
 
             if (retries >= MAX_RETRIES) {
-              ElMessage.warning('Loaded machine list is empty after multiple attempts');
+              // ElMessage.warning('Loaded machine list is empty after multiple attempts');
               return;
             }
 
@@ -628,10 +628,10 @@ export default {
           }
         } catch (error) {
           retries++;
-          // console.error(`Failed to load machine (attempt ${retries}/${MAX_RETRIES}):`, error);
+          console.error(`Failed to load machine (attempt ${retries}/${MAX_RETRIES}):`, error);
 
           if (retries >= MAX_RETRIES) {
-            ElMessage.error('Failed to load machine list after multiple attempts');
+            // ElMessage.error('Failed to load machine list after multiple attempts');
             return;
           }
 
@@ -663,7 +663,7 @@ export default {
             console.warn(`Received empty or invalid job list (attempt ${retries}/${MAX_RETRIES})`);
 
             if (retries >= MAX_RETRIES) {
-              ElMessage.warning('Loaded job list is empty or invalid after multiple attempts');
+              // ElMessage.warning('Loaded job list is empty or invalid after multiple attempts');
               return;
             }
 
@@ -672,10 +672,10 @@ export default {
           }
         } catch (error) {
           retries++;
-          // console.error(`Failed to load task (attempt ${retries}/${MAX_RETRIES}):`, error);
+          console.error(`Failed to load task (attempt ${retries}/${MAX_RETRIES}):`, error);
 
           if (retries >= MAX_RETRIES) {
-            ElMessage.error('Failed to load task list after multiple attempts');
+            // ElMessage.error('Failed to load task list after multiple attempts');
             return;
           }
 
