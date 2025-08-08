@@ -316,6 +316,9 @@ export default {
     const fps = ref(1);
     const factoryList = ref([]);
     const selectedFactory = ref('');
+    let agvIntervalId = null;
+    let machineIntervalId = null;
+    let jobIntervalId = null;
     let intervalId = null;
     const stores = useFactoryState()
 
@@ -339,7 +342,11 @@ export default {
       updateCurrentFactoryMapList()
     });
     onUnmounted(() => {
+      clearInterval(agvIntervalId);
+      clearInterval(machineIntervalId);
+      clearInterval(jobIntervalId);
       clearInterval(intervalId);
+      clearInterval(checkAliveInterval);
     });
 
     const handleChange = (uploadFile, uploadFiles) => {
@@ -382,7 +389,7 @@ export default {
     }
 
     const uploadConfigSet = () => {
-      target_url.value = '/api/' + config_name.value + '/yaml/upload'
+      target_url.value = '/api/' + config_name.value + `/yaml/upload`
       uploadRef.value.submit()
       fileList.value = []
       ElMessage.success("Upload success!");
@@ -428,9 +435,9 @@ export default {
         body: JSON.stringify({target_factory: selectedFactory.value}),
       })
           .then((response) => {
-            loadAgvs();
-            loadMachines();
-            loadJobs();
+            agvIntervalId = setInterval(loadAgvs(), 1000);
+            machineIntervalId = setInterval(loadMachines(), 1000);
+            jobIntervalId = setInterval(loadJobs(), 1000);
             console.log(response);
           })
           .catch((error) => {
@@ -449,9 +456,9 @@ export default {
           .then((data) => {
             console.log(data);
             if (data.is_alive) {
-              loadAgvs();
-              loadMachines();
-              loadJobs();
+              agvIntervalId = setInterval(loadAgvs(), 1000);
+              machineIntervalId = setInterval(loadMachines(), 1000);
+              jobIntervalId = setInterval(loadJobs(), 1000);
 
               // 启动成功,则每隔 0.2 秒更新一次图片
               intervalId = setInterval(updateMapSrcBuffered, 250);
@@ -546,7 +553,7 @@ export default {
     }
 
     const loadAgvs = async () => {
-      const MAX_RETRIES = 5;
+      const MAX_RETRIES = 1;
       const RETRY_DELAY = 2000;
 
       let retries = 0;
@@ -578,7 +585,7 @@ export default {
           }
         } catch (error) {
           retries++;
-          console.error(`Failed to load AGV (attempt ${retries}/${MAX_RETRIES}):`, error);
+          // console.error(`Failed to load AGV (attempt ${retries}/${MAX_RETRIES}):`, error);
 
           if (retries >= MAX_RETRIES) {
             ElMessage.error('Failed to load AGV list after multiple attempts');
@@ -592,7 +599,7 @@ export default {
     };
 
     const loadMachines = async () => {
-      const MAX_RETRIES = 5;
+      const MAX_RETRIES = 1;
       const RETRY_DELAY = 2000;
 
       let retries = 0;
@@ -621,7 +628,7 @@ export default {
           }
         } catch (error) {
           retries++;
-          console.error(`Failed to load machine (attempt ${retries}/${MAX_RETRIES}):`, error);
+          // console.error(`Failed to load machine (attempt ${retries}/${MAX_RETRIES}):`, error);
 
           if (retries >= MAX_RETRIES) {
             ElMessage.error('Failed to load machine list after multiple attempts');
@@ -635,7 +642,7 @@ export default {
     };
 
     const loadJobs = async () => {
-      const MAX_RETRIES = 5;
+      const MAX_RETRIES = 1;
       const RETRY_DELAY = 2000;
 
       // 如果没有缓存或解析失败，则从服务器获取
@@ -665,7 +672,7 @@ export default {
           }
         } catch (error) {
           retries++;
-          console.error(`Failed to load task (attempt ${retries}/${MAX_RETRIES}):`, error);
+          // console.error(`Failed to load task (attempt ${retries}/${MAX_RETRIES}):`, error);
 
           if (retries >= MAX_RETRIES) {
             ElMessage.error('Failed to load task list after multiple attempts');
