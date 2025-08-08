@@ -15,7 +15,7 @@ from backend_core import BackendCore
 # service引入
 from service import file_service
 
-from sky_logs.logger import BACKEND_LOGGER as LOGGER
+from tiangong_logs.logger import BACKEND_LOGGER as LOGGER
 
 
 class BackendServer:

@@ -1,6 +1,6 @@
 # 生命周期设计
 
-参考SpringBoot的生命周期设计,对sky_simulator整体进行类似的设计.
+参考SpringBoot的生命周期设计,对tiangong_simulator整体进行类似的设计.
 使用了 "组件注册表 + 动态工厂 + 环境标识" 机制实现从文件中动态创建.
 ---
 🌱 1. 启动引导阶段（Initialize Bootstrap）
