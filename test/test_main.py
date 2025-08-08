@@ -1,5 +1,5 @@
 
-# 测试整个sky_simulator包的特性
+# 测试整个tiangong_simulator包的特性
 
 
 

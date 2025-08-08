@@ -1,8 +1,7 @@
-from sky_simulator.packet_factory import packet_factory_v0
-from sky_logs.logger import LOGGER
+from tiangong_simulator.packet_factory import packet_factory_v0
+from tiangong_logs.logger import LOGGER
 
 # 创建环境与智能体
-# greedy_Agent = sky_dag_v0.GreedyAgent(name='sky', agent_id='1')
 random_Agent = packet_factory_v0.RandomAgent(name='sky', agent_id='1')
 env = packet_factory_v0.PacketFactoryEnv(agent=random_Agent)
 
