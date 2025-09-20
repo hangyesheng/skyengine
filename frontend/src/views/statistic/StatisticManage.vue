@@ -1,190 +1,180 @@
 <template>
-  <div class="outline">
-    <div>
-      <h3>Statistic Infomation</h3>
-    </div>
-    <div>
-      <div class="new-dag-font-style">Upload Config Set</div>
-      <div class="upload-config-box">
-        <ElRow>
-          <ElCol :span="1"></ElCol>
+  <div class="monitor-outline">
+    <!-- 顶部标题 -->
+    <h3>Runtime Monitor</h3>
 
-          <ElCol :span="10">
-            <ElCard>
-              <template #header>
-                <div class="card-header">
-                  <el-tag>Config Set Operation</el-tag>
-                </div>
-              </template>
-              <v-chart class="chart" :option="option"/>
-            </ElCard>
-          </ElCol>
-          <ElCol :span="2"></ElCol>
+    <!-- 总体指标区 -->
+    <el-row :gutter="20" class="summary-row">
+      <el-col :span="6">
+        <el-card>
+          <div class="summary-item">
+            <div class="summary-label">System Status</div>
+            <el-tag type="success">Running</el-tag>
+          </div>
+        </el-card>
+      </el-col>
+      <el-col :span="6">
+        <el-card>
+          <div class="summary-item">
+            <div class="summary-label">Active AGVs</div>
+            <div>12</div>
+          </div>
+        </el-card>
+      </el-col>
+      <el-col :span="6">
+        <el-card>
+          <div class="summary-item">
+            <div class="summary-label">Completed Jobs</div>
+            <div>256</div>
+          </div>
+        </el-card>
+      </el-col>
+      <el-col :span="6">
+        <el-card>
+          <div class="summary-item">
+            <div class="summary-label">Throughput</div>
+            <div>45 jobs/min</div>
+          </div>
+        </el-card>
+      </el-col>
+    </el-row>
 
-          <ElCol :span="10">
-            <ElCard>
-              <template #header>
-                <div class="card-header">
-                  <el-tag @click="test">Config Set Operation</el-tag>
-                </div>
-              </template>
-              <v-chart class="chart" :option="option"/>
-            </ElCard>
-          </ElCol>
-          <ElCol :span="1"></ElCol>
+    <!-- 资源监控区 -->
+    <div class="section-title">Resource Usage</div>
+    <el-row :gutter="20">
+      <el-col :span="8">
+        <el-card>
+          <v-chart class="chart" :option="machineLoadOption"/>
+        </el-card>
+      </el-col>
+      <el-col :span="8">
+        <el-card>
+          <v-chart class="chart" :option="agvLoadOption"/>
+        </el-card>
+      </el-col>
+      <el-col :span="8">
+        <el-card>
+          <v-chart class="chart" :option="jobLatencyOption"/>
+        </el-card>
+      </el-col>
+    </el-row>
 
-        </ElRow>
+    <!-- 吞吐量监控 -->
+    <div class="section-title">System Throughput</div>
+    <el-card>
+      <v-chart class="chart" :option="throughputOption"/>
+    </el-card>
 
-
+    <!-- 日志 & 告警区 -->
+    <div class="section-title">Logs & Alerts</div>
+    <el-card class="log-card">
+      <div v-for="(line, idx) in logs" :key="idx" class="log-line">
+        {{ line }}
       </div>
-    </div>
-
+    </el-card>
   </div>
-  <br/>
 </template>
 
 <script setup>
-import {ElButton, ElCol, ElInput, ElRow, ElTag, ElTooltip} from "element-plus";
-
+import {ref} from "vue";
+import {ElCard, ElRow, ElCol, ElTag} from "element-plus";
+import VChart from "vue-echarts";
 import {use} from "echarts/core";
+import {LineChart, BarChart} from "echarts/charts";
 import {CanvasRenderer} from "echarts/renderers";
-import {PieChart} from "echarts/charts";
-import {
-  TitleComponent,
-  TooltipComponent,
-  LegendComponent,
-} from "echarts/components";
-import VChart, {THEME_KEY} from "vue-echarts";
-import {ref, provide} from "vue";
+import {TitleComponent, TooltipComponent, LegendComponent, GridComponent} from "echarts/components";
 
-use([
-  CanvasRenderer,
-  PieChart,
-  TitleComponent,
-  TooltipComponent,
-  LegendComponent,
-]);
+use([CanvasRenderer, LineChart, BarChart, TitleComponent, TooltipComponent, LegendComponent, GridComponent]);
 
-const options_dict = ref({
-  machine_load_bar: {},
-  agv_load_bar: {},
-  job_finish_time: {},
-})
-
-const option = ref({
-  title: {
-    text: "Traffic Sources",
-    left: "center",
-  },
-  tooltip: {
-    trigger: "item",
-    formatter: "{a} <br/>{b} : {c} ({d}%)",
-  },
-  legend: {
-    orient: "vertical",
-    left: "left",
-    data: ["Direct", "Email", "Ad Networks", "Video Ads", "Search Engines"],
-  },
-  series: [
-    {
-      name: "Traffic Sources",
-      type: "pie",
-      radius: "55%",
-      center: ["50%", "60%"],
-      data: [
-        {value: 335, name: "Direct"},
-        {value: 310, name: "Email"},
-        {value: 234, name: "Ad Networks"},
-        {value: 135, name: "Video Ads"},
-        {value: 1548, name: "Search Engines"},
-      ],
-      emphasis: {
-        itemStyle: {
-          shadowBlur: 10,
-          shadowOffsetX: 0,
-          shadowColor: "rgba(0, 0, 0, 0.5)",
-        },
-      },
-    },
-  ],
+// 机器负载
+const machineLoadOption = ref({
+  title: {text: "Machine Load", left: "center"},
+  xAxis: {type: "category", data: ["M1","M2","M3","M4","M5"]},
+  yAxis: {type: "value"},
+  series: [{data: [70, 55, 80, 40, 65], type: "bar"}]
 });
 
+// AGV 负载
+const agvLoadOption = ref({
+  title: {text: "AGV Load", left: "center"},
+  xAxis: {type: "category", data: ["AGV1","AGV2","AGV3","AGV4"]},
+  yAxis: {type: "value"},
+  series: [{data: [5, 7, 3, 6], type: "bar"}]
+});
 
+// 任务完成时延
+const jobLatencyOption = ref({
+  title: {text: "Job Completion Latency (s)", left: "center"},
+  xAxis: {type: "category", data: ["Job1","Job2","Job3","Job4","Job5"]},
+  yAxis: {type: "value"},
+  series: [{data: [12, 18, 15, 20, 14], type: "line", smooth: true}]
+});
+
+// 系统吞吐量
+const throughputOption = ref({
+  title: {text: "Throughput Over Time", left: "center"},
+  xAxis: {type: "category", data: ["1min","2min","3min","4min","5min"]},
+  yAxis: {type: "value"},
+  series: [{data: [40, 42, 45, 47, 50], type: "line", smooth: true}]
+});
+
+// 日志模拟
+const logs = ref([
+  "[INFO] AGV1 picked up Job23",
+  "[INFO] Machine M2 started processing Job22",
+  "[INFO] Job21 finished in 14s",
+  "[WARN] AGV3 load > threshold",
+  "[INFO] Throughput reached 45 jobs/min"
+]);
 </script>
 
-
 <style scoped lang="scss">
-.outline {
-  /* max-width: 600px; */
+.monitor-outline {
   padding: 20px;
   background-color: #fff;
-  border-radius: 8px;
-  /* box-shadow: 0px 4px 6px rgba(0, 0, 0, 0.1); */
-}
-
-
-body {
-  font-family: Arial, sans-serif;
-  background-color: #f9f9f9;
-  margin: 0;
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  height: 100vh;
-}
-
-form {
-  max-width: 600px;
-  padding: 20px;
-  background-color: #fff;
-  border-radius: 8px;
-  /* box-shadow: 0px 4px 6px rgba(0, 0, 0, 0.1); */
+  border-radius: 12px;
 }
 
 h3 {
   font-size: 24px;
-  color: #333;
   margin-bottom: 20px;
 }
 
-input[type="text"],
-input[type="file"] {
-  width: calc(100% - 20px);
-  padding: 10px;
-  margin-bottom: 10px;
-  border: 1px solid #ccc;
-  border-radius: 4px;
-  font-size: 16px;
-}
-
-input[type="file"] {
-  cursor: pointer;
-}
-
-.new-dag-font-style {
-  font-size: 16px;
-  margin-bottom: 15px;
+.section-title {
+  font-size: 18px;
   font-weight: bold;
+  margin: 20px 0 10px;
+  color: #333;
 }
 
-.upload-config-box {
-
-  padding: 20px;
-  background-color: #f0f8ff; /* 浅蓝背景 */
-  border-radius: 12px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
-  margin: 0 auto;
+.summary-row {
+  margin-bottom: 20px;
 }
 
-.el-card__body {
-  width: 100px;
-  height: 100px;
+.summary-item {
+  text-align: center;
+  .summary-label {
+    font-size: 14px;
+    color: #666;
+    margin-bottom: 5px;
+  }
 }
 
-.echarts.chart {
-  flex: 1;
+.chart {
   width: 100%;
-  height: 100%;
-  min-height: 300px; /* 最小高度，避免为 0 */
+  height: 300px;
+}
+
+.log-card {
+  max-height: 200px;
+  overflow-y: auto;
+  background: #1e1e1e;
+  color: #dcdcdc;
+  font-family: monospace;
+  font-size: 13px;
+}
+
+.log-line {
+  padding: 2px 0;
 }
 </style>

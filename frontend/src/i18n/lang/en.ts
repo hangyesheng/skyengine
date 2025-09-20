@@ -3,7 +3,7 @@ export default {
         factory: 'Factory Orchestration',
         cases: 'Typical Cases',
         train: 'Train Management',
-        statis:'Information Collect',
+        statis:'Statistic Information',
 
 
         limits: 'limits',

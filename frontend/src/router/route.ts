@@ -1,4 +1,4 @@
-import { RouteRecordRaw } from 'vue-router';
+import {RouteRecordRaw} from 'vue-router';
 
 /**
  * 建议：路由 path 路径与文件夹名称相同，找文件可浏览器地址找，方便定位文件位置
@@ -78,21 +78,6 @@ export const dynamicRoutes: Array<RouteRecordRaw> = [
                 },
             },
             {
-                path: '/train',
-                name: 'train',
-                component: () => import('/@/views/train/index.vue'),
-                meta: {
-                    title: 'message.router.train',
-                    isLink: '',
-                    isHide: false,
-                    isKeepAlive: true,
-                    isAffix: false,
-                    isIframe: false,
-                    roles: ['tiangong', 'common'],
-                    icon: 'iconfont icon-zidingyibuju',
-                },
-            },
-            {
                 path: '/statis',
                 name: 'statis',
                 component: () => import('/@/views/statistic/index.vue'),
@@ -107,6 +92,22 @@ export const dynamicRoutes: Array<RouteRecordRaw> = [
                     icon: 'iconfont icon-zidingyibuju',
                 },
             },
+            {
+                path: '/train',
+                name: 'train',
+                component: () => import('/@/views/train/index.vue'),
+                meta: {
+                    title: 'message.router.train',
+                    isLink: '',
+                    isHide: false,
+                    isKeepAlive: true,
+                    isAffix: false,
+                    isIframe: false,
+                    roles: ['tiangong', 'common'],
+                    icon: 'iconfont icon-zidingyibuju',
+                },
+            },
+
         ],
     },
 ];
