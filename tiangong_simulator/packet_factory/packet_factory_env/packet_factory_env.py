@@ -80,8 +80,10 @@ class PacketFactoryEnv(ParallelEnv):
         LOGGER.info("Environment Initialized Successfully.")
 
     def action_space(self, agent: BaseAgent):
-        decisions, step_time = agent.sample(self.agvs, self.machines,
-                                            self.jobs)  # type: List[Tuple[Operation, AGV,  Machine]], float
+        decisions, step_time = agent.sample(self.agvs,
+                                            self.machines,
+                                            self.jobs,
+                                            self.env_timeline)  # type: List[Tuple[Operation, AGV,  Machine]], float
         return {
             "decisions": decisions,
             "step_time": step_time
@@ -222,9 +224,12 @@ class PacketFactoryEnv(ParallelEnv):
                 break
 
         # === 2. 统计完成状态，计算奖励 ===
+        # 奖励,看情况设置,感觉实际上当前也不需要设置,因为传入了Agent本身
         rewards = {self.agent.agent_id: self.agent.reward({})}
+        # 终止信号,看情况设置,应该还是需要的
         terminations = {self.agent}
-        obs = self._get_obs()
+        # 注意:实际上这里的obs没啥用了,因为会传入agent进入环境内部,sample时可以直接获取所有数据,获得Agent观察的环境信息
+        obs = {}
 
         #  === 3. 更新可视化 ===
         self.env_visualizer.visualize_env()
@@ -235,14 +240,6 @@ class PacketFactoryEnv(ParallelEnv):
         LOGGER.info(f"--------- 结束当前循环步 ---------")
 
         return obs, rewards, terminations, {}, {}
-
-    def _get_obs(self):
-        """
-        获得Agent观察的环境信息
-        :return: 物理节点的观察信息
-        """
-        obs = {}
-        return obs
 
     def reset(self, seed=None, options=None):
         # ---------- 清理重建阶段 ----------

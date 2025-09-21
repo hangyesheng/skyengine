@@ -9,11 +9,14 @@
 from tiangong_simulator.call_back.EnvCallback import EnvCallback
 from tiangong_simulator.registry import register_component
 from tiangong_logs.logger import AGV_LOGGER as LOGGER
+from tiangong_logs.dc_helper import DiskCacheHelper
+
 
 @register_component("agv_callback.BaseCount")
 class BaseCount(EnvCallback):
     def __init__(self):
         super().__init__()
+        self.dc_helper = DiskCacheHelper()
 
     def __call__(self, *args, **kwargs):
         """使类的实例可以像函数一样被调用"""
@@ -23,5 +26,5 @@ class BaseCount(EnvCallback):
         else:
             print("传入了实际的job_component")
         return {
-            'success':"agv_callback.BaseCount success"
+            'success': "agv_callback.BaseCount success"
         }

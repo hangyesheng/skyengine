@@ -8,11 +8,12 @@
 # 该回调计算单个AGV自己经过的路径
 
 from tiangong_simulator.call_back.EnvCallback import EnvCallback
+from tiangong_simulator.call_back.component_callback.agv_callback import BaseCount
 from tiangong_simulator.registry import register_component
 from tiangong_logs.logger import AGV_LOGGER as LOGGER
 
 @register_component("agv_callback.PathCount")
-class PathCount(EnvCallback):
+class PathCount(BaseCount):
     def __init__(self):
         super().__init__()
 

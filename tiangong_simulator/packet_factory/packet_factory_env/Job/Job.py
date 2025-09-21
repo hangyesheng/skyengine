@@ -23,6 +23,8 @@ class Job:
         if len(self.operations) >= 1:
             self.operations[0].set_status(OperationStatus.READY)
 
+        self.begin_time: float = 0.0
+        self.timer: float = 0.0
         self.status = JobStatus.B4START
         self.target_count = target_count  # 目标处理工件数，可选
         # 需要记录的数据
@@ -56,6 +58,9 @@ class Job:
             f"status={self.status}> "
             f"operations={self.operations} "
         )
+
+    def set_begin_time(self, timer: float):
+        self.begin_time = timer
 
     def set_callback_manager(self, callback_manager: JobCallbackManager):
         self.callback_manager = callback_manager
@@ -99,11 +104,12 @@ class Job:
                 count += 1
         return count / len(self.operations)
 
-    def is_finished(self):
+    def is_finished(self, current_env_time: float):
         """
         计算当前Job是否已经完成
         """
         # todo: 待完善job状态转移
+        self.timer = current_env_time
         # return self.status == JobStatus.FINISHED
         if self.operations[self.get_operation_count() - 1].get_status() == OperationStatus.FINISHED:
             # 传入自己,计算所有指标
