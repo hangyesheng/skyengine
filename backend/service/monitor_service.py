@@ -6,40 +6,66 @@
 @Date    ：2025/9/20 22:52
 """
 from typing import Any, Dict, Optional
+import asyncio
+import json
+import time
 from tiangong_logs.dc_helper import DiskCacheHelper
 import config
 
 # 初始化一个全局缓存对象
-dc = DiskCacheHelper(config.CACHE_DIR, expire=60)
+dc = DiskCacheHelper(config.CACHE_DIR, expire=600)
 
 
 def get_agv_indicator(default: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
-    """
-    获取 AGV 指标
-    :param default: 缓存不存在时返回的默认值
-    """
     return dc.get("agv_indicator", default or {})
 
 
 def get_machine_indicator(default: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
-    """
-    获取 Machine 指标
-    """
     return dc.get("machine_indicator", default or {})
 
 
 def get_job_indicator(default: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
-    """
-    获取 Job 指标
-    """
     return dc.get("job_indicator", default or {})
 
 
 def get_system_indicator(default: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
-    """
-    获取系统级别指标
-    """
     return dc.get("system_indicator", default or {})
+
+
+async def event_generator():
+    """不断推送监控数据"""
+    while True:
+        # 从缓存获取数据
+        agv_data = get_agv_indicator({})
+        machine_data = get_machine_indicator({})
+        job_data = get_job_indicator({})
+        system_data = get_system_indicator({})
+
+        # === 格式化给前端的数据 ===
+        payload = {
+            "systemStatus": {
+                "text": system_data.get("status", "Offline"),
+                "type": "success" if system_data.get("status") == "running" else "danger"
+            },
+            "activeAGVs": len(agv_data) if agv_data else 0,
+            "completedJobs": job_data.get("completed", 0),
+            "throughput": system_data.get("throughput", 0),
+
+            # 图表数据（这里要根据缓存格式调整）
+            "machine": [m.get("utilization", 0) for m in machine_data.values()] if isinstance(machine_data,
+                                                                                              dict) else [],
+            "agv": [a["value"]["transport_count"] for a in agv_data.values()] if isinstance(agv_data, dict) else [],
+            "job": [j.get("latency", 0) for j in job_data.get("list", [])] if isinstance(job_data, dict) else [],
+            "throughputSeries": system_data.get("throughput_series", [0, 0, 0, 0, 0]),
+
+            # 日志数据
+            "logs": system_data.get("logs", [
+                "[INFO] Monitor heartbeat {}".format(time.strftime("%H:%M:%S"))
+            ])
+        }
+
+        yield f"data: {json.dumps(payload)}\n\n"
+        await asyncio.sleep(2)  # 每2秒推送一次
 
 
 if __name__ == "__main__":
