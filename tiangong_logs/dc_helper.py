@@ -71,3 +71,20 @@ class DiskCacheHelper:
         关闭缓存（释放资源）
         """
         self.cache.close()
+
+    def append_to_list(self, key: str, value: Any, time, max_length: int = 100, expire: Optional[int] = None):
+        """
+        向缓存中的 list 追加数据
+        :param key: 缓存键
+        :param value: 新增数据
+        :param max_length: list 最大长度，超过后丢弃最早的数据
+        :param expire: 过期时间（秒）
+        """
+        data = self.get(key, [])
+        if not isinstance(data, list):
+            data = []
+        data.append({"ts": time, "value": value})
+        if len(data) > max_length:
+            data = data[-max_length:]  # 只保留最新 N 条
+        self.set(key, data, expire=expire or self.expire)
+        return True
