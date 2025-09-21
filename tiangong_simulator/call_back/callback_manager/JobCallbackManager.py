@@ -22,12 +22,10 @@ class JobCallbackManager(CallbackManager):
         """
         执行所有 'after_work' 回调
         """
-        print(component)
         LOGGER.info("[JOBCallbackManager] 开始执行所有 after_work 回调...")
         results = {}
         for cb in self._callbacks.get("after_work", []):
             cb_name = cb.__class__.__name__
-            print(cb_name)
 
             try:
                 if component is not None:

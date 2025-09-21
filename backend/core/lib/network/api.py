@@ -49,7 +49,7 @@ class NetworkAPIPath:
     MACHINE_MONITOR = '/monitor/machine'
     JOB_MONITOR = '/monitor/job'
     SYSTEM_MONITOR = '/monitor/system'
-
+    TOTAL_MONITOR = '/monitor/total'
 
 class NetworkAPIMethod:
     # 接口：工厂控制
@@ -100,3 +100,4 @@ class NetworkAPIMethod:
     MACHINE_MONITOR = 'GET'
     JOB_MONITOR = 'GET'
     SYSTEM_MONITOR = 'GET'
+    TOTAL_MONITOR = 'GET'

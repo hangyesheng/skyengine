@@ -17,7 +17,6 @@ from service import file_service
 from service import agent_service
 from service import monitor_service
 
-
 from tiangong_logs.logger import BACKEND_LOGGER as LOGGER
 
 
@@ -184,12 +183,10 @@ class BackendServer:
                      handler.get_system_indicator,
                      response_class=JSONResponse,
                      methods=[NetworkAPIMethod.SYSTEM_MONITOR]),
-            # {
-            #     "systemStatus": {"text": "Running", "type": "success"},
-            #     "activeAGVs": 4,
-            #     "completedJobs": 12,
-            #     "throughput": 45
-            # }
+            APIRoute(NetworkAPIPath.TOTAL_MONITOR,
+                     handler.get_total_indicator,
+                     response_class=StreamingResponse,
+                     methods=[NetworkAPIMethod.TOTAL_MONITOR]),
         ]
         self.routes.extend(self.map_routes)
         self.routes.extend(self.agent_routes)
@@ -377,7 +374,6 @@ class APIHandler:
             "agent_list": agent_list,
         })
 
-
     # todo
     async def get_agv_indicator(self):
         """
@@ -386,15 +382,22 @@ class APIHandler:
         return JSONResponse({
             "success": True,
         })
+
     async def get_machine_indicator(self):
         return JSONResponse({
             "success": True,
         })
+
     async def get_job_indicator(self):
         return JSONResponse({
             "success": True,
         })
+
     async def get_system_indicator(self):
         return JSONResponse({
             "success": True,
         })
+
+    async def get_total_indicator(self):
+        """SSE 推流接口"""
+        return StreamingResponse(monitor_service.event_generator(), media_type="text/event-stream")

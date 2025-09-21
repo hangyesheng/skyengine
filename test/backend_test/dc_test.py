@@ -38,8 +38,8 @@ def test_load_all():
 
 
 if __name__ == "__main__":
-    delete_all()
-    # test_load_all()
+    # delete_all()
+    test_load_all()
     # test_logs()
     # dc = DiskCacheHelper(config.CACHE_DIR, expire=60)
     #

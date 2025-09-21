@@ -85,11 +85,12 @@ import {TitleComponent, TooltipComponent, LegendComponent, GridComponent} from "
 
 use([CanvasRenderer, LineChart, BarChart, TitleComponent, TooltipComponent, LegendComponent, GridComponent]);
 
-
-const systemStatus = ref({text: "Running", type: "success"});
-const activeAGVs = ref({text: "4", type: "primary"});
-const completedJobs = ref({text: "12", type: "primary"});
-const throughput = ref({text: "45 jobs/min", type: "primary"});
+// Online success、Offline danger
+const onlineStatus = ref({type: "danger"})
+const systemStatus = ref({text: "Offline", type: onlineStatus.value.type});
+const activeAGVs = ref({text: "0", type: onlineStatus.value.type});
+const completedJobs = ref({text: "0", type: onlineStatus.value.type});
+const throughput = ref({text: "0", type: onlineStatus.value.type});
 
 
 // 机器负载
@@ -125,12 +126,13 @@ const throughputOption = ref({
 });
 
 // 日志模拟
+//   "[INFO] AGV1 picked up Job23",
+//   "[INFO] Machine M2 started processing Job22",
+//   "[INFO] Job21 finished in 14s",
+//   "[WARN] AGV3 load > threshold",
+//   "[INFO] Throughput reached 45 jobs/min"
 const logs = ref([
-  "[INFO] AGV1 picked up Job23",
-  "[INFO] Machine M2 started processing Job22",
-  "[INFO] Job21 finished in 14s",
-  "[WARN] AGV3 load > threshold",
-  "[INFO] Throughput reached 45 jobs/min"
+  "[INFO] I AM AN EXAMPLE LOG",
 ]);
 
 let eventSource = null;
