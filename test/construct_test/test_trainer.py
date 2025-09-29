@@ -20,7 +20,7 @@ import time
 # 添加项目路径
 sys.path.append(os.path.join(os.path.dirname(__file__), '..', '..'))
 
-from tiangong_simulator.packet_factory.Trainer import (
+from sky_simulator.packet_factory.Trainer import (
     BaseTrainer, SimpleTrainer, DQNTrainer, PPOTrainer,
     TrainerFactory, create_trainer
 )
@@ -98,7 +98,7 @@ class MockEnvironment:
             self.finished = True
         
         obs = {"obs": np.random.random(10)}
-        reward = {"agent": np.random.uniform(-1, 1)}
+        reward = {"Agent": np.random.uniform(-1, 1)}
         done = self.finished
         info = {}
         

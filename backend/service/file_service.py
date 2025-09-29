@@ -9,7 +9,7 @@ import yaml
 
 import backend.config_set as backend_config
 import config
-from tiangong_logs.logger import BACKEND_LOGGER as LOGGER
+from sky_logs.logger import BACKEND_LOGGER as LOGGER
 
 
 def get_config_dir():

@@ -9,7 +9,7 @@ from typing import Any, Dict, Optional, List
 import asyncio
 import json
 import time
-from tiangong_logs.dc_helper import DiskCacheHelper
+from sky_logs.dc_helper import DiskCacheHelper
 import config
 from config.all_field_const import CacheInfo
 

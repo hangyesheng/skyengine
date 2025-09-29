@@ -41,8 +41,8 @@ class NetworkAPIPath:
 
     # ========== AGENT相关操作 ==========
     # 获取Agent
-    AGENT_LIST = '/agent/list'
-    SET_AGENT = '/agent/set'
+    AGENT_LIST = '/Agent/list'
+    SET_AGENT = '/Agent/set'
 
     # ========== MONITOR相关操作 ==========
     AGV_MONITOR = '/monitor/agv'

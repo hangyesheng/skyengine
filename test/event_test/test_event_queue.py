@@ -1,10 +1,10 @@
 from threading import Event
 
-from tiangong_simulator.call_back.base_callback.EventQueue import EventQueue
-from tiangong_simulator.call_back.callback_manager.CallbackManager import CallbackManager
-from tiangong_simulator.registry import component_registry, scan_and_register_components, create_component_by_id
-from tiangong_simulator.registry.scanner import load_config
-from tiangong_simulator.event.event_manager.EventManager import EventManager
+from sky_simulator.call_back.base_callback.EventQueue import EventQueue
+from sky_simulator.call_back.callback_manager.CallbackManager import CallbackManager
+from sky_simulator.registry import component_registry, scan_and_register_components, create_component_by_id
+from sky_simulator.registry.scanner import load_config
+from sky_simulator.event.event_manager.EventManager import EventManager
 
 config_path = '../../config/application_config.yaml'
 
