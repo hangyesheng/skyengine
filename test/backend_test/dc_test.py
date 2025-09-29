@@ -5,7 +5,7 @@
 @Author  ：Skyrim
 @Date    ：2025/9/20 23:16 
 '''
-from tiangong_logs.dc_helper import DiskCacheHelper
+from sky_logs.dc_helper import DiskCacheHelper
 import config
 
 

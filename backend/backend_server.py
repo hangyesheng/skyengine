@@ -17,8 +17,8 @@ from service import file_service
 from service import agent_service
 from service import monitor_service
 
-from tiangong_logs.logger import BACKEND_LOGGER as LOGGER
-from tiangong_logs.dc_helper import DiskCacheHelper
+from sky_logs.logger import BACKEND_LOGGER as LOGGER
+from sky_logs.dc_helper import DiskCacheHelper
 
 
 class BackendServer:
@@ -368,7 +368,7 @@ class APIHandler:
 
     async def set_agent(self, request: Request):
         body = await request.json()
-        self.server.set_agent(body.get('agent'))
+        self.server.set_agent(body.get('Agent'))
         return JSONResponse({
             "success": True
         })

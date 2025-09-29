@@ -1,8 +1,8 @@
 # 测试事件动态启动 管理等功能
-from tiangong_simulator.lifecycle import context_creator
-from tiangong_simulator.registry import component_registry, scan_and_register_components, create_component_by_id
-from tiangong_simulator.registry.scanner import load_config
-from tiangong_simulator.event.event_manager.EventManager import EventManager
+from sky_simulator.lifecycle import context_creator
+from sky_simulator.registry import component_registry, scan_and_register_components, create_component_by_id
+from sky_simulator.registry.scanner import load_config
+from sky_simulator.event.event_manager.EventManager import EventManager
 from pathlib import Path
 import config
 
