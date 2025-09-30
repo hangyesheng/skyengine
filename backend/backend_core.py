@@ -3,8 +3,6 @@ import threading
 from typing import List
 from typing import Callable
 
-import yaml
-
 from tiangong_simulator.lifecycle.bootstrap import bootstrap
 from tiangong_simulator.packet_factory.Agent import BaseAgent
 from tiangong_simulator.packet_factory.packet_factory_env.packet_factory_env import PacketFactoryEnv
@@ -16,6 +14,7 @@ import config
 from backend.service import file_service
 
 from tiangong_logs.logger import Logger
+from tiangong_logs.dc_helper import DiskCacheHelper
 
 LOGGER = Logger(log_path=config.BACKEND_LOG_DIR, name="backend").logger
 
@@ -58,7 +57,7 @@ class BackendCore:
         self.agent: BaseAgent = None
         # 线程池,但是实际按照当前的core实现大概只能有单个线程(受到env限制)...后续再修改吧!
         self.thread_pool = ThreadPool()
-
+        self.dc_helper=DiskCacheHelper()
     def bootstrap(self, stop_event: threading.Event, target_factory: str):
         specific_config = file_service.get_new_config_file(target_factory)
         # 创建环境与智能体
@@ -157,6 +156,7 @@ class BackendCore:
     def render_map(self, target_factory):
         """插入配置文件,启动当前渲染地图"""
         # 启动系统!
+        self.dc_helper.clear() # 删除缓存,此处可以安全删除,下面是紧接着的新初始化处理
         self.thread_pool.submit(self.bootstrap, target_factory)
 
     def get_map_current(self):

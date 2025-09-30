@@ -45,7 +45,6 @@ class DelayCount(BaseCount):
             'total_delay': total_delay,
             'indicator_type': 'job_delay'
         }
-        print(f'JOB_{job_component.id:02d}的数据为:{data}')
 
         # 返回指标数据，将被记录到cache中
         self.dc_helper.append_to_list(
