@@ -58,21 +58,20 @@ class FactoryMapLoader(EnvCallback):
         operation_count = 0
         for job_entry in job_config.get('jobs', []):
             job_data = job_entry['job']
-        operations: List[Operation] = []
-        for op_entry in job_data.get('operations', []):
-            op_data = op_entry['operation']
-        durations = [
-            (int(m['id']), float(m['time']))
-            for m in op_data.get('machines', [])
-        ]
-        operations.append(Operation(operation_count, OperationStatus.WAITING, durations))
-        operation_count += 1
-        job = Job(job_data['id'], operations)
-        job.set_callback_manager(job_callback_manager)
+            operations: List[Operation] = []
+            for op_entry in job_data.get('operations', []):
+                op_data = op_entry['operation']
+            durations = [
+                (int(m['id']), float(m['time']))
+                for m in op_data.get('machines', [])
+            ]
+            operations.append(Operation(operation_count, OperationStatus.WAITING, durations))
+            operation_count += 1
+            job = Job(job_data['id'], operations)
+            job.set_callback_manager(job_callback_manager)
 
-        jobs.append(job)
+            jobs.append(job)
         self.dc_helper.set(CacheInfo.KEY_JOB_NUM.value, len(jobs))
-
         return jobs
 
     def create_graph(self):

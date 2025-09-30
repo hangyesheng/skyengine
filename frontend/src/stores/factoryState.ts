@@ -2,7 +2,12 @@ import {defineStore} from 'pinia'
 
 export const useFactoryState = defineStore('factory_state', {
     state: () => ({
-        factoryList: [2333]
+        factoryList: [2333],
+        agentList: [
+            {value: "agent1", label: "Greedy Agent"},
+            {value: "agent2", label: "Random Agent"},
+            {value: "agent3", label: "Normal Agent"},
+        ]
     }),
     actions: {
         install() {

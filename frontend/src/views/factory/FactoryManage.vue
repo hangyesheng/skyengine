@@ -293,11 +293,11 @@
                 </ElCol>
                 <ElCol :span="8">
                   <ElButton type="success" plain @click="updateAgent">
-                    Agent选择
+                    Agent Selection
                   </ElButton>
-                  <ElSelect v-model="selectedAgent" placeholder="请选择Agent" style="width: 200px">
+                  <ElSelect v-model="selectedAgent" placeholder="Please choose agent" style="width: 200px">
                     <ElOption
-                        v-for="item in agentList"
+                        v-for="item in stores.agentList"
                         :key="item.value"
                         :label="item.label"
                         :value="item.value"
@@ -374,11 +374,7 @@ export default {
 
     // ---------- 智能体相关流程 ----------
     const selectedAgent = ref("") //系统开始时会返回当前init agent
-    const agentList = ref([
-      {value: "agent1", label: "智能Agent 1"},
-      {value: "agent2", label: "智能Agent 2"},
-      {value: "agent3", label: "智能Agent 3"},
-    ])
+    const agentList = ref()
 
     const updateAgent = () => {
       const data = {
