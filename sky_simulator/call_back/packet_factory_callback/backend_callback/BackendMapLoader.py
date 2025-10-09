@@ -2,29 +2,29 @@ from typing import List, Tuple
 
 from sky_simulator.call_back.EnvCallback import EnvCallback
 from sky_simulator.registry import register_component
-from sky_simulator.environment.packet_factory.packet_factory_env.Machine.Machine import Machine
-from sky_simulator.environment.packet_factory.packet_factory_env.Agv.AGV import AGV
-from sky_simulator.environment.packet_factory.packet_factory_env.Utils.util import OperationStatus
-from sky_simulator.environment.packet_factory.packet_factory_env.Job.Operation import Operation
-from sky_simulator.environment.packet_factory.packet_factory_env.Job.Job import Job
-from sky_simulator.environment.packet_factory.packet_factory_env.Graph.Graph import Point, Link, Graph
+from sky_simulator.packet_factory.packet_factory_env.Machine.Machine import Machine
+from sky_simulator.packet_factory.packet_factory_env.Agv.AGV import AGV
+from sky_simulator.packet_factory.packet_factory_env.Utils.util import OperationStatus
+from sky_simulator.packet_factory.packet_factory_env.Job.Operation import Operation
+from sky_simulator.packet_factory.packet_factory_env.Job.Job import Job
+from sky_simulator.packet_factory.packet_factory_env.Graph.Graph import Point, Link, Graph
 import yaml
 from sky_simulator.registry import component_registry
 from sky_logs.logger import LOGGER
-
 
 @register_component("backend_callback.MapLoader")
 class FactoryMapLoader(EnvCallback):
     def __init__(self):
         super().__init__()
-        self.env_type = component_registry.get('config').get('env_type')
-        self.config = component_registry.get('config').get(self.env_type)
-        self.job_config_file_path = self.config.get("task_config").get('file')  # 对应 job_config.yaml
-        self.map_config_file_path = self.config.get("factory_config").get('file')  # 对应 map_config.yaml
-
+        self.env_type=component_registry.get('config').get('env_type')
+        self.config=component_registry.get('config').get(self.env_type)
+        self.job_config_file_path =  self.config.get("task_config").get('file')    # 对应 job_config.yaml
+        self.map_config_file_path =  self.config.get("factory_config").get('file') # 对应 map_config.yaml
+        
         map_file = self.map_config_file_path
         map_yaml = yaml.safe_load(open(map_file, 'rb'))
         self.map_config = map_yaml['config']
+
 
     def create_jobs(self):
         job_file = self.job_config_file_path
@@ -45,7 +45,7 @@ class FactoryMapLoader(EnvCallback):
                 operations.append(Operation(operation_count, OperationStatus.WAITING, durations))
                 operation_count += 1
             jobs.append(Job(job_data['id'], operations))
-
+        
         return jobs
 
     def create_graph(self):
@@ -89,11 +89,10 @@ class FactoryMapLoader(EnvCallback):
     def __call__(self):
         jobs: List[Job] = self.create_jobs()
         graph: Graph = self.create_graph()
-        machines: List[Machine] = self.create_machines(graph=graph)
+        machines: List[Machine] =self.create_machines(graph=graph)
         agvs: List[AGV] = self.create_agvs(graph=graph)
 
         return jobs, machines, agvs, graph
-
 
 if __name__ == '__main__':
     mapLoader = FactoryMapLoader()
