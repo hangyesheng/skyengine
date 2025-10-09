@@ -5,10 +5,9 @@
 @Author  ：Skyrimforest
 @Date    ：2025/10/8 23:12
 '''
-import sys
-import os
 from pogema import GridConfig
 from sky_simulator.environment.grid_factory.grid_factory_env.grid_factory_env import GridFactoryEnv
+from sky_simulator.environment.grid_factory.Agent.DeterministicPolicy import DeterministicPolicy
 
 
 def sky_test_grid_factory_env():
@@ -33,18 +32,25 @@ def sky_test_grid_factory_env():
     # 创建环境
     env = GridFactoryEnv(
         grid_config=grid_config,
-        env_config={'enable_logging': True}
     )
 
     print("✓ 环境创建成功")
 
     # 测试环境重置
     obs, info = env.reset(seed=42)
-    print("✓ 环境重置成功")
+    print(f"✓ 环境重置成功:"
+          f""
+          f"这里是obs{obs}"
+          f"这里是info{info}")
 
+    dp = DeterministicPolicy()
     # 测试环境步进
-    actions = [0, 1, 2, 3]  # 4个智能体的动作
-    obs, rewards, terminations, truncations, infos = env.step({'decisions': [], 'step_time': 1.0})
+    agent_actions = dp.act(obs)
+    machine_actions = []
+    print(agent_actions)
+    print(machine_actions)
+    obs, rewards, terminations, truncations, infos = env.step({'agent_actions': agent_actions,
+                                                               'machine_actions': machine_actions})
     print("✓ 环境步进成功")
 
     # 获取环境信息
@@ -68,6 +74,7 @@ def sky_test_grid_factory_env():
     print("\n=== 测试完成 ===")
     return True
 
+
 if __name__ == '__main__':
     try:
         # 测试Pogema环境
@@ -79,8 +86,3 @@ if __name__ == '__main__':
         import traceback
 
         traceback.print_exc()
-
-
-
-
-

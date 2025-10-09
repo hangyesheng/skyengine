@@ -11,17 +11,17 @@ import numpy as np
 import os
 
 from pettingzoo import ParallelEnv
-from pogema import GridConfig, pogema_v0
-from pogema.wrappers.metrics import AgentsDensityWrapper, RuntimeMetricWrapper
-from pogema_toolbox.create_env import MultiMapWrapper
+from pogema import GridConfig, pogema_v0, AnimationMonitor
 
 from sky_simulator.environment.grid_factory.Agent.BaseAgent import BaseAgent
-from sky_simulator.environment.grid_factory.grid_factory_env.Utils.create_env import (
-    ProvideFutureTargetsWrapper, LogActions
-)
+from sky_simulator.environment.grid_factory.grid_factory_env.Utils.single_step_svg import SingleStepAnimationMonitor
+# from pogema.wrappers.metrics import AgentsDensityWrapper, RuntimeMetricWrapper
+# from pogema_toolbox.create_env import MultiMapWrapper
+# from sky_simulator.environment.grid_factory.grid_factory_env.Utils.create_env import (
+#     ProvideFutureTargetsWrapper, LogActions
+# )
 from sky_logs.logger import LOGGER
 from sky_simulator.registry import register_component
-from sky_simulator.call_back.grid_factory_callback.callback_manager.CallbackManager import CallbackManager
 
 
 @register_component("grid_factory")
@@ -50,7 +50,6 @@ class GridFactoryEnv(ParallelEnv):
         super().__init__()
 
         # 基础配置
-        self.env_config = env_config or {}
         self.agent = agent
 
         # 环境状态
@@ -77,8 +76,6 @@ class GridFactoryEnv(ParallelEnv):
         self.agent_targets = []
 
         self._initialize_pogema_env()
-        # 渲染相关
-        self._last_observations = None
 
     def _create_default_grid_config(self) -> GridConfig:
         """创建默认的网格配置"""
@@ -100,14 +97,18 @@ class GridFactoryEnv(ParallelEnv):
             # 创建Pogema环境
             self.pogema_env = pogema_v0(grid_config=self.grid_config)
 
-            # 添加包装器
-            self.pogema_env = AgentsDensityWrapper(self.pogema_env)
-            self.pogema_env = MultiMapWrapper(self.pogema_env)
-            self.pogema_env = RuntimeMetricWrapper(self.pogema_env)
+            # 添加包装器 todo 当前这些没进行测试
+            # self.pogema_env = AgentsDensityWrapper(self.pogema_env)
+            # self.pogema_env = MultiMapWrapper(self.pogema_env)
+            # self.pogema_env = RuntimeMetricWrapper(self.pogema_env)
 
             # 日志记录
-            self.pogema_env = LogActions(self.pogema_env)
-            self.pogema_env = ProvideFutureTargetsWrapper(self.pogema_env)
+            # self.pogema_env = LogActions(self.pogema_env)
+            # self.pogema_env = ProvideFutureTargetsWrapper(self.pogema_env)
+
+            # 添加图像记录包装器,包括单步的和多步的
+            self.pogema_env = SingleStepAnimationMonitor(self.pogema_env)
+            self.pogema_env = AnimationMonitor(self.pogema_env)
 
             LOGGER.info(f"[GridFactoryEnv] Pogema环境初始化成功，智能体数量: {self.grid_config.num_agents}")
 
@@ -116,22 +117,17 @@ class GridFactoryEnv(ParallelEnv):
             self.use_pogema = False
 
     def refresh_status(self):
-        """刷新环境状态"""
+        """刷新Agent状态"""
         try:
             # 初始化智能体信息
-            self._initialize_agents_info()
+            if self.pogema_env:
+                num_agents = self.grid_config.num_agents
+                self.agents_info = [{'id': i, 'status': 'active'} for i in range(num_agents)]
+                self.agent_positions = [(0, 0)] * num_agents
+                self.agent_targets = [(0, 0)] * num_agents
             LOGGER.info("[GridFactoryEnv] 环境状态刷新成功")
-
         except Exception as e:
             LOGGER.error(f"[GridFactoryEnv] 环境状态刷新失败: {e}")
-
-    def _initialize_agents_info(self):
-        """初始化智能体信息"""
-        if self.use_pogema and self.pogema_env:
-            num_agents = self.grid_config.num_agents
-            self.agents_info = [{'id': i, 'status': 'active'} for i in range(num_agents)]
-            self.agent_positions = [(0, 0)] * num_agents
-            self.agent_targets = [(0, 0)] * num_agents
 
     def create_hash_index(self):
         """创建高效获取组件的索引结构"""
@@ -152,66 +148,52 @@ class GridFactoryEnv(ParallelEnv):
 
     def action_space(self, agent: BaseAgent):
         """智能体动作空间"""
-        if self.use_pogema and self.pogema_env:
+        if self.pogema_env:
             # 使用Pogema的动作空间
             return self.pogema_env.action_space(agent.agent_id)
         else:
             # 自定义动作空间
             decisions, step_time = agent.sample(
-                self.agvs, self.machines, self.jobs, self.env_timeline
+                self.agents, self.machines, self.jobs, self.env_timeline
             )
             return {
                 "decisions": decisions,
                 "step_time": step_time
             }
 
-    def _update_agent_positions_from_pogema(self, observations):
-        """从Pogema观察更新智能体位置"""
-        if observations and len(observations) > 0:
-            for i, obs in enumerate(observations):
-                if 'global_xy' in obs:
-                    self.agent_positions[i] = tuple(obs['global_xy'])
-                if 'target_xy' in obs:
-                    self.agent_targets[i] = tuple(obs['target_xy'])
-
-    def step(self, actions=None):
-        """环境步进"""
-        LOGGER.info(f"[GridFactoryEnv] 当前环境时间: {self.env_timeline}")
-
-        # 处理动作
-        if actions is None:
-            actions = {'decisions': []}
-
-        decisions = actions.get('decisions', [])
-        step_time = actions.get('step_time', 1.0)
-
-        LOGGER.info(f"[GridFactoryEnv] 步长时间: {step_time}, 决策数量: {len(decisions)}")
-
-        # 执行环境步进
-        while True:
-            # 检查任务是否完成
-            if self.check_job_finished():
-                break
-
-            # 执行当前决策
-            res = self.env_step(decisions, step_time)
-            if res:
-                # 发生事件，继续执行
-                decisions = []
-            else:
-                # 无事件，跳出循环
-                break
-
+    def machine_step(self, actions=None):
         # 计算奖励和终止条件
         rewards = {}
         terminations = {}
         observations = {}
+        return observations, rewards, terminations, {}, {}
 
-        if self.agent:
-            rewards[self.agent.agent_id] = self.agent.reward({})
-            terminations[self.agent] = False
+    def machine_reset(self):
+        observations = {}
+        infos = {}
+        return observations, infos
 
+    def step(self, actions=None):
+        LOGGER.info(f"[GridFactoryEnv] 当前环境时间: {self.env_timeline}")
+        self.env_timeline += 1
+
+        # 存储输入动作，用于 unpack
+        agent_actions, machine_actions = self.unpack_input(actions)
+
+        # 执行 machine 层步进
+        m_obs, m_reward, m_terminated, m_truncated, m_info = \
+            self.machine_step(machine_actions)
+
+        # 执行 AGV 层步进
+        a_obs, a_reward, a_terminated, a_truncated, a_info = \
+            self.pogema_env.step(agent_actions)
+
+        machine_info = [m_obs, m_reward, m_terminated, m_truncated, m_info]
+        agent_info = [a_obs, a_reward, a_terminated, a_truncated, a_info]
         LOGGER.info(f"[GridFactoryEnv] 结束当前循环步")
+
+        # 合并输出
+        observations, rewards, terminations, truncated, info = self.pack_output(machine_info, agent_info)
 
         return observations, rewards, terminations, {}, {}
 
@@ -220,79 +202,52 @@ class GridFactoryEnv(ParallelEnv):
         LOGGER.info("[GridFactoryEnv] 重置环境")
 
         # 清理和重建
-        self.set_env_timeline(0.0)
+        self.set_env_timeline(0)
+        m_list = []
+        a_list = []
 
-        # 重置Pogema环境
-        if self.pogema_env:
-            try:
-                observations, infos = self.pogema_env.reset(seed=seed)
-                self._update_agent_positions_from_pogema(observations)
-                LOGGER.info("[GridFactoryEnv] Pogema环境重置成功")
-            except Exception as e:
-                LOGGER.error(f"[GridFactoryEnv] Pogema环境重置失败: {e}")
+        # 重置Job-Machine相关环境
+        try:
+            m_observations, m_infos = self.machine_reset()
+            m_list = [m_observations, m_infos]
+            LOGGER.info("[GridFactoryEnv] Machine重置成功")
+        except Exception as e:
+            LOGGER.error(f"[GridFactoryEnv] Machine重置失败: {e}")
 
-        # 刷新状态
+        # 重置Map-AGV相关环境
+        try:
+            a_observations, a_infos = self.pogema_env.reset(seed=seed)
+            a_list = [a_observations, a_infos]
+            LOGGER.info("[GridFactoryEnv] Pogema环境重置成功")
+        except Exception as e:
+            LOGGER.error(f"[GridFactoryEnv] Pogema环境重置失败: {e}")
+
+        # 重置Agent相关状态
         self.refresh_status()
 
-        return {}, {}
+        obs, rew, term, trunc, info = self.pack_output(m_list, a_list)
 
-    def render_observation(self):
-        """渲染观察信息"""
-        LOGGER.info(f"[GridFactoryEnv] 系统资源状态:")
-        LOGGER.info(f"  - 作业数量: {len(self.jobs)}")
-        LOGGER.info(f"  - 机器数量: {len(self.machines)}")
-        LOGGER.info(f"  - AGV数量: {len(self.agvs)}")
-        LOGGER.info(f"  - 智能体位置: {self.agent_positions}")
-        LOGGER.info(f"  - 智能体目标: {self.agent_targets}")
+        return obs, info
 
     def render(self):
-        """渲染环境（使用SVG输出，基于最近一次Pogema观测）"""
+        """渲染环境"""
         if not self.use_pogema:
             LOGGER.info("[GridFactoryEnv] 非Pogema模式，暂不支持SVG渲染")
             return
-
-        # 生成输出目录与文件名
-        output_dir = self.env_config.get('render_svg_dir', 'renders')
-        os.makedirs(output_dir, exist_ok=True)
-        file_path = os.path.join(output_dir, f"frame_{int(self.env_timeline):06d}.svg")
-
-        # 优先使用最近一次观测；若无，则尝试reset一次拿初始观测
-        observations = self._last_observations
-        if observations is None and self.pogema_env is not None:
-            try:
-                observations, _ = self.pogema_env.reset(seed=self.grid_config.seed)
-                self._last_observations = observations
-            except Exception as e:
-                LOGGER.error(f"[GridFactoryEnv] 获取观测用于渲染失败: {e}")
-                return
-
-        # 渲染为SVG
-        try:
-            self._render_svg_from_observations(observations, file_path)
-            LOGGER.info(f"[GridFactoryEnv] 已输出SVG渲染: {file_path}")
-        except Exception as e:
-            LOGGER.error(f"[GridFactoryEnv] SVG渲染失败: {e}")
+        self.pogema_env.render()
 
     # ---------- 获取器方法 ----------
     def get_jobs(self) -> List:
         """获取作业列表"""
         return self.jobs
 
-    def get_job_templates(self) -> List:
-        """获取作业模板列表"""
-        return self.job_templates
-
     def get_machines(self) -> List:
         """获取机器列表"""
         return self.machines
 
-    def get_agvs(self) -> List:
+    def get_agents(self) -> List:
         """获取AGV列表"""
-        return self.agvs
-
-    def get_graph(self):
-        """获取图结构"""
-        return self.graph
+        return self.agents
 
     def get_agents_info(self) -> List[Dict[str, Any]]:
         """获取智能体信息"""
@@ -320,20 +275,51 @@ class GridFactoryEnv(ParallelEnv):
         if self.use_pogema:
             self._initialize_pogema_env()
 
+    def unpack_input(self, actions):
+        """将输入的 actions 拆分为机器与智能体两部分"""
+        # 假设 self.input_actions 是外部传入的总动作字典
+        machine_actions = actions.get("machine_actions", {})
+        agent_actions = actions.get("agent_actions", {})
+        return agent_actions, machine_actions
 
-if __name__ == '__main__':
-    # 测试代码
-    from pogema import GridConfig
+    def pack_output(self, machine_info, agent_info):
+        """动态合并 machine 和 agent 输出"""
 
-    # 创建测试配置
-    config = GridConfig(
-        num_agents=4,
-        size=10,
-        density=0.2,
-        seed=42
-    )
+        def unpack(info):
+            """支持 (obs, reward, term, trunc, info) 或 (obs, info)"""
+            if len(info) == 5:
+                obs, reward, term, trunc, inf = info
+            elif len(info) == 2:
+                obs, inf = info
+                reward, term, trunc = {}, {}, {}
+            else:
+                raise ValueError(f"Unexpected tuple length: {len(info)}")
+            return obs, reward, term, trunc, inf
 
-    # 创建环境
-    env = GridFactoryEnv(grid_config=config)
-    env.render()
-    print("网格工厂环境创建成功")
+        # 动态解包
+        m_obs, m_reward, m_term, m_trunc, m_info = unpack(machine_info)
+        a_obs, a_reward, a_term, a_trunc, a_info = unpack(agent_info)
+
+        # 合并为标准输出结构
+        observations = {
+            "machine_observation": m_obs,
+            "agent_observation": a_obs
+        }
+        rewards = {
+            "machine_reward": m_reward,
+            "agent_reward": a_reward
+        }
+        terminations = {
+            "machine_done": m_term,
+            "agent_done": a_term
+        }
+        truncations = {
+            "machine_truncated": m_trunc,
+            "agent_truncated": a_trunc
+        }
+        infos = {
+            "machine_info": m_info,
+            "agent_info": a_info
+        }
+
+        return observations, rewards, terminations, truncations, infos
