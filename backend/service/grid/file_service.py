@@ -22,6 +22,7 @@ def get_default_config():
     )
     # todo 此处后续需要动态实现
     job_config = {}
-    agent_config = {'agent_name': 'deterministic_policy'}
-    hyper_config = {'seed':42}
-    return grid_config, job_config, agent_config,hyper_config
+    agv_agent_config = {'agent_name': 'deterministic_policy'}
+    system_agent_config = {'agent_name': 'deterministic_policy'}
+    hyper_config = {'seed': 42}
+    return grid_config, job_config, agv_agent_config, system_agent_config, hyper_config

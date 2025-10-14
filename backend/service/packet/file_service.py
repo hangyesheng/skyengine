@@ -150,7 +150,7 @@ def get_new_config_file(target_factory: str):
     # 以config文件夹下的application_config.yaml为基础进行修改
     template_config_path = os.path.join(config.CONFIG_DIR, 'application_config.yaml')
 
-    with open(template_config_path, 'r') as f:
+    with open(template_config_path, 'r',encoding='utf-8') as f:
         specific_config = yaml.safe_load(f)
 
     sky_config = specific_config['config']

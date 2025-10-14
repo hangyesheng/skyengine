@@ -9,7 +9,7 @@ def load_server():
     根据环境变量 SERVER_TYPE 选择不同的 server 实例。
     默认使用 BackendServer。
     """
-    server_type = os.environ.get("SERVER_TYPE", "packet").lower()
+    server_type = os.environ.get("SERVER_TYPE", "grid").lower()
 
     if server_type == "packet":
         # 不同 server 类
@@ -35,6 +35,6 @@ if __name__ == '__main__':
         app,
         host='0.0.0.0',
         port=port,
-        log_config=None,
-        reload=os.environ.get("DEV_MODE", "0") == "1"  # DEV_MODE=1 时启用热重载
+        # log_config=None,
+        # reload=os.environ.get("DEV_MODE", "0") == "1"  # DEV_MODE=1 时启用热重载
     )
