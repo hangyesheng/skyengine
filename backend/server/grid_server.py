@@ -65,6 +65,31 @@ class APIHandler:
     def __init__(self):
         self.core = GridCore()
 
+        # ========== 预览代码 ==========
+        @config_router.api_route(
+            path=GridAPI.CASES_PREVIEW.path,  # 从GridAPI获取接口路径
+            methods=[GridAPI.CASES_PREVIEW.method],  # 从GridAPI获取HTTP请求方法
+            response_class=StreamingResponse,
+        )
+        async def preview_factory(factory_id: str):
+            """
+            动态返回工厂布局图片
+            """
+            # 假设图片存放在 public/images/factory 下
+            img_dir = config.BACKEND_ENV_DIR + "/environment_preview"
+            img_name = f"{factory_id}"
+            img_path = os.path.join(img_dir, img_name)
+
+            if not os.path.exists(img_path):
+                return {"error": "Image not found"}
+
+            # 打开文件，返回 StreamingResponse
+            def iterfile():
+                with open(img_path, mode="rb") as f:
+                    yield from f
+
+            return StreamingResponse(iterfile(), media_type="image/png")
+
         # ========== 测试相关代码 ==========
         @normal_router.api_route(
             path=GridAPI.AGV_MONITOR.path,  # 从GridAPI获取接口路径
@@ -91,8 +116,9 @@ class APIHandler:
             response_class=JSONResponse,
         )
         async def factory_start():
-            self.core.render_map()
-            return {"message": "启动成功"}
+            if self.core.start():
+                return {"message": "仿真启动成功 ✅"}
+            return {"message": "仿真已在运行中 ⚠️"}
 
         @component_router.api_route(
             path=GridAPI.FACTORY_PAUSE.path,  # 从GridAPI获取接口路径
@@ -100,8 +126,19 @@ class APIHandler:
             response_class=JSONResponse,
         )
         async def factory_pause():
-            self.core.pause_map()
-            return {"message": "暂停成功"}
+            if self.core.pause():
+                return {"message": "仿真已暂停 ⏸️"}
+            return {"message": "当前仿真未运行 ⚠️"}
+
+        @component_router.api_route(
+            path=GridAPI.FACTORY_RESUME.path,  # 从GridAPI获取接口路径
+            methods=[GridAPI.FACTORY_RESUME.method],  # 从GridAPI获取HTTP请求方法
+            response_class=JSONResponse,
+        )
+        async def factory_resume():
+            if self.core.resume():
+                return {"message": "仿真已恢复 ▶️"}
+            return {"message": "当前仿真未运行 ⚠️"}
 
         @component_router.api_route(
             path=GridAPI.FACTORY_RESET.path,  # 从GridAPI获取接口路径
@@ -110,6 +147,6 @@ class APIHandler:
         )
         async def factory_reset():
             self.core.reset()
-            return {"message": "渲染成功"}
+            return {"message": "仿真环境已重置 🔄"}
 
         # ========== 智能体组件相关代码 ==========

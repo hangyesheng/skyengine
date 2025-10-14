@@ -6,6 +6,7 @@ ROOT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 # 给出后端路径
 BACKEND_DIR = os.path.join(ROOT_DIR, 'backend')
+BACKEND_ENV_DIR = os.path.join(BACKEND_DIR, 'environment')
 BACKEND_DATA_DIR = os.path.join(BACKEND_DIR, 'config_set')
 
 # 给出数据集路径
@@ -23,9 +24,6 @@ CACHE_DIR = os.path.join(LOG_DIR, 'cache')
 SVG_DIR = os.path.join(LOG_DIR, 'renders')
 ANIMATE_DIR = os.path.join(SVG_DIR, '')
 STEPS_DIR = os.path.join(SVG_DIR, 'steps')
-
-
-
 
 if __name__ == '__main__':
     print(CONFIG_DIR)
