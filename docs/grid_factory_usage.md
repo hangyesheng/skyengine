@@ -33,7 +33,7 @@
 
 ```python
 from pogema import GridConfig
-from sky_executor.grid_factory.grid_factory.grid_factory_env.grid_factory_env import GridFactoryEnv
+from sky_executor.grid_factory.factory.grid_factory_env.grid_factory_env import GridFactoryEnv
 
 # 创建网格配置
 grid_config = GridConfig(
@@ -155,7 +155,7 @@ env_config = {
 ```python
 import numpy as np
 from pogema import GridConfig
-from sky_executor.grid_factory.grid_factory.grid_factory_env.grid_factory_env import GridFactoryEnv
+from sky_executor.grid_factory.factory.grid_factory_env.grid_factory_env import GridFactoryEnv
 
 
 def run_simulation():
@@ -207,7 +207,7 @@ if __name__ == '__main__':
 
 1. **Pogema导入错误**
    ```bash
-   pip install pogema
+   pip install sky_pogema
    ```
 
 2. **环境初始化失败**

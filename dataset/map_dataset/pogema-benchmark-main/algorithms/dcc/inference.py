@@ -59,7 +59,7 @@ class DCCInference:
         )
         self.last_actions = np.zeros((num_agents, 5))
         self.last_actions[np.arange(num_agents), np.array(actions)] = 1
-        actions = [(a + 1)%5 for a in actions]  # mapping from DCC actions to pogema ones
+        actions = [(a + 1)%5 for a in actions]  # mapping from DCC actions to sky_pogema ones
         return actions
 
     def reset_states(self):

@@ -54,7 +54,7 @@ const factories = [
     component: () => import('./FactoryManage.vue')
   },
   {
-    id: "grid_factory",
+    id: "factory",
     name: "翼辉原料分拣货仓",
     image: "factory-yihuiwarehouse.png",
     description: "坐落于华东关键物流节点，拥有 AGV 智能分拣与自动化货物存储管理系统。",

@@ -230,10 +230,10 @@ class EventGenerator:
         
         try:
             # 解析事件类型，支持多种格式
-            # 例如: "packet_factory.AGV_FAIL", "grid_factory.MACHINE_ERROR", "job_system.JOB_ADD"
+            # 例如: "packet_factory.AGV_FAIL", "factory.MACHINE_ERROR", "job_system.JOB_ADD"
             event_parts = event_type.split('.')
             if len(event_parts) >= 2:
-                module_name = event_parts[0]  # packet_factory, grid_factory, job_system
+                module_name = event_parts[0]  # packet_factory, factory, job_system
                 event_name = event_parts[-1]  # AGV_FAIL, MACHINE_ERROR, JOB_ADD
                 
                 # 解析事件对象类型

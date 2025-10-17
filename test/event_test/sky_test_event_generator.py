@@ -19,7 +19,7 @@ config_path = config.CONFIG_DIR + "/application_config.yaml"
 if __name__ == '__main__':
     load_config(config_path)
     selective_scan_and_register_components(scan_all=True,
-                                           exclude_dirs=["environment.grid_factory",
+                                           exclude_dirs=["environment.factory",
                                                          "call_back.grid_factory_callback",
                                                          "event.event.grid_factory_event",
                                                          "environment.packet_factory.Trainer"

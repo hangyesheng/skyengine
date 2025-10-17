@@ -16,14 +16,14 @@ This repository is organized into several key areas:
 ### POGEMA Environment
 Install the POGEMA environment:
 ```bash
-cd pogema
+cd sky_pogema
 python setup.py install
 ```
 
 ### POGEMA Toolbox
 Install additional tools for POGEMA:
 ```bash
-cd pogema-toolbox
+cd sky_pogema-toolbox
 python setup.py install
 ```
 

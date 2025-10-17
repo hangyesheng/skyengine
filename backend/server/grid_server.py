@@ -18,7 +18,7 @@ from fastapi import Request
 import config
 from backend.core.lib.network.api import GridAPI
 
-from sky_executor.grid_factory.grid_factory_core.grid_core import GridCore
+from sky_executor.grid_factory.core.core import GridCore
 
 # service引入
 

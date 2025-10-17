@@ -6,8 +6,8 @@
 @Date    ：2025/10/8 23:12
 '''
 from pogema import GridConfig
-from sky_executor.grid_factory.grid_factory.grid_factory_env.grid_factory_env import GridFactoryEnv
-from sky_executor.grid_factory.grid_factory.Agent.DeterministicPolicy import DeterministicPolicy
+from sky_executor.grid_factory.factory.grid_factory_env.grid_factory_env import GridFactoryEnv
+from sky_executor.grid_factory.factory.Agent.DeterministicPolicy import DeterministicPolicy
 from sky_logs.dc_helper import DiskCacheHelper
 from config.all_field_const import CacheInfo
 
@@ -83,7 +83,7 @@ def sky_test_map_loader():
 
     # 创建网格配置
     grid_config = GridConfig(
-        map_name="pogema-logo",
+        map_name="sky_pogema-logo",
         num_agents=4,  # 4个智能体
         size=15,  # 15x15网格
         density=0.3,  # 30%障碍物密度
@@ -104,9 +104,10 @@ def sky_test_map_loader():
 
     # 下方说明pogema的reset只会刷新agent出现的位置
     env.reset(env.grid_config.seed)
-    env.render()
-    env.reset(23)
-    env.render()
+    print(env.grid_config)
+    # env.render()
+    # env.reset(23)
+    # env.render()
 
 
 if __name__ == '__main__':
