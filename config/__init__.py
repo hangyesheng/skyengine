@@ -13,7 +13,7 @@ BACKEND_DATA_DIR = os.path.join(BACKEND_DIR, 'config_set')
 CONFIG_DIR = os.path.join(ROOT_DIR, 'config')
 MAP_CONFIG_DIR = os.path.join(CONFIG_DIR, 'config_set')
 DATA_DIR = os.path.join(ROOT_DIR, 'dataset')
-MAPF_BENCHMARK_DIR = os.path.join(DATA_DIR, 'map_dataset/pogema-benchmark-main')
+MAPF_BENCHMARK_DIR = os.path.join(DATA_DIR, 'map_dataset/sky_pogema-benchmark-main')
 MAPF_GPT_DIR = os.path.join(DATA_DIR, 'map_dataset/gpt_eval_config')
 # 给出日志路径
 LOG_DIR = os.path.join(ROOT_DIR, 'sky_logs')

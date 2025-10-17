@@ -68,7 +68,7 @@ export const dynamicRoutes: Array<RouteRecordRaw> = [
                     //     },
                     // },
                     // {
-                    //     path: 'grid_factory', // 子工厂2
+                    //     path: 'factory', // 子工厂2
                     //     name: 'grid-factory-manage',
                     //     component: () => import('/@/views/factory/GridFactoryManage.vue'),
                     //     meta: {

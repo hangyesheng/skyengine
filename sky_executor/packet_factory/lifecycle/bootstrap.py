@@ -18,7 +18,7 @@ def bootstrap(config):
     # ---------- 扫描组件 ----------
     LOGGER.info("[Bootstrap] Scanning and registering components...")
     selective_scan_and_register_components(scan_all=True,
-                                           exclude_dirs=["environment.grid_factory",
+                                           exclude_dirs=["environment.factory",
                                                          "call_back.grid_factory_callback",
                                                          "event.event.grid_factory_event",
                                                          "environment.packet_factory.Trainer"

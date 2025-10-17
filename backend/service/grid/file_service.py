@@ -18,7 +18,7 @@ def get_default_config(
         obs_radius=3,
         collision_system='priority',
         on_target='restart',
-        map_name="pogema-logo",
+        map_name="sky_pogema-logo",
 ):
     grid_config = GridConfig(
         num_agents=num_agents,  # 4个智能体

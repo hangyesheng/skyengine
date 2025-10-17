@@ -20,7 +20,7 @@ Pogema-Toolbox 是一个为 Pogema 环境提供的综合工具包，专注于简
 ## 2. 安装
 
 ```bash
-pip install pogema-toolbox
+pip install sky_pogema-toolbox
 ```
 
 ## 3. 核心功能
