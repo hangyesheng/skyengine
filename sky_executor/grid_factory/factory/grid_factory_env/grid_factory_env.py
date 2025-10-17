@@ -106,7 +106,7 @@ class GridFactoryEnv(ParallelEnv):
         self.grid.get_obstacles()
 
         self.machines = generate_machines(self.grid.get_obstacles(), self.machine_config)
-        possible_targets=self.get_grid_possible_positions()
+        self.get_grid_possible_positions()
 
         LOGGER.info(f"[GridFactoryEnv] 创建了 {self.machine_config.num_machines} 个机器")
         observations = {}

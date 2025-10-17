@@ -5,15 +5,10 @@
 @Author  ：Skyrimforest
 @Date    ：2025/10/17 20:13
 '''
-from sky_executor.grid_factory.factory.grid_factory_env.Utils.pic_drawer import draw_svg
-
-'''
-@Project ：SkyEngine 
-@File    ：sky_test_pogema_lifelong.py
-@IDE     ：PyCharm
-@Author  ：Skyrimforest
-@Date    ：2025/10/17 20:13
-'''
+from sky_executor.grid_factory.factory.Agent.DeterministicPolicy import DeterministicPolicy
+from sky_executor.grid_factory.factory.grid_factory_env.Utils.machine import generate_machines, MachineConfig
+from sky_executor.grid_factory.factory.grid_factory_env.Utils.pic_drawer import draw_svg, \
+    draw_svg_with_machines_and_targets
 
 import numpy as np
 from pogema import GridConfig
@@ -27,35 +22,46 @@ def test_pogema_lifelong():
     num_agents = 3
     size = 10
 
-    # 自定义可能目标位置 (比如 Machine 位置)
-    possible_targets_xy = [
-        (2, 2),
-        (7, 7),
-        (5, 1),
-        (8, 3)
-    ]
-
     grid_config = GridConfig(
         num_agents=num_agents,
         size=size,
+        density=0.2,
         obs_radius=2,
         max_episode_steps=20,
-        targets_xy=None,  # 不提供固定序列
-        possible_targets_xy=possible_targets_xy,
-        seed=42
     )
-
     # ---------- 2. 初始化 PogemaLifeLong ----------
     from pogema import AnimationMonitor
 
     env = PogemaLifeLong(grid_config)
     env = AnimationMonitor(env)
+    env.reset()
+    env.render()
+    print(env.grid.get_obstacles())
+    machines=generate_machines(env.grid.get_obstacles(),MachineConfig(
+            num_machines=4,
+            strategy= 'random',
+            seed= 42,
+            zones= 4,
+        ))
+    machine_possible_positions = [m.location for m in machines]
+    print(f"可行的空地:{machine_possible_positions}")
+    # 预补偿：在输入 possible_targets_xy 时减去 obs_radius
+    possible_targets_xy = [(x - grid_config.obs_radius, y - grid_config.obs_radius)
+                           for (x, y) in machine_possible_positions]
+    env.grid_config.possible_targets_xy=possible_targets_xy
 
     # ---------- 3. 重置环境 ----------
-    obs, info = env.reset(seed=42)
-    print("重置后的观测:")
-    print(obs)
-    print("初始 info:")
+    obs, info = env.reset()
+    env.render()
+    print("\n渲染环境 (SVG)")
+    # svg_str = draw_svg(env, 0)
+    #
+    # with open("temp.svg", "w") as f:
+    #     f.write(svg_str)
+    svg_str = draw_svg_with_machines_and_targets(env, grid_config.possible_targets_xy)
+    with open("temp.svg", "w") as f:
+        f.write(svg_str)
+
     for idx, inf in enumerate(info):
         print(f"Agent {idx}: {inf}")
 
@@ -65,26 +71,22 @@ def test_pogema_lifelong():
         goal = env.grid.finishes_xy[idx]
         print(f"Agent {idx} target: {goal}")
 
+    dp = DeterministicPolicy()
     # ---------- 5. 随机移动 agents，模拟几个 step ----------
-    for step in range(5):
-        # 随机动作: 0-4，假设上、下、左、右、停
-        actions = [np.random.randint(0, 5) for _ in range(num_agents)]
+    idx=0
+    while True:
+        print(env.grid.finishes_xy)
+        idx+=1
+        actions=dp.act(obs)
         obs, rewards, terminated, truncated, infos = env.step(actions)
-        print(f"\nStep {step + 1}:")
-        print("Actions:", actions)
-        print("Rewards:", rewards)
-        for idx, inf in enumerate(infos):
-            print(f"Agent {idx} info:", inf)
-        # 打印当前目标位置
-        print("当前目标位置:")
-        for idx in range(num_agents):
-            goal = env.grid.finishes_xy[idx]
-            print(f"Agent {idx} target: {goal}")
+        # ---------- 6. 渲染环境 ----------
+        env.render()
 
-    # ---------- 6. 渲染环境 ----------
-    print("\n渲染环境 (SVG)")
-    svg_str = draw_svg(env,1)
-    print(svg_str[:500], "...")  # 只打印前500字符预览
+        svg_str = draw_svg_with_machines_and_targets(env, grid_config.possible_targets_xy,timeline=idx)
+        with open(f"temp{idx}.svg", "w") as f:
+            f.write(svg_str)
+        if idx > 40:
+            break
 
 if __name__ == "__main__":
     test_pogema_lifelong()
