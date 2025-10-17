@@ -49,25 +49,40 @@ def draw_svg(env, timeline):
     animation = AnimationDrawer().create_animation(grid_holder)
     return animation.render()
 
-def draw_svg_with_machine(env, machines: List[Union[tuple, object]], timeline=0,
-                          shape="circle", color="#1E90FF"):
+def draw_svg_with_machines_and_targets(env,
+                                       machines: List[Union[tuple, object]],
+                                       timeline: int = 0,
+                                       shape: str = "circle",
+                                       inactive_color: str = "#A9A9A9",  # 未激活：灰
+                                       active_color: str = "#FF8C00",    # 激活：橙
+                                       active_opacity: float = 0.85,
+                                       inactive_opacity: float = 0.6,
+                                       stroke_color: str = "black",
+                                       stroke_width: float = 0.02):
     """
-    在 Pogema SVG 中叠加机器节点。
+    在 Pogema SVG 中叠加机器节点，并高亮当前激活目标。
 
     Args:
-        env: Pogema 环境对象（支持 draw_svg）
-        machines: 机器对象列表（可为 [(x, y), ...] 或 [Machine(...), ...]）
-        timeline: 时间步
-        shape: 绘制形状 ('circle' 或 'rect')
-        color: 填充颜色
+        env: Pogema 环境对象
+        machines: 机器对象列表（[(x, y), ...] 或 [Machine(...), ...]）
+        timeline: 当前时间步
+        shape: 机器绘制形状 ('circle' 或 'rect')
+        inactive_color: 未激活机器颜色
+        active_color: 被指派目标的颜色
+        active_opacity: 激活机器的不透明度
+        inactive_opacity: 未激活机器的不透明度
+        stroke_color: 边框颜色
+        stroke_width: 边框线宽
     """
-    # 生成 Pogema 原始地图的 SVG
+    # 1️⃣ 绘制基础地图
     svg_str = draw_svg(env, timeline)
 
-    svg_objects = []
+    # 2️⃣ 获取当前激活目标坐标集合
+    active_targets = set(tuple(pos) for pos in env.grid.finishes_xy)
 
-    for idx, m in enumerate(machines):
-        # 自动提取坐标
+    svg_objects = []
+    for m in machines:
+        # --- 提取坐标 ---
         if hasattr(m, "location"):
             x, y = m.location  # Machine 对象
         elif isinstance(m, (tuple, list)) and len(m) == 2:
@@ -75,27 +90,42 @@ def draw_svg_with_machine(env, machines: List[Union[tuple, object]], timeline=0,
         else:
             raise TypeError(f"Unsupported machine type: {type(m)}")
 
-        # Pogema 坐标为 (row, col)
-        cx, cy = y + 0.5, x + 0.5  # 注意翻转
+        # --- 判断激活状态 ---
+        is_active = (x, y) in active_targets
 
+        # --- 坐标转换（行列翻转）---
+        cx, cy = y + 0.5, x + 0.5
+
+        # --- 绘制 ---
         if shape == "circle":
-            obj = Circle(cx=cx, cy=cy, r=0.35,
-                         fill=color, opacity=0.8,
-                         stroke="black", stroke_width=0.02)
+            obj = Circle(
+                cx=cx,
+                cy=cy,
+                r=0.35,
+                fill=active_color if is_active else inactive_color,
+                opacity=active_opacity if is_active else inactive_opacity,
+                stroke=stroke_color,
+                stroke_width=stroke_width
+            )
         elif shape == "rect":
-            obj = Rectangle(x=y + 0.1, y=x + 0.1,
-                            width=0.8, height=0.8,
-                            fill=color, opacity=0.7,
-                            stroke="black", stroke_width=0.02)
+            obj = Rectangle(
+                x=y + 0.1,
+                y=x + 0.1,
+                width=0.8,
+                height=0.8,
+                fill=active_color if is_active else inactive_color,
+                opacity=active_opacity if is_active else inactive_opacity,
+                stroke=stroke_color,
+                stroke_width=stroke_width
+            )
         else:
-            raise ValueError(f"Unknown shape '{shape}', expected 'circle' or 'rect'.")
+            raise ValueError(f"Unknown shape '{shape}'")
 
         svg_objects.append(obj)
 
-    # 合并机器图层 SVG
+    # 3️⃣ 组合 SVG 层
     machine_layer = "\n".join(obj.render() for obj in svg_objects)
 
-    # 插入到原始 SVG 的 </svg> 前
     if "</svg>" in svg_str:
         svg_str = svg_str.replace("</svg>", f"{machine_layer}\n</svg>")
     else:

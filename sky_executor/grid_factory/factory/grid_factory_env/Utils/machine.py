@@ -31,8 +31,8 @@ class MachineConfig(BaseModel):
 
 
 def generate_machines(grid: List[List[int]], machine_config: MachineConfig) -> List[Machine]:
-    """在 Pogema 地图上生成机器节点"""
-    cfg = machine_config.dict()  # ✅ pydantic BaseModel 转普通 dict
+    """在 Pogema 地图上生成机器节点（禁止靠近边界的格子）"""
+    cfg = machine_config.dict()
 
     num_machines = cfg["num_machines"]
     strategy = cfg["strategy"]
@@ -48,9 +48,13 @@ def generate_machines(grid: List[List[int]], machine_config: MachineConfig) -> L
     if not height or not width:
         raise ValueError("Grid is empty")
 
-    empty_cells = [(r, c) for r in range(height) for c in range(width) if grid[r][c] == 0]
+    # ✅ 保证机器不出现在边界
+    def is_inner_cell(r, c):
+        return 1 <= r < height - 1 and 1 <= c < width - 1 and grid[r][c] == 0
+
+    empty_cells = [(r, c) for r in range(height) for c in range(width) if is_inner_cell(r, c)]
     if not empty_cells:
-        raise ValueError("No empty cells to place machines.")
+        raise ValueError("No valid inner cells to place machines.")
 
     selected = []
 
@@ -66,7 +70,7 @@ def generate_machines(grid: List[List[int]], machine_config: MachineConfig) -> L
                 if len(selected) >= num_machines:
                     break
                 x, y = i * grid_spacing, j * grid_spacing
-                if 0 <= x < height and 0 <= y < width and grid[x][y] == 0:
+                if is_inner_cell(x, y):
                     selected.append((x, y))
         if len(selected) < num_machines:
             remaining = [c for c in empty_cells if c not in selected]
@@ -81,9 +85,9 @@ def generate_machines(grid: List[List[int]], machine_config: MachineConfig) -> L
                     break
                 x = int(round(i * grid_spacing + random.uniform(-noise, noise)))
                 y = int(round(j * grid_spacing + random.uniform(-noise, noise)))
-                x = max(0, min(x, height - 1))
-                y = max(0, min(y, width - 1))
-                if grid[x][y] == 0 and (x, y) not in selected:
+                x = max(1, min(x, height - 2))  # ✅ 限制在内圈
+                y = max(1, min(y, width - 2))
+                if is_inner_cell(x, y) and (x, y) not in selected:
                     selected.append((x, y))
         if len(selected) < num_machines:
             remaining = [c for c in empty_cells if c not in selected]
@@ -97,11 +101,11 @@ def generate_machines(grid: List[List[int]], machine_config: MachineConfig) -> L
             for j in range(zones):
                 if len(selected) >= num_machines:
                     break
-                r0, r1 = i * zone_h, min((i + 1) * zone_h, height)
-                c0, c1 = j * zone_w, min((j + 1) * zone_w, width)
+                r0, r1 = max(1, i * zone_h), min((i + 1) * zone_h, height - 1)
+                c0, c1 = max(1, j * zone_w), min((j + 1) * zone_w, width - 1)
                 candidates = [(r, c) for r in range(r0, r1)
                               for c in range(c0, c1)
-                              if grid[r][c] == 0 and (r, c) not in selected]
+                              if is_inner_cell(r, c) and (r, c) not in selected]
                 random.shuffle(candidates)
                 if candidates:
                     selected.append(candidates[0])
