@@ -27,7 +27,7 @@
             />
           </el-select>
 
-          <el-button type="primary" @click="enterFactory">进入工厂管理</el-button>
+          <el-button type="primary" @click="onSignIn">进入工厂管理</el-button>
         </div>
       </el-card>
 
@@ -42,9 +42,12 @@ import {ElMessage} from 'element-plus'
 import {ref, computed, watch, reactive} from "vue"
 import {useRouter, useRoute} from "vue-router"
 import {useThemeConfig} from '/@/stores/themeConfig';
+import {initFrontEndControlRoutes} from '/@/router/frontEnd';
+import {NextLoading} from '/@/utils/loading';
 import {storeToRefs} from 'pinia';
 import {Session} from '/@/utils/storage';
 import Cookies from 'js-cookie';
+import {dynamicRoutes} from '/@/router/route'
 
 const storesThemeConfig = useThemeConfig();
 const {themeConfig} = storeToRefs(storesThemeConfig);
@@ -69,7 +72,7 @@ const factories = [
     component: () => import('../factory/FactoryManage.vue')
   },
   {
-    id: "factory",
+    id: "grid_factory",
     name: "翼辉原料分拣货仓",
     image: "factory-yihuiwarehouse.png",
     description: "坐落于华东关键物流节点，拥有 AGV 智能分拣与自动化货物存储管理系统。",
@@ -105,60 +108,98 @@ const updateFactory = (id) => {
 const isChildRoute = computed(() => {
   // 当前路由路径以 /factory/开头且不等于 /factory 本身
   return route.path.startsWith('/factory/') && route.path !== '/factory'
-})
-
+})// 登录主函数
 const onSignIn = async () => {
-  state.loading.signIn = true;
-  // 存储 token 到浏览器缓存
-  Session.set('token', Math.random().toString(36).substr(0));
-  // 模拟数据，对接接口时，记得删除多余代码及对应依赖的引入。用于 `/src/stores/userInfo.ts` 中不同用户登录判断（模拟数据）
-  Cookies.set('userName', state.ruleForm.userName);
+  state.loading.signIn = true
+
+  // 写入登录 token & 用户信息
+  Session.set('token', Math.random().toString(36).substr(0))
+  Cookies.set('userName', state.ruleForm.userName)
+
   if (!themeConfig.value.isRequestRoutes) {
-    // 前端控制路由，2、请注意执行顺序
-    const isNoPower = await initFrontEndControlRoutes();
-    signInSuccess(isNoPower);
-  } else {
-    // 模拟后端控制路由，isRequestRoutes 为 true，则开启后端控制路由
-    // 添加完动态路由，再进行 router 跳转，否则可能报错 No match found for location with path "/"
-    const isNoPower = await initBackEndControlRoutes();
-    // 执行完 initBackEndControlRoutes，再执行 signInSuccess
-    signInSuccess(isNoPower);
-  }
-};
-
-const enterFactory = () => {
-  const routeName = 'factory'
-  const factoryId = selectedFactory.value.id
-  const newComponent = selectedFactory.value.component
-  const newTitle = selectedFactory.value.name
-
-  // 先删除旧的 factory 路由
-  const existingRoute = router.getRoutes().find(r => r.name === routeName)
-  if (existingRoute) {
-    router.removeRoute(routeName)
+    const isNoPower = await initFrontEndControlRoutes()
+    await signInSuccess(isNoPower)
   }
 
-  // 添加新的 factory 路由，直接替换成新的组件
-  router.addRoute({
-    path: '/factory',
-    name: routeName,
-    component: newComponent,
-    meta: {
-      title: newTitle,
-      roles: ['tiangong', 'common'],
-      icon: 'iconfont icon-zidingyibuju',
-      isKeepAlive: true,
-    },
-  })
+  state.loading.signIn = false
+}
 
-  // 登录状态更新
-  onSignIn()
+// 登录成功后的流程
+const signInSuccess = async (isNoPower) => {
+  if (isNoPower) {
+    ElMessage.warning('Sorry, you do not have login permissions')
+    Session.clear()
+    return
+  }
 
-  // 跳转到新的 factory 页面
-  router.push({name: routeName})
+  // 注册 dynamicRoutes
+  const existingFactory = router.getRoutes().find(r => r.name === 'factory')
+  if (!existingFactory) {
+    dynamicRoutes.forEach(route => {
+      router.addRoute(route)
+    })
+    console.log('[✅ 路由已注册]:', router.getRoutes().map(r => r.name))
+  }
+
+  // 登录成功提示
+  ElMessage.success('登录成功!')
+  NextLoading.start()
+
+  // 如果有 redirect 参数，优先跳转
+  if (route.query && route.query.redirect) {
+    const redirectPath = route.query.redirect
+    let redirectParams = ''
+    try {
+      if (route.query.params && Object.keys(route.query.params).length > 0) {
+        redirectParams = JSON.parse(route.query.params)
+      }
+    } catch (e) {
+      console.warn('redirect params parse error:', e)
+    }
+    router.push({path: redirectPath, query: redirectParams})
+    return
+  }
+
+  // 否则直接进入工厂页面
+  await enterFactory()
 }
 
 
+const enterFactory = async () => {
+  const factoryId = selectedFactory.value?.id || 'default'
+  const newComponent = selectedFactory.value.component
+  const newTitle = selectedFactory.value?.name || '默认工厂'
+
+  const childRouteName = `factory-${factoryId}`
+
+  const factoryRoute = router.getRoutes().find(r => r.name === 'factory')
+  if (!factoryRoute) {
+    console.error('❌ 未找到 factory 路由，请确保 dynamicRoutes 已注册')
+    return
+  }
+
+  // 若还没有该子路由则添加
+  const existingChild = router.getRoutes().find(r => r.name === childRouteName)
+  if (!existingChild) {
+    router.addRoute('factory', {
+      path: factoryId, // 相对路径
+      name: childRouteName,
+      component: newComponent,
+      meta: {
+        title: newTitle,
+        roles: ['tiangong', 'common'],
+        icon: 'iconfont icon-zidingyibuju',
+        isKeepAlive: true,
+      },
+    })
+  }
+
+  // 动态修改 factory 的 redirect 指向当前工厂
+  factoryRoute.redirect = `/factory/${factoryId}`
+
+  // 跳转进去
+  await router.push(`/factory/${factoryId}`)
+}
 const loginForm = reactive({
   username: '',
   password: ''
@@ -178,15 +219,6 @@ const handleLogin = () => {
   ElMessage.success(`欢迎回来，${loginForm.username}`)
 }
 
-const switchMode = (mode) => {
-  if (mode === 'factory') {
-    previewImage.value = '/assets/factory-preview-2.jpg'
-    ElMessage.info('已切换至工厂预览模式')
-  } else {
-    previewImage.value = '/assets/factory-admin.jpg'
-    ElMessage.info('已切换至管理员预览')
-  }
-}
 </script>
 
 <style scoped>
