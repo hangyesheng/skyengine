@@ -51,17 +51,15 @@ export const dynamicRoutes: Array<RouteRecordRaw> = [
                 path: '/factory',
                 name: 'factory',
                 component: () => import('/@/views/factory/index.vue'), // 父页面
+                redirect: '/factory/default', // 登录后会被 enterFactory 替换成真实的 factoryId
                 meta: {
                     title: 'message.router.factory',
                     roles: ['tiangong', 'common'],
                     icon: 'iconfont icon-zidingyibuju',
                     isKeepAlive: true
                 },
-                children: [
-                ],
+                children: [],
             },
-
-
             {
                 path: '/cases',
                 name: 'cases',

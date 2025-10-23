@@ -30,24 +30,7 @@
 </template>
 
 <script setup lang="ts">
-import {ref, onMounted} from 'vue';
-import {ElMessage} from 'element-plus';
-import axios from 'axios';
 import AccountLogin from './account.vue';
-
-const factoryImage = ref<string | null>(null);
-
-const loadFactoryPreview = async () => {
-  try {
-    const {data} = await axios.get('/api/factory/preview', {responseType: 'blob'});
-    factoryImage.value = URL.createObjectURL(data);
-  } catch (err) {
-    console.error(err);
-    ElMessage.error('加载工厂预览失败');
-  }
-};
-
-onMounted(() => loadFactoryPreview());
 </script>
 
 <style scoped lang="scss">

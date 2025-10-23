@@ -19,6 +19,7 @@
 
 <script>
 import FactoryRouter from "/@/views/factory/FactoryRouter.vue";
+import router from "/@/router/index.js";
 
 
 export default {
@@ -28,6 +29,9 @@ export default {
   data() {
     return {}
   },
+  mounted() {
+    router.push({path: '/factory'})
+    },
 }
 
 </script>
