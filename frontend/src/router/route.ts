@@ -51,35 +51,15 @@ export const dynamicRoutes: Array<RouteRecordRaw> = [
                 path: '/factory',
                 name: 'factory',
                 component: () => import('/@/views/factory/index.vue'), // 父页面
+                redirect: '/factory/default', // 登录后会被 enterFactory 替换成真实的 factoryId
                 meta: {
                     title: 'message.router.factory',
                     roles: ['tiangong', 'common'],
                     icon: 'iconfont icon-zidingyibuju',
                     isKeepAlive: true
                 },
-                children: [
-                    // {
-                    //     path: 'packet_factory', // 子工厂1
-                    //     name: 'packet-factory-manage',
-                    //     component: () => import('/@/views/factory/FactoryManage.vue'),
-                    //     meta: {
-                    //         title: '翼辉电池装配无人产线',
-                    //         roles: ['tiangong', 'packet'],
-                    //     },
-                    // },
-                    // {
-                    //     path: 'factory', // 子工厂2
-                    //     name: 'grid-factory-manage',
-                    //     component: () => import('/@/views/factory/GridFactoryManage.vue'),
-                    //     meta: {
-                    //         title: '翼辉原料分拣货仓',
-                    //         roles: ['tiangong', 'grid'],
-                    //     },
-                    // },
-                ],
+                children: [],
             },
-
-
             {
                 path: '/cases',
                 name: 'cases',
