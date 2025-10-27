@@ -246,6 +246,7 @@ class GridFactoryEnv(ParallelEnv):
         # 合并输出
         observations, rewards, terminations, truncated, info = self.pack_output(machine_info, agent_info)
 
+        # todo 当前的obs尚未和job machine版本对齐 请将machine相关的观察结果实现
         return observations, rewards, terminations, truncated, info
 
     def reset(self, seed=None, options=None):
