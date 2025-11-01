@@ -30,7 +30,7 @@ class RouteSolver:
         """
         pass
 
-    def plan(self, obs: dict, transfer_requests: list) -> list:
+    def plan(self, obs: dict) -> list:
         """
         核心接口：根据当前环境状态和待搬运任务，输出每个agent的动作。
 
@@ -39,14 +39,6 @@ class RouteSolver:
         obs : dict
             当前环境观测，包含每个AGV的局部视野等信息。
             通常来源于 env.step() 或 env.reset() 返回。
-        transfer_requests : list
-            来自 JobSolver 的物料搬运请求。
-            格式例如：
-            [
-                {'job_id': 2, 'op_id': 1, 'from_machine': 1, 'to_machine': 3, 'ready_time': 12.0},
-                ...
-            ]
-
         输出:
         ------
         agent_actions : list[int]

@@ -7,27 +7,7 @@
 '''
 import random
 from typing import List, Tuple
-from pydantic import BaseModel
-
-
-class Machine:
-    """Machine 逻辑节点"""
-    def __init__(self, machine_id: int, location: Tuple[int, int]):
-        self.id = machine_id
-        self.location = location
-
-    def __repr__(self):
-        return f"Machine(id={self.id}, location={self.location})"
-
-
-class MachineConfig(BaseModel):
-    """Machine 配置"""
-    num_machines: int = 5
-    strategy: str = "random"
-    seed: int = 42
-    zones: int = 4
-    grid_spacing: int = 5
-    noise: float = 1.0
+from sky_executor.grid_factory.factory.grid_factory_env.Utils.structure import Machine, MachineConfig
 
 
 def generate_machines(grid: List[List[int]], machine_config: MachineConfig) -> List[Machine]:
