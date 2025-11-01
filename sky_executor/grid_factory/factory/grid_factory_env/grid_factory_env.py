@@ -6,19 +6,23 @@
 @Date    ：2025/1/15 10:00 
 '''
 from typing import List, Tuple, Dict, Any, Optional
-import config
-from sky_executor.grid_factory.factory.Agent.BaseAgent import GridBaseAgent
-from sky_logs.logger import LOGGER
-from sky_executor.utils.registry import register_component
+import random
 import yaml
 from pathlib import Path
 
-from sky_executor.grid_factory.factory.grid_factory_env.Utils.machine import generate_machines,Machine,MachineConfig
 from pettingzoo import ParallelEnv
 from pogema.grid import Grid
 from pogema import GridConfig, pogema_v0, AnimationMonitor
 from pogema_toolbox.registry import ToolboxRegistry
 from pogema_toolbox.create_env import MultiMapWrapper
+
+import config
+from sky_executor.grid_factory.factory.Agent.BaseAgent import GridBaseAgent
+from sky_logs.logger import LOGGER
+from sky_executor.utils.registry import register_component
+from sky_executor.grid_factory.factory.grid_factory_env.Utils.structure import Job, Operation, MachineConfig, JobConfig
+from sky_executor.grid_factory.factory.grid_factory_env.Utils.machine import generate_machines
+from sky_executor.grid_factory.factory.grid_factory_env.Utils.job import generate_jobs
 
 # 禁用 ToolboxRegistry 日志输出
 ToolboxRegistry.setup_logger(level="CRITICAL", sink=None)
@@ -39,7 +43,7 @@ class GridFactoryEnv(ParallelEnv):
 
     def __init__(self,
                  grid_config: Optional[GridConfig] = None,
-                machine_config: Optional[MachineConfig] = None,
+                 machine_config: Optional[MachineConfig] = None,
                  agent: Optional[GridBaseAgent] = None):
         """
         初始化网格工厂环境
@@ -63,10 +67,12 @@ class GridFactoryEnv(ParallelEnv):
         # 机器组件 也就是路由的起始点和终止点
         self.machines = []
         self.machine_possible_positions: List[Tuple[int, int]] = []
-        self.machine_config= machine_config or self._create_default_machine_config()
+        self.machine_config = machine_config or self._create_default_machine_config()
 
         # 任务组件
         self.jobs = []
+        self.pending_transfers = []  # Job层给的任务
+        self.active_transfers = []  # 当前执行中的运输任务
 
         # 智能体组件
         self.agents = []
@@ -100,7 +106,7 @@ class GridFactoryEnv(ParallelEnv):
         self.machine_possible_positions = [m.location for m in self.machines]
         return self.machine_possible_positions
 
-    def machine_reset(self,):
+    def machine_reset(self, ):
         # 获得可能的位置，修改config
         self.grid: Grid = Grid(grid_config=self.grid_config)
         self.grid.get_obstacles()
@@ -139,11 +145,24 @@ class GridFactoryEnv(ParallelEnv):
         """创建默认的机器配置"""
         return MachineConfig(
             num_machines=4,
-            strategy= 'random',
-            seed= 42,
-            zones= 4,
-            grid_spacing= 5,
-            noise= 1.0
+            strategy='random',
+            seed=42,
+            zones=4,
+            grid_spacing=5,
+            noise=1.0
+        )
+
+    def _create_default_job_config(self):
+        """创建默认的任务配置"""
+        return JobConfig(
+            num_jobs=6,
+            min_ops_per_job=2,
+            max_ops_per_job=3,
+            min_proc_time=2,
+            max_proc_time=7,
+            machine_choices=2,
+            total_machines=self.machine_config.num_machines,
+            seed=42
         )
 
     def _initialize_pogema_env(self):
@@ -151,18 +170,8 @@ class GridFactoryEnv(ParallelEnv):
         try:
             # 创建Pogema环境
             self.pogema_env = pogema_v0(grid_config=self.grid_config)
-
-            # 添加包装器 todo 当前这些没进行测试
-            # self.pogema_env = AgentsDensityWrapper(self.pogema_env)
+            # 添加包装器
             self.pogema_env = MultiMapWrapper(self.pogema_env)  # 支持多地图
-            # self.pogema_env = RuntimeMetricWrapper(self.pogema_env)
-
-            # 日志记录
-            # self.pogema_env = LogActions(self.pogema_env)
-            # self.pogema_env = ProvideFutureTargetsWrapper(self.pogema_env)
-
-            # 添加图像记录包装器,包括单步的和多步的
-            # self.pogema_env = SingleStepAnimationMonitor(self.pogema_env)
             self.pogema_env = AnimationMonitor(self.pogema_env)
             print(f"请看这里：{self.pogema_env.get_obstacles().astype(int).tolist()}")
             LOGGER.info(f"[GridFactoryEnv] Pogema环境初始化成功，智能体数量: {self.grid_config.num_agents}")
@@ -216,35 +225,172 @@ class GridFactoryEnv(ParallelEnv):
                 "step_time": step_time
             }
 
-    def machine_step(self, actions=None):
-        # 计算奖励和终止条件
-        rewards = {}
-        terminations = {}
-        observations = {}
-        return observations, rewards, terminations, {}, {}
+    def job_step(self, actions=None):
+        """
+        Job 层执行一次调度时间推进。
+        根据机器加工状态推进时间，判断哪些工序完成，
+        并生成 AGV 转运任务。
+        """
+        observations, rewards, terminations, infos = {}, {}, {}, {}
 
+        # 1️⃣ 获取当前时间线
+        current_time = self.get_env_timeline()
+
+        # 2️⃣ 模拟每台机器的加工状态
+        finished_ops = []
+        for m in self.machines:
+            if not hasattr(m, "active_op"):
+                continue
+            active_op = m.active_op
+            # 如果当前时间超过结束时间 -> 说明完成
+            if current_time >= active_op["end"]:
+                finished_ops.append(active_op)
+                m.active_op = None
+
+        # 3️⃣ 为完成的工序生成运输任务
+        for op in finished_ops:
+            transfer = {
+                "from_machine": op["machine_id"],
+                "to_machine": op.get("next_machine_id", None),
+                "job_id": op["job_id"],
+                "op_id": op["op_id"]
+            }
+            self.pending_transfers.append(transfer)
+
+        # 4️⃣ 计算奖励（越快完工越好）
+        rewards = {"job_reward": -len(self.pending_transfers)}
+
+        # 5️⃣ 判断是否全部完成
+        done = all([m.active_op is None for m in self.machines])
+        terminations = {"job_done": done}
+
+        # 6️⃣ 生成观察信息
+        observations = {
+            "finished_ops": finished_ops,
+            "pending_transfers": self.pending_transfers
+        }
+        infos = {
+            "job_progress": f"{len(finished_ops)} ops finished at time {current_time}"
+        }
+
+        return observations, rewards, terminations, {}, infos
+
+    def job_reset(self):
+        """
+        初始化 Job 层任务系统：
+        1. 创建机器和 Job
+        2. 调用调度器生成加工计划
+        3. 存储初始调度结果
+        """
+        LOGGER.info("[GridFactoryEnv] 初始化 Job 层任务...")
+
+        # 1️⃣ 创建机器
+        self.machines = generate_machines([], self.machine_config)
+        self.get_grid_possible_positions()
+
+        # 2️⃣ 创建 Jobs
+        self.job_config = self._create_default_job_config()
+        self.jobs = generate_jobs(self.job_config)
+
+        # 3️⃣ 调用离线调度器生成初步排程
+        from sky_executor.grid_factory.factory.grid_factory_env.Component.JobSolver.template_solver.offline_solver import \
+            priority_greedy
+        res = priority_greedy(self.jobs, self.machines,
+                              priority_rule="SPT",
+                              transfer_time_estimator=lambda a, b: 0.0)
+
+        # 4️⃣ 存储调度结果
+        self.job_schedule = res.machine_schedule
+        self.pending_transfers = res.transfer_requests  # 下一步交给 AGV
+        self.job_stats = res.stats
+
+        # 5️⃣ 构建初始观察信息
+        observations = {
+            "job_schedule": self.job_schedule,
+            "pending_transfers": self.pending_transfers,
+        }
+
+        infos = {
+            "makespan_est": res.stats["makespan"]
+        }
+
+        LOGGER.info(f"[GridFactoryEnv] 初始化调度完成，共生成 {len(self.jobs)} 个Job")
+        return observations, infos
+
+    # todo 做测试
+    def activate_task(self):
+        # 激活可执行任务（ready_time <= 当前时间）
+        ready_tasks = [t for t in self.pending_transfers if t["ready_time"] <= self.env_timeline]
+        for task in ready_tasks:
+            assigned = self.assign_task_to_agent(task)
+            if assigned:
+                self.active_transfers.append(task)
+                self.pending_transfers.remove(task)
+
+    def assign_task_to_agent(self, task: Dict[str, Any]) -> bool:
+        """为任务分配空闲AGV"""
+        if not hasattr(self, 'agents_info'):
+            return False
+
+        idle_agents = [a for a in self.agents_info if a["status"] == "idle"]
+        if not idle_agents:
+            return False
+
+        agent = min(idle_agents, key=lambda a: self._distance(a["pos"], self._machine_pos(task["from_machine"])))
+
+        agent_id = agent["id"]
+        from_pos = self._machine_pos(task["from_machine"])
+        to_pos = self._machine_pos(task["to_machine"])
+
+        # 更新目标
+        self.agent_targets[agent_id] = to_pos
+        self.agent_positions[agent_id] = from_pos
+        agent["status"] = "busy"
+        agent["current_task"] = task
+
+        LOGGER.info(f"[GridFactoryEnv] 分配任务 {task['job_id']} -> AGV {agent_id}")
+        return True
+
+    def update_transfer_status(self, agent_info):
+        """检查已完成任务并更新状态"""
+        for i, agent in enumerate(self.agents_info):
+            if agent["status"] == "busy":
+                cur_pos = self.agent_positions[i]
+                target_pos = self.agent_targets[i]
+                if cur_pos == target_pos:
+                    finished_task = agent.pop("current_task", None)
+                    if finished_task:
+                        LOGGER.info(f"[GridFactoryEnv] 任务完成：Job {finished_task['job_id']} 的运输结束。")
+                        self.active_transfers.remove(finished_task)
+                    agent["status"] = "idle"
 
     def step(self, actions=None):
         LOGGER.info(f"[GridFactoryEnv] 当前环境时间: {self.env_timeline}")
         self.env_timeline += 1
 
+        self.activate_task()
+
         # 存储输入动作，用于 unpack
         agent_actions, machine_actions = self.unpack_input(actions)
 
-        # 执行 machine 层步进
-        m_obs, m_reward, m_terminated, m_truncated, m_info = \
-            self.machine_step(machine_actions)
-
-        # 执行 AGV 层步进
+        # 执行 路由 层步进
         a_obs, a_reward, a_terminated, a_truncated, a_info = \
             self.pogema_env.step(agent_actions)
 
-        machine_info = [m_obs, m_reward, m_terminated, m_truncated, m_info]
+        # 更新任务完成状态
+        # todo 到达某个地点后，让该地点的目标down掉operation_time的时间,之后重新上线。
+        self.update_transfer_status(a_info)
+
+        # Job 层同步
+        j_obs, j_reward, j_terminated, j_truncated, j_info = \
+            self.job_step(machine_actions)
+
         agent_info = [a_obs, a_reward, a_terminated, a_truncated, a_info]
+        job_info = [j_obs, j_reward, j_terminated, j_truncated, j_info]
         LOGGER.info(f"[GridFactoryEnv] 结束当前循环步")
 
         # 合并输出
-        observations, rewards, terminations, truncated, info = self.pack_output(machine_info, agent_info)
+        observations, rewards, terminations, truncated, info = self.pack_output(job_info, agent_info)
 
         # todo 当前的obs尚未和job machine版本对齐 请将machine相关的观察结果实现
         return observations, rewards, terminations, truncated, info
@@ -257,6 +403,9 @@ class GridFactoryEnv(ParallelEnv):
         # --- 重置机器相关，使用可能位置 ---
         m_observations, m_infos = self.machine_reset()
 
+        # --- 重置任务相关，使用任务列表 ---
+        j_observations, j_infos = self.job_reset()
+
         # --- 重置 Pogema 相关 ---
         a_observations, a_infos = self.pogema_env.reset(seed=seed)
 
@@ -267,7 +416,22 @@ class GridFactoryEnv(ParallelEnv):
         obs, rew, term, trunc, info = self.pack_output([m_observations, m_infos],
                                                        [a_observations, a_infos])
 
+        self.pending_transfers.clear()
+        self.active_transfers.clear()
+        for a in self.agents_info:
+            a["status"] = "idle"
+
         return obs, info
+
+    def _machine_pos(self, machine_id: int) -> Tuple[int, int]:
+        """返回机器的网格坐标"""
+        if machine_id < len(self.machines):
+            return self.machines[machine_id].location
+        else:
+            raise IndexError(f"Machine {machine_id} 不存在")
+
+    def _distance(self, pos1, pos2):
+        return abs(pos1[0] - pos2[0]) + abs(pos1[1] - pos2[1])
 
     def render(self):
         """渲染环境"""

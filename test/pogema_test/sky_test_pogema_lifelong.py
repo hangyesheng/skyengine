@@ -14,6 +14,7 @@ import numpy as np
 from pogema import GridConfig
 from pogema.envs import PogemaLifeLong
 
+
 def test_pogema_lifelong():
     """
     测试 PogemaLifeLong 环境
@@ -37,28 +38,26 @@ def test_pogema_lifelong():
     env.reset()
     env.render()
     print(env.grid.get_obstacles())
-    machines=generate_machines(env.grid.get_obstacles(),MachineConfig(
-            num_machines=4,
-            strategy= 'random',
-            seed= 42,
-            zones= 4,
-        ))
+    # ======================= 生成机器位置 =============================
+    machines = generate_machines(env.grid.get_obstacles(), MachineConfig(
+        num_machines=4,
+        strategy='random',
+        seed=42,
+        zones=4,
+    ))
     machine_possible_positions = [m.location for m in machines]
     print(f"可行的空地:{machine_possible_positions}")
     # 预补偿：在输入 possible_targets_xy 时减去 obs_radius
     possible_targets_xy = [(x - grid_config.obs_radius, y - grid_config.obs_radius)
                            for (x, y) in machine_possible_positions]
-    env.grid_config.possible_targets_xy=possible_targets_xy
-
+    # ======================= 结束生成机器位置 =============================
+    env.grid_config.possible_targets_xy = possible_targets_xy
     # ---------- 3. 重置环境 ----------
     obs, info = env.reset()
     env.render()
     print("\n渲染环境 (SVG)")
-    # svg_str = draw_svg(env, 0)
-    #
-    # with open("temp.svg", "w") as f:
-    #     f.write(svg_str)
-    svg_str = draw_svg_with_machines_and_targets(env, grid_config.possible_targets_xy)
+    # 利用env.grid_config.possible_targets_xy和env.grid.finishes_xy即可绘制。
+    svg_str = draw_svg_with_machines_and_targets(env)
     with open("temp.svg", "w") as f:
         f.write(svg_str)
 
@@ -73,20 +72,21 @@ def test_pogema_lifelong():
 
     dp = DeterministicPolicy()
     # ---------- 5. 随机移动 agents，模拟几个 step ----------
-    idx=0
+    idx = 0
     while True:
         print(env.grid.finishes_xy)
-        idx+=1
-        actions=dp.act(obs)
+        idx += 1
+        actions = dp.act(obs)
         obs, rewards, terminated, truncated, infos = env.step(actions)
         # ---------- 6. 渲染环境 ----------
         env.render()
 
-        svg_str = draw_svg_with_machines_and_targets(env, grid_config.possible_targets_xy,timeline=idx)
+        svg_str = draw_svg_with_machines_and_targets(env, timeline=idx)
         with open(f"temp{idx}.svg", "w") as f:
             f.write(svg_str)
         if idx > 40:
             break
+
 
 if __name__ == "__main__":
     test_pogema_lifelong()
