@@ -28,7 +28,7 @@ from sky_executor.grid_factory.factory.grid_factory_env.Utils.assign_env import 
     PogemaLifeLongWithAssign,
 )
 from sky_executor.grid_factory.factory.grid_factory_env.Utils.machine import (
-    generate_machines,
+    generate_machines, revert_to_pogema
 )
 from sky_executor.grid_factory.factory.grid_factory_env.Utils.job import generate_jobs
 
@@ -116,7 +116,6 @@ class GridFactoryEnv(ParallelEnv):
     def current_targets(self):
         return self.pogema_env.grid.finishes_xy
 
-
     def machine_reset(
             self,
     ):
@@ -124,9 +123,9 @@ class GridFactoryEnv(ParallelEnv):
         grid: Grid = Grid(grid_config=self.grid_config)
         grid.get_obstacles()
 
-        self.machines = generate_machines(
+        self.machines = revert_to_pogema(generate_machines(
             grid.get_obstacles(), self.machine_config
-        )
+        ))
         """获得机器的位置"""
         self.grid_config.possible_targets_xy = [m.location for m in self.machines]
 
@@ -193,7 +192,6 @@ class GridFactoryEnv(ParallelEnv):
         LOGGER.info(
             f"[GridFactoryEnv] Pogema环境初始化成功，智能体数量: {self.grid_config.num_agents}"
         )
-
 
     def create_hash_index(self):
         """创建高效获取组件的索引结构"""
@@ -382,7 +380,7 @@ class GridFactoryEnv(ParallelEnv):
         self.pending_transfers.clear()
         self.active_transfers.clear()
         # reset之后才能看这里
-        print(f"请看这里：{self.pogema_env.grid.get_obstacles().astype(int).tolist()}")
+        # print(f"请看这里：{self.pogema_env.grid.get_obstacles().astype(int).tolist()}")
 
         return obs, info
 
