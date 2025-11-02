@@ -214,6 +214,14 @@ def generate_machines(grid: List[List[int]], machine_config: MachineConfig) -> L
     return MachineGenerator(grid, machine_config).generate()
 
 
+def revert_to_pogema(machines: List[Machine], padding: int = 4):
+    print(f"机器位置: {machines}")
+    for m in machines:
+        m.location = (m.location[0] - padding + 1, m.location[1] - padding + 1)
+    print(f"修正后的位置：{machines}")
+    return machines
+
+
 if __name__ == "__main__":
     # print(1.0==1)
     grid = [[0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
@@ -236,6 +244,7 @@ if __name__ == "__main__":
     new_grid = grid
     config = MachineConfig(num_machines=6, strategy="grid+noise", seed=123, noise=1.5)
     machines = generate_machines(grid, config)
+    new_machines = revert_to_pogema(machines, padding=1)
     for m in machines:
         new_grid[m.location[0]][m.location[1]] = 233
         print(m)
