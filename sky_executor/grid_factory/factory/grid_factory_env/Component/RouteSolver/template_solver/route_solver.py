@@ -8,12 +8,11 @@
 
 
 class RouteSolver:
-    def __init__(self, env):
+    def __init__(self):
         """
         RouteSolver 与环境绑定。
         env 通常是 Pogema 式的多智能体网格环境。
         """
-        self.env = env
         self.pending_transfers = []  # 等待执行的运输任务
         self.active_routes = {}  # agv_id -> 当前路径状态
         self.policy = None  # 可选：内部策略 (如A*或RL)

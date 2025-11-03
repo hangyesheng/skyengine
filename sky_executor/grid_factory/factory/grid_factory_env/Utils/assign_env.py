@@ -12,6 +12,7 @@ class PogemaLifeLongWithAssign(PogemaLifeLong):
 
     def reset(self, seed: Optional[int] = None, return_info: bool = True, options: Optional[dict] = None, ):
         super().reset(seed, return_info, options)
+        # 重新分配可能的目标
         for idx in range(self.grid_config.num_agents):
             self.grid.finishes_xy[idx] = random.choice(self.grid_config.possible_targets_xy)
         if return_info:
