@@ -9,7 +9,7 @@
 # 此处列举了常用的结构
 
 from dataclasses import dataclass
-from typing import List, Dict, Tuple, Optional, Callable
+from typing import List, Dict, Tuple, Optional
 from pydantic import BaseModel
 
 
@@ -30,8 +30,6 @@ class Job:
     ops: List[Operation]
 
 
-# class Machine:
-#     m_id: int
 @dataclass
 class Machine:
     """Machine 逻辑节点"""
@@ -46,6 +44,7 @@ class Machine:
 
 class MachineConfig(BaseModel):
     """Machine 配置"""
+
     num_machines: int = 5
     strategy: str = "random"
     seed: int = 42
@@ -69,6 +68,8 @@ class JobConfig(BaseModel):
 
 @dataclass
 class JobSolverResult:
+    """用于静态调度"""
+
     machine_schedule: Dict[
         int, List[Tuple[float, float, int, int]]
     ]  # machine_id -> [(start_time, end_time, job_id, op_id)]
@@ -91,3 +92,17 @@ class RouteProblem:
     tasks: List[RouteTask]
     policy_name: str = "astar"  # or 'ppo', 'rra', etc.
     max_steps: int = 256
+
+
+class RoutingTask:
+    """无论静态还是动态都需要"""
+
+    def __init__(
+        self, job_id, op_id, source, destination=None, candidate_machines=None
+    ):
+        self.job_id = job_id
+        self.op_id = op_id
+        self.source = source
+        self.destination = destination
+        self.candidate_machines = candidate_machines or []
+        self.dynamic = destination is None  # 是否动态决策

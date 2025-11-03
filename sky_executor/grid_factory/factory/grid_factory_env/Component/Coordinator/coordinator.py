@@ -20,29 +20,28 @@ class Coordinator:
     """
 
     def __init__(self, job_solver: JobSolver = None, route_solver: RouteSolver = None):
-        if job_solver is not None:
-            self.job_solver = job_solver
-        if route_solver is not None:
-            self.route_solver = route_solver
+
+        self.job_solver = job_solver if job_solver is not None else JobSolver()
+        self.route_solver = route_solver if route_solver is not None else RouteSolver()
 
     def decide(self, obs):
         # 解包输入
-        machine_observation = obs.get("machine_observation", None)
-        assert machine_observation is not None, "请提供机器观测信息"
+        job_observation = obs.get("job_observation", None)
+        assert job_observation is not None, "请提供机器观测信息"
         agent_observation = obs.get("agent_observation", None)
         assert agent_observation is not None, "请提供智能体观测信息"
 
         # 1 获取 Job 层计划
-        job_decision = self.job_solver.plan(machine_observation)
-        machine_actions = job_decision["machine_actions"]
-        transfer_requests = job_decision["transfer_requests"]
+        job_decision = self.job_solver.plan(job_observation)
+        # job_actions = job_decision["job_actions"]
+        transfer_requests = job_decision["transfer_requests"]  # 获取转移请求
 
         # 3 获取 Route 层动作
         route_decision = self.route_solver.plan(agent_observation)
 
         # 4 任务结算层,确定当前已经完成的任务,交付给协调器
 
-        return {"machine_actions": machine_actions, "agent_actions": route_decision}
+        return {"job_actions": transfer_requests, "agent_actions": route_decision}
 
     def assign(self):
         pass

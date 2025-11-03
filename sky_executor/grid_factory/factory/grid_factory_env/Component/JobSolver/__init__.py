@@ -26,3 +26,6 @@
 # | `transfers_done`          | `[(job_id, op_id, from_machine, to_machine)]`                  | 已经完成的搬运任务       |
 # | `transfer_time_estimator` | 函数句柄                                                           | 可计算机器间传输时间      |
 
+
+# 这里其实就是从job(operation)中，获得对应的执行逻辑，根据不同的策略生成路由任务即可。
+

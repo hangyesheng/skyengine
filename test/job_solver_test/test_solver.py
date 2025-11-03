@@ -15,7 +15,7 @@
 
 import random
 from sky_executor.grid_factory.factory.grid_factory_env.Utils.structure import Job, Machine, Operation
-from sky_executor.grid_factory.factory.grid_factory_env.Component.JobSolver.template_solver.offline_solver import priority_greedy
+from SkyEngine.sky_executor.grid_factory.factory.grid_factory_env.Component.JobSolver.utils.op_priority_greedy import priority_greedy
 from sky_executor.grid_factory.factory.grid_factory_env.Component.JobSolver.utils.draw_metrics import (plot_machine_gantt,
                                                                                                        plot_machine_util_bar)
 

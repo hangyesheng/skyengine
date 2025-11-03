@@ -1,33 +1,14 @@
-'''
-@Project ：SkyEngine 
+"""
+@Project ：SkyEngine
 @File    ：job_solver.py
 @IDE     ：PyCharm
 @Author  ：Skyrimforest
 @Date    ：2025/10/27 22:49
-'''
+"""
 
 
 class JobSolver:
-    def __init__(self, env):
-        self.env = env
-        self.current_plan = None  # 当前调度结果缓存
-        self.pending_ops = []  # 尚未分配的操作
-        self.active_ops = []  # 正在执行的操作
-        self.finished_ops = []  # 已完成操作
-        self.transfer_requests = []  # 交由RouteSolver处理的搬运请求
-
-    def observe(self, obs: dict):
-        """
-        接收环境状态观察。
-        obs 通常包括：
-        - 当前机器状态（idle / busy / occupied_until）
-        - Job 状态（ready / running / finished）
-        - 当前时间步
-        - Operation 就绪情况（前序是否完成）
-        - Transfer 完成信息（AGV完成物料搬运）
-
-        返回内部可用的 job/task 信息
-        """
+    def __init__(self):
         pass
 
     def plan(self, obs: dict) -> dict:
@@ -52,13 +33,3 @@ class JobSolver:
         ]
         """
         pass
-
-    def update_after_step(self, infos):
-        """
-        每个时间步后由环境调用，更新执行状态：
-        - 哪些任务完成了
-        - 哪些转运完成
-        - 哪些机器空闲
-        """
-        pass
-

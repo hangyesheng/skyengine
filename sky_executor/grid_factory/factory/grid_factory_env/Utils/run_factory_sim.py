@@ -6,7 +6,7 @@
 @Date    ：2025/10/31 16:59
 '''
 from sky_executor.grid_factory.factory.grid_factory_env.grid_factory_env import GridFactoryEnv
-from sky_executor.grid_factory.factory.grid_factory_env.Component.JobSolver.template_solver.offline_solver import priority_greedy
+from SkyEngine.sky_executor.grid_factory.factory.grid_factory_env.Component.JobSolver.utils.op_priority_greedy import priority_greedy
 
 
 # === Step 1: 离线求解 ===
