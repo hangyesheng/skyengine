@@ -6,15 +6,14 @@
 @Date    ：2025/1/15 10:00
 """
 
-from typing import List, Tuple, Dict, Any, Optional
+from typing import List, Tuple, Optional
 import yaml
 from pathlib import Path
 
 from pettingzoo import ParallelEnv
 from pogema.grid import Grid
-from pogema import pogema_v0, GridConfig, AnimationMonitor
+from pogema import GridConfig, AnimationMonitor
 from pogema_toolbox.registry import ToolboxRegistry
-from pogema_toolbox.create_env import MultiMapWrapper
 
 import config
 from sky_executor.grid_factory.factory.Agent.BaseAgent import GridBaseAgent
@@ -48,6 +47,8 @@ class GridFactoryEnv(ParallelEnv):
     2. 支持多智能体路径规划
     3. 集成事件系统和回调机制
     4. 支持工厂任务调度
+
+    注意环境reset之后才能有grid相关结构
     """
 
     metadata = {"render_modes": ["human"], "name": "grid_factory_env"}
@@ -78,7 +79,7 @@ class GridFactoryEnv(ParallelEnv):
         # 机器组件 也就是路由的起始点和终止点
         self.machines = []
         self.machine_config = machine_config or self._create_default_machine_config()
-
+        
         # 任务组件
         self.jobs = []
         self.pending_transfers = []  # Job层给的任务
@@ -116,7 +117,7 @@ class GridFactoryEnv(ParallelEnv):
     def current_targets(self):
         return self.pogema_env.grid.finishes_xy
 
-    def machine_reset(self, seed=42):
+    def machine_reset(self):
         # 获得可能的位置，修改config
         # todo machine seed need to add.
         grid: Grid = Grid(grid_config=self.grid_config)
@@ -223,57 +224,53 @@ class GridFactoryEnv(ParallelEnv):
 
     def job_step(self, actions=None):
         """
-        Job 层执行一次调度时间推进。
-        根据机器加工状态推进时间，判断哪些工序完成，
-        并生成 AGV 转运任务。
+        Job 层获取routing tasks,更新环境本身的相关信息,后续交给assigner层指派。
         """
         observations, rewards, terminations, infos = {}, {}, {}, {}
-        self.pending_transfers.extend(transfer_requests)  # 新添加的待执行的任务
-        self.active_transfers = []  # 当前执行中的运输任务
 
-        # 1️⃣ 获取当前时间线
-        current_time = self.get_env_timeline()
+        # 当前仿真时刻
+        t = self.env_timeline
 
-        # 2️⃣ 模拟每台机器的加工状态
+        # === 1️⃣ 接收 JobSolver 的决策 ===
+        if actions is not None:
+            # 新的转运请求加入 pending_transfers
+            new_transfers = actions.get("transfer_requests", [])
+            self.pending_transfers.extend(new_transfers)
+
+        # === 2️⃣ 推进加工状态 ===
         finished_ops = []
         for m in self.machines:
-            if not hasattr(m, "active_op"):
-                continue
-            active_op = m.active_op
-            # 如果当前时间超过结束时间 -> 说明完成
-            if current_time >= active_op["end"]:
+            active_op = getattr(m, "active_op", None)
+            if active_op is not None and t >= active_op["end"]:
+                # 工序完成
                 finished_ops.append(active_op)
                 m.active_op = None
 
-        # 3️⃣ 为完成的工序生成运输任务
-        for op in finished_ops:
-            transfer = {
-                "from_machine": op["machine_id"],
-                "to_machine": op.get("next_machine_id", None),
-                "job_id": op["job_id"],
-                "op_id": op["op_id"],
-            }
-            self.pending_transfers.append(transfer)
+        # === 5️⃣ 奖励与完成判定 ===
+        # 简单策略：奖励 = 已完成工序数 - 待转运数
+        rewards = {"job_reward": len(finished_ops) - len(self.pending_transfers)}
 
-        # 4️⃣ 计算奖励（越快完工越好）
-        rewards = {"job_reward": -len(self.pending_transfers)}
-
-        # 5️⃣ 判断是否全部完成
-        done = all([m.active_op is None for m in self.machines])
+        done = len(self.pending_transfers) == 0 and all(
+            getattr(m, "active_op", None) is None for m in self.machines
+        )
         terminations = {"job_done": done}
-
-        # 6️⃣ 生成观察信息
-        observations = {
-            "finished_ops": finished_ops,
-            "pending_transfers": self.pending_transfers,
-        }
+        truncations = {"job_truncation": False}
+        # === 6️⃣ 汇总信息 ===
         infos = {
-            "job_progress": f"{len(finished_ops)} ops finished at time {current_time}"
+            "finished_ops": finished_ops,
         }
 
-        return observations, rewards, terminations, {}, infos
+        # === 7️⃣ 输出观测 ===
+        observations = {
+            "machines": self.machines,
+            "pending_transfers": self.pending_transfers,
+            "active_transfers": self.active_transfers,
+            "finished_ops": finished_ops,
+        }
 
-    def job_reset(self, seed=42):
+        return observations, rewards, terminations, truncations, infos
+
+    def job_reset(self):
         """
         初始化 Job 层任务系统：
         1. 创建机器和 Job
@@ -339,25 +336,33 @@ class GridFactoryEnv(ParallelEnv):
 
         self.activate_task()
 
-        agent_actions, job_actions = self.unpack_input(actions)
+        (
+            job_actions,
+            task_actions,
+            agent_actions,
+        ) = self.unpack_input(actions)
+
+        j_obs, j_reward, j_terminated, j_truncated, j_info = self.job_step(job_actions)
 
         a_obs, a_reward, a_terminated, a_truncated, a_info = self.pogema_env.step(
             agent_actions
         )
 
+        t_obs, t_reward, t_terminated, t_truncated, t_info = self.pogema_env.task_step(
+            task_actions
+        )
+
         self.update_transfer_status(a_info)
-        j_obs, j_reward, j_terminated, j_truncated, j_info = self.job_step(job_actions)
 
         agent_info = [a_obs, a_reward, a_terminated, a_truncated, a_info]
+        task_info = [t_obs, t_reward, t_terminated, t_truncated, t_info]
         job_info = [j_obs, j_reward, j_terminated, j_truncated, j_info]
-        LOGGER.info(f"[GridFactoryEnv] 结束当前循环步")
 
         # 合并输出
         observations, rewards, terminations, truncated, info = self.pack_output(
-            job_info, agent_info
+            job_info, task_info, agent_info
         )
 
-        # todo 当前的obs尚未和job job版本对齐 请将job相关的观察结果实现
         return observations, rewards, terminations, truncated, info
 
     def reset(self, seed=None):
@@ -365,24 +370,24 @@ class GridFactoryEnv(ParallelEnv):
 
         self.set_env_timeline(0)
 
-        # --- 重置机器相关，使用可能位置 ---
-        m_observations, m_infos = self.machine_reset(seed=seed)
+        # --- 重置任务相关，使用可能位置 ---
+        t_observations, t_infos = self.machine_reset()
 
         # --- 重置任务相关，使用任务列表 ---
-        j_observations, j_infos = self.job_reset(seed=seed)
+        j_observations, j_infos = self.job_reset()
 
         # --- 重置 Pogema 相关 ---
         a_observations, a_infos = self.pogema_env.reset(seed=seed)
 
         # --- 打包输出 ---
         obs, rwd, term, trunc, info = self.pack_output(
-            [m_observations, m_infos], [a_observations, a_infos]
+            [j_observations, j_infos],
+            [t_observations, t_infos],
+            [a_observations, a_infos],
         )
 
         self.pending_transfers.clear()
         self.active_transfers.clear()
-        # reset之后才能看这里
-        # print(f"请看这里：{self.pogema_env.grid.get_obstacles().astype(int).tolist()}")
 
         return obs, info
 
@@ -402,22 +407,17 @@ class GridFactoryEnv(ParallelEnv):
         """获取机器列表"""
         return self.machines
 
-    # todo 这些agent的信息可以通过env获取 可以修改一下
     def get_agents(self) -> List:
         """获取AGV列表"""
         return self.agents
-
-    # def get_agents_info(self) -> List[Dict[str, Any]]:
-    #     """获取智能体信息"""
-    #     return self.agents_info
 
     def get_agent_positions(self) -> List[Tuple[int, int]]:
         """获取智能体位置"""
         return self.pogema_env.grid.get_agents_xy()
 
-    # def get_agent_targets(self) -> List[Tuple[int, int]]:
-    #     """获取智能体目标"""
-    #     return self.agent_targets
+    def get_agent_targets(self) -> List[Tuple[int, int]]:
+        """获取智能体目标"""
+        return self.pogema_env.grid.finishes_xy
 
     def get_pogema_env(self):
         """获取Pogema环境实例"""
@@ -436,10 +436,15 @@ class GridFactoryEnv(ParallelEnv):
         """将输入的 actions 拆分为机器与智能体两部分"""
         # 假设 self.input_actions 是外部传入的总动作字典
         job_actions = actions.get("job_actions", {})
+        task_actions = actions.get("task_actions", {})
         agent_actions = actions.get("agent_actions", {})
-        return agent_actions, job_actions
+        return (
+            job_actions,
+            task_actions,
+            agent_actions,
+        )
 
-    def pack_output(self, job_info, agent_info):
+    def pack_output(self, job_info, task_info, agent_info):
         """动态合并 job 和 agent 输出"""
 
         def unpack(info):
@@ -453,15 +458,35 @@ class GridFactoryEnv(ParallelEnv):
                 raise ValueError(f"Unexpected tuple length: {len(info)}")
             return obs, reward, term, trunc, inf
 
-        # 动态解包
-        m_obs, m_reward, m_term, m_trunc, m_info = unpack(job_info)
+        j_obs, j_reward, j_term, j_trunc, j_info = unpack(job_info)
+        t_obs, t_reward, t_term, t_trunc, t_info = unpack(task_info)
         a_obs, a_reward, a_term, a_trunc, a_info = unpack(agent_info)
 
         # 合并为标准输出结构
-        observations = {"job_observation": m_obs, "agent_observation": a_obs}
-        rewards = {"job_reward": m_reward, "agent_reward": a_reward}
-        terminations = {"job_done": m_term, "agent_done": a_term}
-        truncations = {"job_truncated": m_trunc, "agent_truncated": a_trunc}
-        infos = {"job_info": m_info, "agent_info": a_info}
+        observations = {
+            "job_observation": j_obs,
+            "task_observation": t_obs,
+            "agent_observation": a_obs,
+        }
+        rewards = {
+            "job_reward": j_reward,
+            "task_reward": t_reward,
+            "agent_reward": a_reward,
+        }
+        terminations = {
+            "job_done": j_term,
+            "task_done": t_term,
+            "agent_done": a_term,
+        }
+        truncations = {
+            "job_truncated": j_trunc,
+            "task_truncated": t_trunc,
+            "agent_truncated": a_trunc,
+        }
+        infos = {
+            "job_info": j_info,
+            "task_info": t_info,
+            "agent_info": a_info,
+        }
 
         return observations, rewards, terminations, truncations, infos
