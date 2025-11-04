@@ -5,13 +5,6 @@
 @Author  ：Skyrimforest
 @Date    ：2025/10/27 23:10
 '''
-'''
-@Project ：SkyEngine 
-@File    ：sky_test_machine_env.py
-@IDE     ：PyCharm
-@Author  ：Skyrimforest
-@Date    ：2025/10/17 13:38
-'''
 # 这里对machine生成策略进行测试，查看是否成功实现不同的machine生成策略
 from pogema import GridConfig
 from sky_executor.grid_factory.factory.grid_factory_env.grid_factory_env import GridFactoryEnv
