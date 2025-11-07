@@ -50,17 +50,15 @@ export const dynamicRoutes: Array<RouteRecordRaw> = [
             {
                 path: '/factory',
                 name: 'factory',
-                component: () => import('/@/views/factory/index.vue'),
+                component: () => import('/@/views/factory/index.vue'), // 父页面
+                redirect: '/factory/default', // 登录后会被 enterFactory 替换成真实的 factoryId
                 meta: {
                     title: 'message.router.factory',
-                    isLink: '',
-                    isHide: false,
-                    isKeepAlive: true,
-                    isAffix: false,
-                    isIframe: false,
                     roles: ['tiangong', 'common'],
                     icon: 'iconfont icon-zidingyibuju',
+                    isKeepAlive: true
                 },
+                children: [],
             },
             {
                 path: '/cases',
@@ -92,22 +90,6 @@ export const dynamicRoutes: Array<RouteRecordRaw> = [
                     icon: 'iconfont icon-zidingyibuju',
                 },
             },
-            {
-                path: '/train',
-                name: 'train',
-                component: () => import('/@/views/train/index.vue'),
-                meta: {
-                    title: 'message.router.train',
-                    isLink: '',
-                    isHide: false,
-                    isKeepAlive: true,
-                    isAffix: false,
-                    isIframe: false,
-                    roles: ['tiangong', 'common'],
-                    icon: 'iconfont icon-zidingyibuju',
-                },
-            },
-
         ],
     },
 ];
