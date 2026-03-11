@@ -186,7 +186,12 @@
 
 ---
 
-## 八、许可证与归属
+## 八、联系我们
 
-* License：MIT
-* 维护团队：南京大学计算机学院 DISLAB
+如果有任何问题，请随时通过以下方式联系我们：
+- [谢磊 lxie@nju.edu.cn](mailto:lxie@nju.edu.cn)
+- [吴昊 wuhao@smail.nju.edu.cn](mailto:wuhao@smail.nju.edu.cn)
+
+## 九、许可证与归属
+
+天工系统遵循Apache 2.0许可证,请参阅[LICENSE](LICENSE)以获取详细信息。
