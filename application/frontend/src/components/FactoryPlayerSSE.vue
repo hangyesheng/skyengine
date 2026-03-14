@@ -12,7 +12,7 @@
             <div class="placeholder-icon">⚙️</div>
             <h2>待配置工厂环境</h2>
             <p>请在右侧面板上传工厂配置文件（JSON格式）</p>
-            <p class="hint">或调用 initializeConfig() 以加载本地配置</p>
+            <p class="hint">若无可用配置可下载模板文件以做测试</p>
           </div>
         </div>
         <FactoryVisualization v-else :static-config="topologyConfig" :baseGridSize="renderConfig.baseGridSize"
@@ -63,93 +63,6 @@ const store = useFactoryStore();
 const currentScenario = ref('');
 const configLoaded = ref(false);
 const configError = ref(null);
-
-/**
- * 从 JSON 配置文件加载工厂拓扑
- * @param {string} configPath - 配置文件路径（如 '/configs/packet_factory.json'）
- * @returns {Promise<Object>} 解析后的拓扑配置
- */
-async function loadTopologyFromJson(configPath) {
-  try {
-    const response = await fetch(configPath);
-    if (!response.ok) {
-      throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-    }
-
-    const config = await response.json();
-
-    // 验证必要字段
-    if (!config.topology || !config.topology.zones || !config.topology.machines || !config.topology.waypoints) {
-      throw new Error('配置文件缺少必要的 topology 字段');
-    }
-
-    // 处理 zones（确保每个 zone 都有必要字段）
-    const zones = config.topology.zones.map(zone => ({
-      id: zone.id,
-      name: zone.name || '未命名区域',
-      area: zone.area,
-      type: zone.type || 'workarea',
-      color: zone.color || 'rgba(0, 0, 0, 0.1)'
-    }));
-
-    // 处理 machines（转换对象为标准格式）
-    const machines = {};
-    Object.entries(config.topology.machines).forEach(([key, machine]) => {
-      machines[key] = {
-        id: machine.id || key,
-        name: machine.name || `Machine ${key}`,
-        location: machine.location,
-        size: machine.size || [2, 2],
-        status: machine.status || 'IDLE'
-      };
-    });
-
-    // 处理 waypoints（转换对象为标准格式）
-    const waypoints = {};
-    Object.entries(config.topology.waypoints).forEach(([key, waypoint]) => {
-      waypoints[key] = {
-        id: waypoint.id || key,
-        location: waypoint.location,
-        type: waypoint.type || 'route',
-        name: waypoint.name || `Waypoint ${key}`
-      };
-    });
-
-    const parsedConfig = {
-      zones,
-      machines,
-      waypoints,
-      baseGridSize: config.renderConfig?.baseGridSize || 40,
-      gridWidth: config.topology?.gridWidth || 20,
-      gridHeight: config.topology?.gridHeight || 14
-    };
-
-    console.log('✅ 工厂配置加载成功:', config.name);
-    configError.value = null;
-    return parsedConfig;
-  } catch (error) {
-    const errorMsg = `配置加载失败: ${error.message}`;
-    console.error('❌', errorMsg);
-    configError.value = errorMsg;
-    throw error;
-  }
-}
-
-/**
- * 初始化配置（从 JSON 或使用默认硬编码配置）
- */
-async function initializeConfig(configPath = '/configs/packet_factory.json') {
-  try {
-    const loadedConfig = await loadTopologyFromJson(configPath);
-    // 更新 Store 中的配置
-    const configId = store.setCurrentTopologyConfig(loadedConfig)
-    configLoaded.value = true
-    console.log(`✅ 配置已加载: ${configId}`)
-  } catch (error) {
-    console.warn('⚠️ 配置加载失败，请在右侧面板上传配置文件');
-    configLoaded.value = false;
-  }
-}
 
 // --- 默认空配置（等待用户上传）---
 const defaultTopologyConfig = {
@@ -207,7 +120,7 @@ watch(() => store.currentConfigId, (newConfigId) => {
   if (newConfigId) {
     configLoaded.value = true;
     console.log(`✅ 配置已切换，地图已更新: ${newConfigId}`);
-    
+
     // 自动初始化 AGV
     setTimeout(() => {
       store.initializeAGVs();

@@ -3,7 +3,7 @@
 
 ## 一、系统定位与愿景
 
-**TianGong（天工）** 是一个面向柔性制造系统（FMS）的 **仿真—调度一体化平台**，核心目标是：
+**SkyEngine（天工）** 是一个面向柔性制造系统（FMS）的 **仿真—调度一体化平台**，核心目标是：
 
 > **以高保真仿真为验证闭环，将调度算法从“离线求解器”提升为“可落地的生产决策系统”。**
 
@@ -98,7 +98,6 @@
 
 * **GridFactory**： 网格场景，用于探索多智能体寻路与任务分配的联合任务。
 
-
 #### （2）调度与规划组件
 
 算法环境本身被拆分为 **可插拔组件**：
@@ -149,6 +148,12 @@
 * 支持状态持久化与对比实验
 * 支持研究算法直接工程运行
 
+依据假设创建了不同的强化学习环境，若想进行不同的柔性产线算法研究，请了解以下环境的相关信息，并针对化部署。
+
+| 强化学习环境 | 描述 | 部署指南
+|---------|----------|-------|
+| GridFactory | 用于研究 JSSP + MAPF 的网格环境 | [GridFactory]( https://github.com/dayu-autostreamer/skyengine/blob/main/docs/grid_factory)
+| PacketFactory | 非网格环境 | [PacketFactory]( https://github.com/dayu-autostreamer/skyengine/blob/main/docs/packet_factory)
 ---
 
 ## 六、适用人群
@@ -189,8 +194,9 @@
 ## 八、联系我们
 
 如果有任何问题，请随时通过以下方式联系我们：
-- [谢磊 lxie@nju.edu.cn](mailto:lxie@nju.edu.cn)
-- [吴昊 wuhao@smail.nju.edu.cn](mailto:wuhao@smail.nju.edu.cn)
+
+* [谢磊 lxie@nju.edu.cn](mailto:lxie@nju.edu.cn)
+* [吴昊 wuhao@smail.nju.edu.cn](mailto:wuhao@smail.nju.edu.cn)
 
 ## 九、许可证与归属
 

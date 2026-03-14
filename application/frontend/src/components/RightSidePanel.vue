@@ -31,7 +31,6 @@
 
 <script setup>
 import { ref } from 'vue'
-// 不需要引入 ref(null) 给 eventPanel 了
 import ConfigPanel from './ConfigPanel.vue'
 import MetricsPanel from './MetricsPanel.vue'
 import EventPanel from './EventPanel.vue'

@@ -98,6 +98,8 @@
             <el-button
               size="small"
               :type="currentConfigId === config.id ? 'primary' : 'default'"
+              :loading="isLoading"
+              :disabled="isLoading"
               @click="selectConfig(config.id)"
             >
               {{ currentConfigId === config.id ? '✓ 使用中' : '使用' }}
@@ -110,7 +112,7 @@
       <div class="section-block flex-grow">
         <div class="section-title">
           <i class="el-icon-s-grid"></i>
-          工厂节点资产
+          工厂资产
           <el-tooltip content="包含逻辑节点与物理设备" placement="top">
             <span class="info-icon">ⓘ</span>
           </el-tooltip>
@@ -303,9 +305,36 @@ function uploadConfig() {
   reader.readAsText(selectedFile.value)
 }
 
-function selectConfig(configId) {
-  store.setCurrentConfig(configId)
-  ElMessage.success('已切换配置')
+async function selectConfig(configId) {
+  const config = store.factoryConfigs[configId]
+  if (!config) {
+    ElMessage.error('配置不存在')
+    return
+  }
+
+  isLoading.value = true
+
+  try {
+    // 1. 更新本地 store
+    store.setCurrentConfig(configId)
+
+    // 2. 同步到后端
+    const response = await apiPost(API_ROUTES.FACTORY_CONFIG_UPLOAD, {
+      filename: `${config.name || configId}.json`,
+      config: config,
+    })
+
+    if (response.status === 'ok') {
+      ElMessage.success(`已切换到配置: ${config.name || configId}`)
+    } else {
+      throw new Error(response.message || '切换配置失败')
+    }
+  } catch (error) {
+    console.error('切换配置失败:', error)
+    ElMessage.error(`切换配置失败: ${error.message}`)
+  } finally {
+    isLoading.value = false
+  }
 }
 
 function downloadTemplate() {

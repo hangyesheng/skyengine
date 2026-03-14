@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-**TianGong (天工)** is a flexible manufacturing simulation-integrated scheduling platform (SkyEngine v1.0.0). It combines high-fidelity simulation with scheduling algorithms for production decision systems.
+**TianGong (天工)** is a flexible manufacturing simulation-integrated scheduling platform (SkyEngine v1.0.0). It combines high-fidelity simulation with scheduling auvlgorithms for production decision systems.
 
 ## Architecture
 
@@ -79,8 +79,7 @@ factory.cleanup() # Release resources
 
 ### Backend (FastAPI)
 ```bash
-cd application/backend
-uvicorn application.backend.server:app --reload --port 8000
+uv run uvicorn application.backend.server:app --reload --host 0.0.0.0 --port 8000
 ```
 
 ### Frontend (Vue.js)
