@@ -12,12 +12,17 @@ export const API_ROUTES = {
   // 系统相关
   HEALTH: "/health",
   SCENARIO_STATUS: "/scenario/status",
+  ALGO: "/algo",
 
   // 工厂配置相关 (控制连接)
   FACTORY_CONFIG_UPLOAD: "/factory/config/upload",
   FACTORY_CONTROL_RESET: "/factory/control/reset",
   FACTORY_CONTROL_PLAY: "/factory/control/play",
   FACTORY_CONTROL_SWITCH: "/factory/control/switch",
+
+  // 调度算法相关
+  FACTORY_ALGORITHM_SET: "/factory/algorithm/set",
+  FACTORY_ALGORITHM_GET: "/factory/algorithm/get",
 
   // SSE 流相关，其中事件不同，不同工厂自行处理
   STREAM_STATE: "/stream/state",
@@ -47,6 +52,7 @@ export function getApiUrl(route, params = {}) {
  * 通用 HTTP 请求方法
  * @param {string} route - API 路由
  * @param {Object} options - 请求选项
+ * @param {number} options.timeout - 超时时间（毫秒），默认 10000ms
  * @returns {Promise} 响应数据
  */
 async function request(route, options = {}) {
@@ -55,6 +61,7 @@ async function request(route, options = {}) {
     body = null,
     params = {},
     headers = {},
+    timeout = 10000, // 默认 10 秒超时
     ...otherOptions
   } = options;
 
@@ -72,19 +79,35 @@ async function request(route, options = {}) {
     config.body = JSON.stringify(body);
   }
 
-  const response = await fetch(url, config);
+  // 创建超时控制器
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), timeout);
+  config.signal = controller.signal;
 
-  if (!response.ok) {
-    const error = new Error(`HTTP Error: ${response.status}`);
-    error.status = response.status;
+  try {
+    const response = await fetch(url, config);
+    clearTimeout(timeoutId);
+
+    if (!response.ok) {
+      const error = new Error(`HTTP Error: ${response.status}`);
+      error.status = response.status;
+      throw error;
+    }
+
+    const contentType = response.headers.get("content-type");
+    if (contentType && contentType.includes("application/json")) {
+      return response.json();
+    }
+    return response.text();
+  } catch (error) {
+    clearTimeout(timeoutId);
+    if (error.name === 'AbortError') {
+      const timeoutError = new Error(`请求超时 (${timeout}ms)`);
+      timeoutError.isTimeout = true;
+      throw timeoutError;
+    }
     throw error;
   }
-
-  const contentType = response.headers.get("content-type");
-  if (contentType && contentType.includes("application/json")) {
-    return response.json();
-  }
-  return response.text();
 }
 
 /**

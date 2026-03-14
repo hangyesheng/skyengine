@@ -1,12 +1,16 @@
 """
 @Project ：SkyEngine
-@File    ：assigner_factory.py
+@File    ：ProxyFactory.py
 @IDE     ：PyCharm
 @Author  ：Skyrimforest
 @Date    ：2025/11/4 23:09
 """
 
-from application.backend.core.BaseFactoryProxy import BaseFactoryProxy
+import sys
+from pathlib import Path
+
+
+from application.backend.core.BaseFactoryProxy import BaseFactoryProxy, FactoryProxyProtocol
 
 
 class ProxyFactory:
@@ -20,8 +24,19 @@ class ProxyFactory:
     @classmethod
     def register(cls, name: str, proxy_class):
         """显式注册一个 Proxy"""
-        if not issubclass(proxy_class, BaseFactoryProxy):
-            raise TypeError(f"{proxy_class} 必须继承  BaseFactoryProxy")
+        # 支持两种方式：继承 BaseFactoryProxy 或实现 FactoryProxyProtocol
+        is_valid = (
+            issubclass(proxy_class, BaseFactoryProxy) or
+            isinstance(proxy_class, FactoryProxyProtocol)
+        )
+        if not is_valid:
+            # 尝试通过鸭子类型检查：至少有这些方法
+            required_methods = ['initialize', 'start', 'pause', 'reset', 'cleanup', 'set_config']
+            has_methods = all(hasattr(proxy_class, m) for m in required_methods)
+            if not has_methods:
+                raise TypeError(
+                    f"{proxy_class} 必须继承 BaseFactoryProxy 或实现 FactoryProxyProtocol 接口"
+                )
         cls._registry[name.lower()] = proxy_class
         return proxy_class
 
@@ -47,6 +62,31 @@ class ProxyFactory:
     @classmethod
     def create(cls, name: str, **kwargs) -> BaseFactoryProxy:
         name = name.lower()
+
+        # 针对插件环境进行延迟导入
+        if name == "grid_factory":
+            try:
+                # 添加 backend 目录到 sys.path，使得可以 import joint_sim
+                _backend_path = Path(__file__).parent.parent
+                if str(_backend_path) not in sys.path:
+                    sys.path.insert(0, str(_backend_path))
+                from joint_sim.proxy.grid_factory_proxy import GridFactoryProxy
+
+                if name not in cls._registry:
+                    cls.register(name, GridFactoryProxy)
+            except ImportError as e:
+                raise ImportError(f"创建 {name} 失败。请先安装必要的依赖包: {e}")
+
+        elif name == "packet_factory":
+            try:
+                # todo 导入packetfactory的proxy类
+                from xxxx import PacketFactoryProxy
+
+                if name not in cls._registry:
+                    cls.register(name, PacketFactoryProxy)
+            except ImportError as e:
+                raise ImportError(f"创建 {name} 失败。请先安装必要的依赖包: {e}")
+
         if name not in cls._registry:
             raise ValueError(
                 f"未知的 FactoryProxy 类型: {name}，可选项为: {list(cls._registry.keys())}"

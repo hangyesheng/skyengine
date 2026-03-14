@@ -2,7 +2,7 @@
 FastAPI SSE 服务器，提供环境状态和性能指标实时推送
 """
 
-# 启动脚本 uv run uvicorn application.backend.server:app --reload --port 8000
+# 启动脚本 uv run uvicorn application.backend.server:app --reload --host 0.0.0.0 --port 8000
 
 from fastapi import FastAPI, Body
 from fastapi.responses import StreamingResponse
@@ -11,7 +11,10 @@ import asyncio
 import json
 
 # Import factory proxies (must import all to ensure registration)
-from application.backend.core.BaseFactoryProxy import BaseFactoryProxy, ExecutionStatus
+from application.backend.core.BaseFactoryProxy import (
+    ExecutionStatus,
+    FactoryProxyProtocol,  # 协议接口 - 支持非继承式复用
+)
 from application.backend.core.ProxyFactory import ProxyFactory
 
 
@@ -20,8 +23,8 @@ app = FastAPI()
 # 存储当前加载的配置
 current_config = None
 
-# 存储当前的工厂代理实例
-current_factory_proxy: BaseFactoryProxy = None
+# 存储当前的工厂代理实例（任何实现了 FactoryProxyProtocol 的对象都可以）
+current_factory_proxy: FactoryProxyProtocol = None
 
 # 存储当前的工厂类型
 current_factory_type: str = "base_factory"
@@ -43,20 +46,20 @@ def format_sse_message(event_name: str, data: dict) -> str:
 
 
 # ============ 路由函数 ============
-# 工厂状态流（简化路由，不使用 factory_id）
+# 工厂状态流
 @app.get("/stream/state")
 async def stream_state():
     """
     工厂状态流 SSE 端点
     """
-
     async def generate():
-        if current_factory_proxy is None:
-            yield format_sse_message("state", {"status": "no_factory"})
-            return
-
         while True:
             try:
+                if current_factory_proxy is None:
+                    # ✅ 不要 return，继续循环等待工厂加载
+                    yield format_sse_message("state", {"status": "no_factory"})
+                    await asyncio.sleep(2.0)
+                    continue
                 # 只在工厂运行时发送数据
                 if current_factory_proxy.is_running():
                     # 从工厂代理获取事件列表（支持多事件类型）
@@ -65,12 +68,12 @@ async def stream_state():
                         yield format_sse_message(event_type, data)
                 else:
                     # 工厂未运行时，发送空闲状态
-                    yield format_sse_message("state", {
-                        "status": "idle",
-                        "message": "Factory is not running"
-                    })
-                
-                await asyncio.sleep(1.5)
+                    yield format_sse_message(
+                        "state", {"status": "idle", "message": "Factory is not running"}
+                    )
+                    await asyncio.sleep(2.0)
+
+                await asyncio.sleep(0.1)  # 减少轮询间隔，避免状态丢失
             except Exception as e:
                 yield format_sse_message(
                     "state", {"status": "error", "message": str(e)}
@@ -96,31 +99,9 @@ async def stream_metrics():
     """
 
     async def generate():
-        if current_factory_proxy is None:
-            yield format_sse_message("metrics", {"status": "no_factory"})
-            return
-
         while True:
-            try:
-                # 只在工厂运行时发送数据
-                if current_factory_proxy.is_running():
-                    # 从工厂代理获取事件列表（支持多事件类型）
-                    events = await current_factory_proxy.get_metrics_events()
-                    for event_type, data in events:
-                        yield format_sse_message(event_type, data)
-                else:
-                    # 工厂未运行时，发送空闲状态
-                    yield format_sse_message("metrics", {
-                        "status": "idle",
-                        "message": "Factory is not running"
-                    })
-                
-                await asyncio.sleep(1.5)
-            except Exception as e:
-                yield format_sse_message(
-                    "metrics", {"status": "error", "message": str(e)}
-                )
-                break
+            yield format_sse_message("state", {"status": "idle"})
+            await asyncio.sleep(1.5)  # 确保是 asyncio.sleep 不是 time.sleep
 
     return StreamingResponse(
         generate(),
@@ -131,6 +112,43 @@ async def stream_metrics():
             "Connection": "keep-alive",
         },
     )
+    # async def generate():
+    #     while True:
+    #         try:
+    #             if current_factory_proxy is None:
+    #                 # ✅ 不要 return，继续循环等待工厂加载
+    #                 yield format_sse_message("state", {"status": "no_factory"})
+    #                 await asyncio.sleep(2.0)
+    #                 continue
+    #             # 只在工厂运行时发送数据
+    #             if current_factory_proxy.is_running():
+    #                 # 从工厂代理获取事件列表（支持多事件类型）
+    #                 events = await current_factory_proxy.get_metrics_events()
+    #                 for event_type, data in events:
+    #                     yield format_sse_message(event_type, data)
+    #             else:
+    #                 # 工厂未运行时，发送空闲状态
+    #                 yield format_sse_message(
+    #                     "metrics",
+    #                     {"status": "idle", "message": "Factory is not running"},
+    #                 )
+    #                 await asyncio.sleep(2.0)
+
+    #         except Exception as e:
+    #             yield format_sse_message(
+    #                 "metrics", {"status": "error", "message": str(e)}
+    #             )
+    #             break
+
+    # return StreamingResponse(
+    #     generate(),
+    #     media_type="text/event-stream",
+    #     headers={
+    #         "Cache-Control": "no-cache",
+    #         "X-Accel-Buffering": "no",
+    #         "Connection": "keep-alive",
+    #     },
+    # )
 
 
 # 工厂控制流（简化路由，不使用 factory_id）
@@ -141,23 +159,9 @@ async def stream_control():
     """
 
     async def generate():
-        if current_factory_proxy is None:
-            yield format_sse_message("control", {"status": "no_factory"})
-            return
-
         while True:
-            try:
-                # 控制流始终发送状态（包括 idle/running/paused）
-                events = await current_factory_proxy.get_control_events()
-                for event_type, data in events:
-                    yield format_sse_message(event_type, data)
-                
-                await asyncio.sleep(2.0)  # 控制状态更新频率较低
-            except Exception as e:
-                yield format_sse_message(
-                    "control", {"status": "error", "message": str(e)}
-                )
-                break
+            yield format_sse_message("control", {"status": "idle"})
+            await asyncio.sleep(2.0)
 
     return StreamingResponse(
         generate(),
@@ -168,12 +172,98 @@ async def stream_control():
             "Connection": "keep-alive",
         },
     )
+    # async def generate():
+    #     while True:
+    #         try:
+    #             if current_factory_proxy is None:
+    #                 # ✅ 不要 return，继续循环等待工厂加载
+    #                 yield format_sse_message("state", {"status": "no_factory"})
+    #                 await asyncio.sleep(2.0)
+    #                 continue
+    #             # 控制流始终发送状态（包括 idle/running/paused）
+    #             events = await current_factory_proxy.get_control_events()
+    #             for event_type, data in events:
+    #                 yield format_sse_message(event_type, data)
+
+    #             await asyncio.sleep(2.0)  # 控制状态更新频率较低
+    #         except Exception as e:
+    #             yield format_sse_message(
+    #                 "control", {"status": "error", "message": str(e)}
+    #             )
+    #             break
+
+    # return StreamingResponse(
+    #     generate(),
+    #     media_type="text/event-stream",
+    #     headers={
+    #         "Cache-Control": "no-cache",
+    #         "X-Accel-Buffering": "no",
+    #         "Connection": "keep-alive",
+    #     },
+    # )
 
 
 @app.get("/factory")
 async def factory():
     """根端点，简单欢迎信息"""
     return {"message": "Welcome to the SkyEngine SSE Server"}
+
+
+@app.post("/algo")
+async def algo():
+    """
+    算法端点，返回当前工厂支持的调度算法列表
+
+    从 current_factory_proxy.inner_properties['algorithm'] 获取算法配置
+    返回格式: [{ label: '算法名称', value: 'algorithm_id' }, ...]
+    """
+    # 默认算法选项（当没有工厂或未配置时使用）
+    default_algorithms = [
+        {"label": "默认生产运输", "value": "default"},
+        {"label": "贪心算法优化", "value": "greedy"},
+        {"label": "强化学习 (PPO)", "value": "rl_ppo"},
+        {"label": "多代理协同 (MAPF)", "value": "mapf_v2"},
+    ]
+
+    # 如果没有加载工厂代理，返回默认选项
+    if current_factory_proxy is None:
+        return default_algorithms
+
+    # 尝试从 inner_properties 获取算法配置
+    if current_factory_proxy.inner_properties is None:
+        return default_algorithms
+
+    # 获取算法配置
+    algorithm_config = current_factory_proxy.inner_properties.get("algorithm")
+
+    # 如果没有配置算法，返回默认选项
+    if algorithm_config is None:
+        return default_algorithms
+
+    # 如果 algorithm 是列表格式，直接返回
+    if isinstance(algorithm_config, list):
+        return algorithm_config
+
+    # 如果 algorithm 是字典格式，转换为前端期望的格式
+    if isinstance(algorithm_config, dict):
+        # 支持多种格式：
+        # 1. { "options": [{ "label": "...", "value": "..." }, ...] }
+        # 2. { "assigners": [...], "route_solvers": [...], ... } -> 取第一个可用的
+        if "options" in algorithm_config:
+            return algorithm_config["options"]
+        elif "assigners" in algorithm_config:
+            # 返回 assigners 作为算法选项
+            assigners = algorithm_config.get("assigners", [])
+            return [
+                {
+                    "label": a.get("name", a.get("id", str(a))),
+                    "value": a.get("id", str(a)),
+                }
+                for a in assigners
+            ]
+
+    # 其他情况返回默认选项
+    return default_algorithms
 
 
 @app.post("/factory/config/upload")
@@ -185,11 +275,16 @@ async def upload_factory_config(filename: str = None, config: dict = None):
         if not config:
             return {"status": "error", "message": "配置数据不能为空"}
 
+        # 判断config字段,如果key中有config字段就只保留config
+        if "config" in config:
+            config = config["config"]
+
         # 保存配置到全局变量
         current_config = config
 
         # 初始化工厂
         current_factory_proxy.set_config(config)
+        print(config)
 
         return {
             "status": "ok",
@@ -209,27 +304,32 @@ async def upload_factory_config(filename: str = None, config: dict = None):
 @app.post("/factory/control/reset")
 async def reset_factory_control():
     """重置工厂控制端点"""
-    global current_factory_proxy
 
+    global current_factory_proxy
+    print("开始执行初始化逻辑0")
     if current_factory_proxy is None:
         return {"status": "error", "message": "No factory loaded"}
-
+    print("开始执行初始化逻辑1")
     try:
         # 如果没有初始化，先初始化
-        if current_factory_proxy.status == ExecutionStatus.IDLE and current_factory_proxy.current_step == 0:
+        if (
+            current_factory_proxy.status == ExecutionStatus.IDLE
+            and current_factory_proxy.current_step == 0
+        ):
             await current_factory_proxy.initialize()
             print("[Reset] Factory initialized")
-        
+
         await current_factory_proxy.reset()
         print(f"[Reset] Factory reset, status: {current_factory_proxy.status.value}")
         return {
             "status": "ok",
             "message": "Factory control reset successfully",
-            "current_status": current_factory_proxy.status.value
+            "current_status": current_factory_proxy.status.value,
         }
     except Exception as e:
         print(f"❌ 重置失败: {str(e)}")
         import traceback
+
         traceback.print_exc()
         return {"status": "error", "message": str(e)}
 
@@ -312,17 +412,18 @@ async def play_factory_control():
         if current_factory_proxy._state_queue is None:
             await current_factory_proxy.initialize()
             print("[Play] Factory initialized before starting")
-        
+
         await current_factory_proxy.start()
         print(f"[Play] Factory started, status: {current_factory_proxy.status.value}")
         return {
             "status": "ok",
             "message": "Factory control started successfully",
-            "current_status": current_factory_proxy.status.value
+            "current_status": current_factory_proxy.status.value,
         }
     except Exception as e:
         print(f"❌ 启动失败: {str(e)}")
         import traceback
+
         traceback.print_exc()
         return {"status": "error", "message": str(e)}
 
@@ -340,6 +441,58 @@ async def pause_factory_control():
         return {"message": "Factory control paused successfully"}
     except Exception as e:
         print(f"❌ 暂停失败: {str(e)}")
+        return {"status": "error", "message": str(e)}
+
+
+@app.post("/factory/algorithm/set")
+async def set_algorithm(algorithm: str = Body(..., embed=True)):
+    """
+    设置当前工厂的调度算法
+
+    Args:
+        algorithm: 算法标识符 (如 'default', 'greedy', 'ortools', 'rl' 等)
+
+    Returns:
+        设置结果
+    """
+    global current_factory_proxy
+
+    if current_factory_proxy is None:
+        return {"status": "error", "message": "No factory loaded"}
+
+    try:
+        current_factory_proxy.set_algorithm(algorithm)
+        return {
+            "status": "ok",
+            "message": f"Algorithm set to '{algorithm}' successfully",
+            "algorithm": algorithm,
+        }
+    except Exception as e:
+        print(f"❌ 设置算法失败: {str(e)}")
+        return {"status": "error", "message": str(e)}
+
+
+@app.get("/factory/algorithm/get")
+async def get_algorithm():
+    """
+    获取当前工厂的调度算法
+
+    Returns:
+        当前算法标识符
+    """
+    global current_factory_proxy
+
+    if current_factory_proxy is None:
+        return {"status": "error", "message": "No factory loaded", "algorithm": None}
+
+    try:
+        algorithm = current_factory_proxy.get_algorithm()
+        return {
+            "status": "ok",
+            "algorithm": algorithm,
+        }
+    except Exception as e:
+        print(f"❌ 获取算法失败: {str(e)}")
         return {"status": "error", "message": str(e)}
 
 
