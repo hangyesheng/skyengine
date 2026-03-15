@@ -912,6 +912,69 @@ onUnmounted(() => {
   color: #666;
 }
 
+/* 确保容器使用 flex 布局 */
+.factory-manage-container {
+  display: flex;
+  height: 100vh;
+  overflow: hidden;
+  width: 100%;
+}
 
+/* 左侧面板 - 整体滚动 */
+.left-panel {
+  flex: 0 0 auto;
+  width: 280px;
+  height: 100%;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: 10px;
+  box-sizing: border-box;
+  padding-bottom: 50px; /* 增加底部内边距，确保最后一个元素完整显示 */
+  scroll-padding-bottom: 50px; /* 滚动时底部预留空间 */
+}
+
+/* 右侧面板 - 整体滚动 */
+.right-side-panel {
+  flex: 0 0 auto;
+  height: 100%;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: 10px;
+  box-sizing: border-box;
+  padding-bottom: 50px; /* 增加底部内边距，确保最后一个元素完整显示 */
+  scroll-padding-bottom: 50px; /* 滚动时底部预留空间 */
+}
+
+/* 中间面板 - 保持固定高度 */
+.middle-panel {
+  flex: 1;
+  height: 100%;
+  overflow: hidden;
+  padding: 10px;
+  box-sizing: border-box;
+}
+
+/* 滚动条样式优化 */
+.left-panel::-webkit-scrollbar,
+.right-side-panel::-webkit-scrollbar {
+  width: 6px;
+}
+
+.left-panel::-webkit-scrollbar-thumb,
+.right-side-panel::-webkit-scrollbar-thumb {
+  background-color: #ccc;
+  border-radius: 3px;
+}
+
+.left-panel::-webkit-scrollbar-thumb:hover,
+.right-side-panel::-webkit-scrollbar-thumb:hover {
+  background-color: #999;
+}
+
+/* 确保最后一个卡片有足够间距 */
+.left-panel > .el-card:last-child,
+.right-side-panel > .el-card:last-child {
+  margin-bottom: 20px;
+}
 
 </style>
