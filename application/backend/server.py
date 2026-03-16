@@ -382,7 +382,8 @@ async def switch_factory_proxy(factory_id: str = Body(..., embed=True)):
         try:
             current_factory_proxy = ProxyFactory.create(factory_type)
 
-            await current_factory_proxy.initialize()
+            # todo fix 不成立，因为现在工厂代理的初始化是异步的，需要上传config之后才能init.不能在这里直接调用 initialize 方法
+            # await current_factory_proxy.initialize()
             
             # 注册后端路由
             RouteRegistry.register_to_app(app)

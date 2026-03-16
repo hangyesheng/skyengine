@@ -23,6 +23,8 @@
 uv add joint-sim
 ```
 
+> 如果搜索不到，请清理缓存：uv cache clean
+
 或使用 pip：
 
 ```bash
