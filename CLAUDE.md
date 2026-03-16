@@ -4,227 +4,232 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-**TianGong (天工)** is a flexible manufacturing simulation-integrated scheduling platform (SkyEngine v1.0.0). It combines high-fidelity simulation with scheduling auvlgorithms for production decision systems.
+**SkyEngine (天工)** is a flexible manufacturing system (FMS) simulation-scheduling integration platform. It provides high-fidelity simulation verification for scheduling algorithms, designed for smart manufacturing, digital twin validation, and multi-agent path planning research.
 
-## Architecture
+The architecture follows a **two-layer decoupled design**:
+- **Service Layer** (`application/`): FastAPI backend + Vue.js frontend, providing REST APIs, SSE streaming, and visualization
+- **Algorithm/Executor Layer** (`executor/`): Factory simulation environments, scheduling algorithms, path planning, and event systems
 
-The system follows a **two-layer decoupled architecture**:
+**Key Principle**: Service layer contains no scheduling logic; algorithm layer has no business interface dependencies.
 
-```
-Service Layer (application/)
-  - FastAPI REST API + SSE streaming (port 8000)
-  - Vue.js frontend with ECharts visualization
-  - FactoryProxy bridges service and algorithm layers
+---
 
-Algorithm Layer (sky_executor/)
-  - factory_template/     # Abstract interfaces for factories
-  - Pluggable scheduling components
-  - RL training framework
-```
+## Development Commands
 
-**Key principle**: Service layer does not contain scheduling logic; algorithm layer does not depend on business interfaces.
-
-### Factory Template Abstraction
-
-The `factory_template` module provides abstract interfaces for all factory types:
-
-```python
-from sky_executor.factory_template import (
-    BaseFactory,          # Abstract factory manager
-    BaseEnvironment,      # Abstract environment (Gymnasium-like)
-    ExecutionStatus,      # Factory execution states
-    BaseCallback,         # Lifecycle callbacks
-    BaseEvent,            # Events for SSE streaming
-    NamespaceRegistry,    # Namespace-based component registry
-)
-```
-
-Key classes:
-- **ExecutionStatus**: Enum with states (IDLE, RUNNING, PAUSED, STOPPED, ERROR)
-- **BaseEnvironment**: Abstract environment with reset/step/render/get_state/set_state
-- **BaseFactory**: Abstract factory manager with lifecycle methods
-- **BaseCallback**: Hook into factory lifecycle events
-- **NamespaceRegistry**: Register components by namespace and name
-
-### GridFactory Implementation
-
-GridFactory is the primary factory implementation:
-
-```python
-from sky_executor.grid_factory.factory.grid_factory import GridFactory, GridFactoryConfig
-
-# Create configuration
-config = GridFactoryConfig(
-    num_agents=4,
-    grid_size=8,
-    num_machines=8,
-    num_jobs=6,
-    job_solver="greedy",
-    assigner="ortools",
-    route_solver="astar",
-    step_interval=1.0,
-)
-
-# Create and use factory
-factory = GridFactory(config)
-factory.initialize()
-factory.start()   # Run in background thread
-factory.pause()   # Pause execution
-factory.reset()   # Reset to initial state
-factory.stop()    # Stop execution
-factory.cleanup() # Release resources
-```
-
-## Common Commands
-
-### Backend (FastAPI)
+### Backend (Python/FastAPI)
 ```bash
-uv run uvicorn application.backend.server:app --reload --host 0.0.0.0 --port 8000
-```
-
-### Frontend (Vue.js)
-```bash
-cd application/frontend
-npm install
-npm run dev      # Development server
-npm run build    # Production build
-```
-
-### RL Training Pipeline
-```bash
-# 1. Collect expert trajectories
-python scripts/collect_expert_trajectories.py --expert_type ortools --num_episodes 100
-
-# 2. Train Assigner model
-python scripts/train_assigner.py --traj_dir expert_trajectories/ortools --num_epochs 100 --device cuda
-
-# 3. Train Route Solver model
-python scripts/train_route_solver.py --traj_dir expert_trajectories/mapf_gpt --use_cnn --device cuda
-
-# 4. Evaluate models
-python scripts/evaluate_rl_solver.py --assigner_model checkpoints/assigner_bc/checkpoint_best.pt
-
-# Monitor training with TensorBoard
-tensorboard --logdir logs/
-```
-
-### Dependencies
-```bash
-# Python dependencies (uses uv)
+# Install dependencies (using uv package manager)
 uv sync
 
-# Frontend dependencies
-cd application/frontend && npm install
+# Start backend server (with auto-reload)
+uv run uvicorn application.backend.server:app --reload --host 0.0.0.0 --port 8000
+
+# Start without reload
+uv run uvicorn application.backend.server:app --host 0.0.0.0 --port 8000
 ```
 
-## Core Components
+### Frontend (Vue.js/Vite)
+```bash
+cd application/frontend
 
-### Algorithm Components (sky_executor/grid_factory/factory/Component/)
+# Install dependencies
+npm install
 
-Four pluggable component types with unified interfaces:
+# Start development server
+npm run dev
 
-1. **JobSolver** (`JobSolver/`): Task/job scheduling (JSSP)
-2. **Assigner** (`Assigner/`): Task-to-AGV assignment
-   - Implementations: random, greedy, nearest, least_congestion, load_balance, ortools, rl
-3. **RouteSolver** (`RouteSolver/`): Multi-agent pathfinding (MAPF)
-   - Implementations: astar, greedy, instant, mapf_gpt, rl
-4. **Coordinator** (`Coordinator/`): Integrates all component decisions
+# Build for production
+npm run build
 
-### Component Registry Pattern
+# Format code
+npm run format
+```
 
-Components use a decorator-based registry:
+### Testing
+```bash
+# Check available factory proxies
+uv run python -c "from application.backend.core.ProxyFactory import ProxyFactory; import application.backend.core; print(ProxyFactory.available())"
+
+# Test SSE endpoint
+curl -N http://localhost:8000/stream/state
+
+# Health check
+curl http://localhost:8000/health
+```
+
+---
+
+## Architecture Details
+
+### Service Layer Structure
+
+**Backend** (`application/backend/`):
+- `server.py` - Main FastAPI application with SSE endpoints and factory lifecycle management
+- `core/` - Proxy pattern implementation for factory abstraction
+  - `BaseFactoryProxy.py` - Abstract base defining proxy protocol
+  - `ProxyFactory.py` - Registry and factory for creating proxy instances
+  - `RouteRegistry.py` - Centralized route registration system
+  - `StaticFactoryProxy.py` - Demo/testing proxy with predefined scenarios
+  - `PacketFactoryProxy.py` - Real production factory proxy
+- `packet_factory/` - Backend services for PacketFactory (backend_server, backend_core, service)
+
+**Frontend** (`application/frontend/`):
+- `src/stores/factory.js` - Pinia store managing factory configs, animation frames, and playback state
+- `src/utils/sse.js` - SSE manager for real-time communication
+- `src/utils/factoryConnection.js` - Factory connection manager for SSE
+- `src/utils/api.js` - API route definitions and HTTP utilities
+- `src/scenarios/` - Test scenarios (fullSystemTest.js, backendSystemTest.js)
+- `src/views/` - Main views (FactoryView, HomeView)
+- `src/views/factory/` - Factory-specific management views
+- `src/components/` - Reusable UI components (FactoryVisualization, ControlPanel, etc.)
+
+### Algorithm/Executor Layer Structure
+
+**executor/packet_factory/`**:
+- `registry/` - Component and event registration system
+- `lifecycle/` - Factory lifecycle management (bootstrap, context, initializer)
+- `packet_factory_env/` - Factory environment implementation
+- `event/` - Event system
+- `call_back/` - Callback handlers
+- `logger/` - Logging utilities
+
+### Configuration & Data
+
+- `config/` - Factory configuration files (JSON format)
+  - `example_factory.json` - Static factory example
+  - `grid_factory.json` - Grid-based factory configuration
+- `dataset/` - Benchmark datasets for testing (JSPLIB, FJSP instances, POGEMA)
+
+---
+
+## Key Design Patterns
+
+### FactoryProxy Pattern
+
+All factory implementations expose a unified interface through the `FactoryProxyProtocol`:
 
 ```python
-from sky_executor.grid_factory.factory.Component import AssignerFactory
+# Lifecycle
+async def initialize()
+async def cleanup()
+async def start()
+async def pause()
+async def reset()
+async def stop()
 
-@AssignerFactory.register("my_assigner")
-class MyAssigner(BaseAssigner):
-    def assign(self, env) -> AssignResult:
-        ...
+# Streaming (SSE)
+async def get_state_events() -> list
+async def get_metrics_events() -> list
+async def get_control_events() -> list
 
-# Usage via string name
-coordinator = Coordinator(assigner="my_assigner")
+# Snapshots
+async def get_state_snapshot() -> dict
+async def get_metrics_snapshot() -> dict
+async def get_control_status() -> dict
 ```
 
-### Factory Types
+Proxies are registered via decorator and created through `ProxyFactory.create("factory_id")`.
 
-- **GridFactory**: Grid-based manufacturing with AGV pathfinding (primary)
-  - Implements `BaseFactory` interface
-  - Manages `GridFactoryEnv` (extends `BaseEnvironment` + PettingZoo `ParallelEnv`)
-  - Threading-based execution with start/pause/stop/reset lifecycle
-  - Uses `Coordinator` for solver orchestration
+### SSE Data Flow
 
-### Service Layer (Application Layer)
+1. Frontend connects to `/stream/state` (or `/stream/metrics`, `/stream/control`)
+2. Backend yields SSE events with format: `event: {type}\ndata: {json}\n\n`
+3. Frontend SSEManager parses events and updates stores
+4. Store updates trigger Vue component re-rendering
 
-The service layer wraps sync factories for async execution:
-
-```python
-# GridFactoryProxy wraps GridFactory for async/SSE
-from application.backend.core.GridFactoryProxy import GridFactoryProxy
-
-proxy = GridFactoryProxy()
-proxy.set_config(config_dict)
-await proxy.initialize()
-await proxy.start()  # Starts async execution loop
-state = await proxy.get_state_snapshot()  # For SSE streaming
-await proxy.cleanup()
+**State Snapshot Format**:
+```javascript
+{
+  "timestamp": "T+10s",
+  "env_timeline": "10",
+  "grid_state": {
+    "positions_xy": [[5, 2], [3, 4]],    // AGV [x, y] positions
+    "is_active": [true, true]              // AGV active states
+  },
+  "machines": {
+    "M1": { "status": "WORKING", "progress": 75 },
+    "M2": { "status": "IDLE", "progress": 0 }
+  },
+  "active_transfers": [
+    { "from": "M1", "to": "M3", "agv": "AGV-1", "progress": 50 }
+  ]
+}
 ```
 
-## Key Directories
+### Frontend Store Architecture
 
-```
-sky_executor/
-├── factory_template/           # Abstract factory interfaces
-│   ├── factory_core/           # BaseFactory, BaseEnvironment, ExecutionStatus
-│   ├── callback/               # BaseCallback for lifecycle hooks
-│   ├── event/                  # BaseEvent for SSE streaming
-│   └── registry/               # NamespaceRegistry for component registration
-├── grid_factory/
-│   └── factory/
-│       ├── grid_factory.py     # GridFactory class (implements BaseFactory)
-│       ├── grid_factory_env.py # GridFactoryEnv (implements BaseEnvironment)
-│       ├── Component/          # Pluggable algorithm components
-│       ├── Utils/              # Shared utilities
-│       ├── problem/            # Problem definitions
-│       ├── trajectory/         # RL trajectory recording
-│       └── training/           # Training utilities
+**factory.js** store manages:
+- `factories` - Available factory types
+- `factoryConfigs` - Loaded factory configurations
+- `historyBuffer` - Animation frame queue (unified data source)
+- `currentIndex` - Current playback position
+- `isPlaying` - Playback state
 
-application/
-├── backend/
-│   ├── core/
-│   │   ├── BaseFactoryProxy.py # Base async proxy interface
-│   │   ├── GridFactoryProxy.py # Async wrapper for GridFactory
-│   │   └── ProxyFactory.py     # Factory registration
-│   └── server.py               # Main entry point
-└── frontend/                   # Vue.js + Element Plus
+**Key Methods**:
+- `pushSnapshot(snapshot)` - Append frame to buffer (for SSE/real-time)
+- `loadData(data)` - Load complete history (for offline replay)
+- `nextStep()` - Advance animation frame
 
-scripts/                        # Training/evaluation scripts
-docs/                           # Documentation (RL_TRAINING.md, etc.)
+### Vite Proxy Configuration
+
+Frontend proxies `/api/*` to `http://127.0.0.1:8000`:
+
+```javascript
+proxy: {
+  "/api": {
+    target: 'http://127.0.0.1:8000',
+    changeOrigin: true,
+    rewrite: (path) => path.replace(/^\/api/, ""),
+  },
+}
 ```
 
-## Data Flow
+Use `getApiUrl(route)` from `utils/api.js` for consistent URL generation.
 
-```
-Environment → Observation → Coordinator → Actions → Environment
-                ↓                           ↓
-            Problem                    Solution
-```
+---
 
-Coordinator orchestrates: `Job Scheduling → Task Assignment → Path Planning`
+## Available Factory Types
 
-## Code Conventions
+| ID | Name | Description | Status |
+|----|------|-------------|---------|
+| `packet_factory` | 翼辉电池装配无人产线 | Production-ready |
+| `grid_factory` | 翼辉原料分拣仓 | Requires joint_sim |
+| `northeast_center` | 北满钢铁制造中心 | Demo (alias: static_factory) |
+| `southwest_logistics` | 西南铝业制造中心 | Coming soon |
 
-- Python 3.11+ with type hints
-- Component classes inherit from base classes (BaseAssigner, BaseRouteSolver, etc.)
-- Results returned as dataclasses (AssignResult, RouteResult, etc.)
-- Use `@dataclass` for result types
-- Registry pattern for component discovery
+---
 
-## Dependencies
+## Important File Locations
 
-Key packages (see pyproject.toml):
-- fastapi, uvicorn, tornado (web/streaming)
-- torch (deep learning)
-- ortools (optimization)
-- gymnasium, pettingzoo (RL environments)
-- pogema (MAPF benchmark)
+| Purpose | Path |
+|---------|------|
+| Backend Server | `application/backend/server.py` |
+| Base Proxy | `application/backend/core/BaseFactoryProxy.py` |
+| Proxy Factory | `application/backend/core/ProxyFactory.py` |
+| Route Registry | `application/backend/core/RouteRegistry.py` |
+| Frontend Store | `application/frontend/src/stores/factory.js` |
+| SSE Manager | `application/frontend/src/utils/sse.js` |
+| API Routes | `application/frontend/src/utils/api.js` |
+| Factory Configs | `config/*.json` |
+| Backend Tests | `application/frontend/src/scenarios/` |
+
+---
+
+## Adding New Factory Proxies
+
+1. Create proxy class inheriting from `BaseFactoryProxy` in `application/backend/core/`
+2. Register with `@ProxyFactory.register_proxy("factory_id")` decorator
+3. Implement required async methods (initialize, start, pause, reset, etc.)
+4. Register custom routes via `@RouteRegistry.register_route(...)` if needed
+5. Add factory definition to `stores/factory.js` factories array
+6. Create corresponding Vue component in `views/factory/`
+
+See `PacketFactoryProxy.py` for a complete example with custom route registration.
+
+---
+
+## Testing with Static Data
+
+For frontend development without backend, use `StaticFactoryProxy` which provides predefined AGV trajectories, machine states, and metrics. This is accessed via the "northeast_center" factory ID.
+
+The `fullSystemTest.js` scenario provides 55 frames of animation data for testing visualization.
