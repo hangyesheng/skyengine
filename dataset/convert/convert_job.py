@@ -1,7 +1,7 @@
 import yaml
 
 # 输入文件名
-input_file_path = r'./agv-instances/brandimarte/mk01.txt'
+input_file_path = r'./agv-instances/brandimarte/mk15.txt'
 # 输出文件名
 output_file_path = 'job_config.yaml'
 
