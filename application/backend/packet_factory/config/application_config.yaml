@@ -4,14 +4,14 @@ config:
   simulation:
     env_name: packet_factory
 
-    factory_config:
-      file: ./config_set/map_config.yaml
+    # map_config:
+    #   由配置文件生成
 
-    task_config:
-      file: ./config_set/job_config.yaml
+    # job_config:
+    #   由配置文件生成
 
-    event_config:
-      file: ./config_set/event_config.yaml
+    # event_config:
+    #   由配置文件生成
 
     agent:
       agent_name: packet_factory.RandomAgent

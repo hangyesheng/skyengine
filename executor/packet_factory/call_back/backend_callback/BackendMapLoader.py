@@ -18,20 +18,13 @@ from executor.packet_factory.logger.logger import LOGGER
 class FactoryMapLoader(EnvCallback):
     def __init__(self):
         super().__init__()
-        self.env_type=component_registry.get('config').get('env_type')
-        self.config=component_registry.get('config').get(self.env_type)
-        self.job_config_file_path =  self.config.get("task_config").get('file')    # 对应 job_config.yaml
-        self.map_config_file_path =  self.config.get("factory_config").get('file') # 对应 map_config.yaml
-        
-        map_file = self.map_config_file_path
-        map_yaml = yaml.safe_load(open(map_file, 'rb'))
-        self.map_config = map_yaml['config']
-
+        self.env_type = component_registry.get('config').get('env_type')
+        self.config = component_registry.get('config').get(self.env_type)
+        self.job_config = self.config.get("job_config")  
+        self.map_config = self.config.get("map_config")
 
     def create_jobs(self):
-        job_file = self.job_config_file_path
-        job_yaml = yaml.safe_load(open(job_file, 'rb'))
-        job_config = job_yaml['config']
+        job_config = self.job_config
 
         jobs = []
         operation_count = 0

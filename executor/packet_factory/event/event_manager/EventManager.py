@@ -42,18 +42,7 @@ class EventManager:
 
         return event
 
-    def load_event(self, config_path):
-        if not os.path.exists(config_path):
-            raise FileNotFoundError(f"Configuration file not found: {config_path}")
-
-        with open(config_path, "r", encoding="utf-8") as f:
-            raw_config = yaml.safe_load(f)
-
-        if "config" not in raw_config:
-            raise ValueError("Missing 'config' section in configuration.")
-
-        event_config = raw_config["config"]
-
+    def load_event(self, event_config):
         event_type_list =  event_config.get("event_type", None)
 
         if event_type_list is not None and len(event_type_list) > 0:
