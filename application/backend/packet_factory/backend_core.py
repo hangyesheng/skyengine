@@ -54,13 +54,28 @@ class BackendCore:
     def __init__(self):
         # 环境本身
         self.env: PacketFactoryEnv = None
-        # 线程池,但是实际按照当前的core实现大概只能有单个线程(受到env限制)...后续再修改吧!
+        # 线程池，但是实际按照当前的 core 实现大概只能有单个线程 (受到 env 限制)...后续再修改吧!
         self.thread_pool = ThreadPool()
+        # 内存中的配置存储 {config_name: config_data}
+        self.config_store = {}
 
     def bootstrap(self, stop_event: threading.Event, target_factory: str):
-        specific_config = file_service.get_new_config_file(target_factory)
+        specific_config = self.config_store[target_factory]
+        LOGGER.info(f"[Bootstrap] 从内存加载配置：{target_factory}, 配置内容：{specific_config}")
+
+        template_config_path = os.path.join(file_service.get_config_dir(), 'application_config.yaml')
+
+        with open(template_config_path, 'r') as f:
+            template_config = yaml.safe_load(f)
+
+        final_config = template_config['config']
+        env_type = final_config['env_type']
+        final_config[env_type]['job_config'] = specific_config['job_config']
+        final_config[env_type]['event_config'] = specific_config['event_config']
+        final_config[env_type]['map_config'] = specific_config['map_config']
+
         # 创建环境与智能体
-        env, agent = bootstrap(specific_config)
+        env, agent = bootstrap(final_config)
 
         self.env = env
 
@@ -155,9 +170,22 @@ class BackendCore:
         return job_list
 
     def render_map(self, target_factory):
-        """插入配置文件,启动当前渲染地图"""
+        """插入配置文件，启动当前渲染地图"""
         # 启动系统!
         self.thread_pool.submit(self.bootstrap, target_factory)
+
+    def save_config_to_memory(self, config_name: str, config_data: dict):
+        """将配置保存到内存"""
+        self.config_store[config_name] = config_data
+        LOGGER.info(f"[Config] 配置已保存到内存：{config_name}")
+
+    def get_config_from_memory(self, config_name: str):
+        """从内存获取配置"""
+        return self.config_store.get(config_name)
+
+    def get_all_config_names(self):
+        """获取所有配置名称列表"""
+        return list(self.config_store.keys())
 
     def get_map_current(self):
         pic = b''

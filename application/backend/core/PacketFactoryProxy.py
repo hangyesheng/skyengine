@@ -1,6 +1,6 @@
 import os
 from typing import List, Optional
-from fastapi import FastAPI, File, UploadFile, Form, Body, Request
+from fastapi import Query, File, UploadFile, Form, Body, Request
 from starlette.responses import JSONResponse, FileResponse, StreamingResponse
 
 from application.backend.core.BaseFactoryProxy import BaseFactoryProxy
@@ -9,6 +9,8 @@ from application.backend.core.RouteRegistry import RouteRegistry
 from application.backend.packet_factory.backend_server import APIHandler
 from application.backend.packet_factory.backend_core import BackendCore
 from application.backend.packet_factory.service import file_service
+
+from executor.packet_factory.logger.logger import BACKEND_LOGGER as LOGGER
 
 
 class PacketFactoryProxy(BaseFactoryProxy):
@@ -122,20 +124,30 @@ class PacketFactoryProxy(BaseFactoryProxy):
             job_progress_list = self._backend_core.get_jobs_progress()
             return JSONResponse({"jobs": job_progress_list})
 
-        @RouteRegistry.register_route("/{config_name}/yaml/upload", method="POST")
-        async def api_yaml_upload(config_name: str, file: UploadFile = File(...)):
+        @RouteRegistry.register_route("/yaml/upload", method="POST")
+        async def api_yaml_upload(
+            config_name: str = Query(..., description="Name of the config to upload"),
+            file: UploadFile = File(...)
+        ):
             content = await file.read()
-            file_service.save_file(config_name, file)
+            # 解析 YAML 内容并保存到内存
+            import yaml
+            import io
+            content_str = content.decode('utf-8')
+            yaml_content = yaml.safe_load(io.StringIO(content_str))
+            LOGGER.info(f"Uploaded config: {config_name}, content: {yaml_content}")
+            # 将配置保存到 BackendCore 的内存中
+            self._backend_core.save_config_to_memory(config_name, yaml_content)
             return JSONResponse({"state": "success", "msg": f"Config {config_name} uploaded successfully"})
         
         # ========== 配置上传路由 ==========
         @RouteRegistry.register_route("/standard/get", method="GET")
         async def api_standard_get():
-            zip_path = os.path.join(file_service.get_config_set_dir(), "template_config_set.zip")
+            yaml_path = os.path.join(file_service.get_config_set_dir(), "pipeline_config.yaml")
             return FileResponse(
-                path=zip_path,
-                filename="template_config_set.zip",
-                media_type="application/zip"
+                path=yaml_path,
+                filename="pipeline_config.yaml",
+                media_type="application/x-yaml"
             )
         
         # ========== 日志下载路由 ==========
@@ -147,7 +159,6 @@ class PacketFactoryProxy(BaseFactoryProxy):
             file_name = ""
             if file_type == "backend":
                 log_path = file_service.get_log(file_service.get_backend_log_dir())
-                print(log_path)
                 file_name = log_path.split("\\")[-1]
             elif file_type == "system":
                 log_path = file_service.get_log(file_service.get_system_log_dir())
@@ -170,25 +181,43 @@ class PacketFactoryProxy(BaseFactoryProxy):
         @RouteRegistry.register_route("/map/render", method="POST")
         async def api_map_render(request: Request):
             body = await request.json()
-            print(body)
             self._backend_core.render_map(body.get("target_factory"))
             return JSONResponse({"success": True})
         
         @RouteRegistry.register_route("/factory/list", method="GET")
         async def api_factory_list():
-            config_list = file_service.get_config_list()
+            # 从内存中读取配置列表
+            config_list = self._backend_core.get_all_config_names()
             factory_list = [{"id": config_name} for config_name in config_list]
             return JSONResponse({"factory_list": factory_list, "success": True})
         
         self._routes_registered = True
-        print(f"✅ PacketFactoryProxy 路由已注册，共 {len(RouteRegistry.get_routes())} 条")
+        LOGGER.info(f"✅ PacketFactoryProxy 路由已注册，共 {len(RouteRegistry.get_routes())} 条")
     
+    async def _load_all_configs_to_memory(self):
+        """初始化时从文件加载所有配置到内存"""
+        try:
+            config_list = file_service.get_config_list()
+            for config_name in config_list:
+                try:
+                    # 读取yaml文件
+                    config_content = file_service.parse_yaml_content(file_service.get_config_content(config_name))
+                    # 将配置保存到 BackendCore 的内存中
+                    self._backend_core.save_config_to_memory(config_name, config_content)
+                except Exception as e:
+                    LOGGER.error(f"加载配置 {config_name} 失败：{e}")
+            LOGGER.info(f"[初始化] 已从文件加载 {len(config_list)} 个配置到内存")
+        except Exception as e:
+            LOGGER.error(f"[初始化] 加载配置列表失败：{e}")
+
     # ========== BaseFactoryProxy 接口实现 ==========
     
     async def initialize(self):
         """初始化工厂"""
         self._ensure_backend()
         self._register_backend_routes()
+        # 初始化时从文件加载所有配置到内存
+        await self._load_all_configs_to_memory()
 
     async def cleanup(self):
         """清理工厂"""

@@ -1,4 +1,36 @@
-config:
+event_config:
+  event_type: # 交给manager管理
+    - packet_factory.JUST_TEST
+
+    - packet_factory.ENV_PAUSED
+    - packet_factory.ENV_RECOVER
+    - packet_factory.ENV_RESTART
+
+    - packet_factory.AGV_FAIL
+
+    - packet_factory.MACHINE_FAIL
+
+    - packet_factory.JOB_ADD
+
+#  event_timeline: # 交给queue管理
+#    - event:
+#        timestamp: 1
+#        type: packet_factory.JUST_TEST
+#        args: ['trigger',{'data':233}]
+#    - event:
+#        timestamp: 2
+#        type: packet_factory.MACHINE_FAIL
+#        args: ['trigger',{'id': 1}]
+#    - event:
+#        timestamp: 3
+#        type: packet_factory.JUST_TEST
+#        args: ['recover',{'data':'agv failed.'}]
+#    - event:
+#        timestamp: 4
+#        type: packet_factory.MACHINE_FAIL
+#        args: [ 'recover',{'id': 1} ]
+
+job_config:
   jobs:
   - job:
       id: 0
@@ -425,3 +457,134 @@ config:
             time: 3
           - id: 3
             time: 2
+map_config:
+  width: 20  # todo
+  height: 30  # todo
+
+  points:
+    - point:
+        id: 1
+        coordinate: [1, 0]
+    - point:
+        id: 2
+        coordinate: [0, 1]
+    - point:
+        id: 3
+        coordinate: [0, 2]
+    - point:
+        id: 4
+        coordinate: [1, 3]
+    - point:
+        id: 5
+        coordinate: [3, 3]
+    - point:
+        id: 6
+        coordinate: [5, 3]
+    - point:
+        id: 7
+        coordinate: [6, 2]
+    - point:
+        id: 8
+        coordinate: [6, 1]
+    - point:
+        id: 9
+        coordinate: [5, 0]
+    - point:
+        id: 10
+        coordinate: [3, 0]
+
+  machines:  # todo: type, 根据数据集machine的id应从0开始编号
+    - machine:
+        id: 0
+        type: packet_factory.Machine
+        point_id: 2
+    - machine:
+        id: 1
+        type: packet_factory.Machine
+        point_id: 3
+    - machine:
+        id: 2
+        type: packet_factory.Machine
+        point_id: 10
+    - machine:
+        id: 3
+        type: packet_factory.Machine
+        point_id: 5
+    - machine:
+        id: 4
+        type: packet_factory.Machine
+        point_id: 8
+    - machine:
+        id: 5
+        type: packet_factory.Machine
+        point_id: 7
+
+
+  links:
+    - link:
+        id: 1
+        begin: 1
+        end: 2
+    - link:
+        id: 2
+        begin: 2
+        end: 3
+    - link:
+        id: 3
+        begin: 3
+        end: 4
+    - link:
+        id: 4
+        begin: 4
+        end: 5
+    - link:
+        id: 5
+        begin: 5
+        end: 6
+    - link:
+        id: 6
+        begin: 6
+        end: 7
+    - link:
+        id: 7
+        begin: 7
+        end: 8
+    - link:
+        id: 8
+        begin: 8
+        end: 9
+    - link:
+        id: 9
+        begin: 9
+        end: 10
+    - link:
+        id: 10
+        begin: 10
+        end: 1
+    
+
+  agvs:  # todo: capacity
+    - agv:
+        id: 1
+        type: packet_factory.Agv
+        point_id: 2
+        velocity: 1
+        capacity: 42  
+    - agv:
+        id: 2
+        type: packet_factory.Agv
+        point_id: 3
+        velocity: 1
+        capacity: 42
+    - agv:
+        id: 3
+        type: packet_factory.Agv
+        point_id: 8
+        velocity: 1
+        capacity: 42
+    - agv:
+        id: 4
+        type: packet_factory.Agv
+        point_id: 7
+        velocity: 1
+        capacity: 42

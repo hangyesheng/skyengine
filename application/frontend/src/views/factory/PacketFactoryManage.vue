@@ -38,7 +38,7 @@
         </el-row>
         <div class="mb-2">
           <div style="text-align: center; margin-bottom: 6px;">Speed Level: {{ speedLevel }}</div>
-          <el-slider v-model="speedLevel" :min="1" :max="10" show-input size="small" @change="changeSpeed"/>
+          <el-slider v-model="speedLevel" :min="1" :max="60" show-input size="small" @change="changeSpeed"/>
         </div>
       </el-card>
 
@@ -218,9 +218,6 @@
           >
             <el-icon class="el-icon--upload"><upload-filled/></el-icon>
             <div class="el-upload__text">Drop file here or <em>click to add!</em></div>
-            <template #tip>
-              <div class="el-upload__tip">A config set should contain 3 config files</div>
-            </template>
           </el-upload>
         </div>
       </div>
@@ -338,7 +335,7 @@ const getStandardConfig = () => {
       }
       
       const disposition = response.headers.get('Content-Disposition');
-      let filename = 'template_config_set.zip';
+      let filename = 'pipeline_config.yaml';
 
       if (disposition && disposition.includes('filename=')) {
         filename = disposition.split('filename=')[1].replace(/"/g, '');
@@ -363,7 +360,7 @@ const getStandardConfig = () => {
 };
 
 const uploadConfigSet = () => {
-  target_url.value = '/api/' + config_name.value + `/yaml/upload?t=${Date.now()}`;
+  target_url.value = `/api/yaml/upload?config_name=${encodeURIComponent(config_name.value)}&t=${Date.now()}`;
   uploadRef.value.submit();
   fileList.value = [];
 

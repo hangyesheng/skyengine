@@ -223,7 +223,14 @@ class APIHandler:
         return JSONResponse({"jobs": job_progress_list})
 
     async def handle_yaml_upload(self, config_name: str, file: UploadFile = File(...)):
-        file_service.save_file(config_name, file)
+        content = await file.read()
+        # 解析 YAML 内容并保存到内存
+        import yaml
+        import io
+        content_str = content.decode('utf-8')
+        yaml_content = yaml.safe_load(io.StringIO(content_str))
+        # 将配置保存到 BackendCore 的内存中
+        self.server.save_config_to_memory(config_name, yaml_content)
         return JSONResponse({
             "success": True
         })
@@ -269,8 +276,8 @@ class APIHandler:
         })
 
     async def handle_file_list(self):
-        # 返回图片
-        config_list = file_service.get_config_list()
+        # 从内存中读取配置列表
+        config_list = self.server.get_all_config_names()
         factory_list = []
         for config_name in config_list:
             data = {

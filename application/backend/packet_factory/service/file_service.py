@@ -86,64 +86,28 @@ def get_log(log_path):
 
 def get_config_list():
     """
-    扫描 config_set 文件夹内的所有子文件夹，返回文件夹名称列表。
+    扫描 config_set 文件夹内的所有.yaml文件，返回文件名称列表。
     返回：
-        List[str]: 所有子文件夹的名称列表。
+        List[str]: 所有.yaml文件的名称列表，不包含后缀。
     """
-    config_root = get_config_set_dir()
-    print(config_root)
-    if not os.path.exists(config_root):
-        return []
-
-    folder_list = [
-        name for name in os.listdir(config_root)
-        if os.path.isdir(os.path.join(config_root, name)) and name != '__pycache__'
+    config_set_dir = get_config_set_dir()
+    return [
+        f for f in os.listdir(config_set_dir)
+        if f.endswith('.yaml')
     ]
-    print(folder_list)
 
-    return folder_list
+def get_config_content(config_name):
+    with open(os.path.join(get_config_set_dir(), config_name), 'rb') as f:
+        return f.read()
 
-
-def get_file_content():
-    pass
-
-def load_factory_config(target_factory: str):
-    base_dir = os.path.join(get_config_set_dir(), target_factory)
-
-    event_config_path = os.path.join(base_dir, "event_config.yaml")
-    job_config_path = os.path.join(base_dir, "job_config.yaml")
-    map_config_path = os.path.join(base_dir, "map_config.yaml")
-
-    return {
-        "event_config": event_config_path,
-        "job_config": job_config_path,
-        "map_config": map_config_path
-    }
-
-
-def get_new_config_file(target_factory: str):
-    # 配置文件插入
-    specific_config_files = load_factory_config(target_factory)
-
-    template_config_path = os.path.join(get_config_dir(), 'application_config.yaml')
-
-    with open(template_config_path, 'r') as f:
-        specific_config = yaml.safe_load(f)
-
-    sky_config = specific_config['config']
-    env_type = sky_config['env_type']
-    sky_config[env_type]['task_config']['file'] = specific_config_files['job_config']
-    sky_config[env_type]['event_config']['file'] = specific_config_files['event_config']
-    sky_config[env_type]['factory_config']['file'] = specific_config_files['map_config']
-
-    new_config_path = os.path.join(get_config_dir(), f'{target_factory}_config.yaml')
-    # 写入新配置
-    with open(new_config_path, 'w') as f:
-        yaml.dump(specific_config, f, default_flow_style=False, allow_unicode=True)
-
-    sky_config['config_path'] = new_config_path
-    print(sky_config)
-    return sky_config
-
-if __name__ == '__main__':
-    get_new_config_file('template_config_set')
+def parse_yaml_content(content: bytes) -> dict:
+    """
+    解析 YAML 内容并返回字典。
+    参数：
+        content (bytes): YAML 文件的二进制内容
+    返回：
+        dict: 解析后的配置字典
+    """
+    import io
+    content_str = content.decode('utf-8')
+    return yaml.safe_load(io.StringIO(content_str))
