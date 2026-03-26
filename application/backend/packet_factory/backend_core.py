@@ -3,6 +3,7 @@ import threading
 from typing import List
 from typing import Callable
 import json
+import time
 
 import yaml
 
@@ -199,58 +200,104 @@ class BackendCore:
         LOGGER.info(f"total makespan: {env.env_timeline}s")
 
     def _save_training_results(self, env, agent):
-        """保存训练结果"""
+        """
+        保存训练结果到规范目录
+        :param env: 环境实例
+        :param agent: Agent 实例
+        """
         try:
-            results = {
-                'makespan': env.env_timeline,
-                'decision_stats': agent.get_decision_stats() if hasattr(agent, 'get_decision_stats') else {},
-                'q_table_size': len(getattr(agent, 'q_table', {}))
-            }
+            # 优先调用 Agent 的 save_training_result 方法（如果存在）
+            if hasattr(agent, 'save_training_result'):
+                result_path = agent.save_training_result()
+                if result_path:
+                    LOGGER.info(f"[Training] Results saved to {result_path}")
+            else:
+                # 降级方案：保存到 training_logs/results/ 目录
+                agent_name = getattr(agent, 'name', 'UnknownAgent')
+                timestamp = time.strftime('%Y%m%d_%H%M%S')
+                result_dir = f"training_logs/results/{agent_name}_{timestamp}"
+                
+                os.makedirs(result_dir, exist_ok=True)
+                
+                results = {
+                    'makespan': env.env_timeline,
+                    'decision_stats': agent.get_decision_stats() if hasattr(agent, 'get_decision_stats') else {},
+                    'q_table_size': len(getattr(agent, 'q_table', {})),
+                    'metadata': {
+                        'agent_name': agent_name,
+                        'agent_id': getattr(agent, 'agent_id', None),
+                        'save_time': time.strftime('%Y-%m-%d %H:%M:%S')
+                    }
+                }
+                
+                result_file = os.path.join(result_dir, 'training_report.json')
+                with open(result_file, 'w') as f:
+                    json.dump(results, f, indent=2)
+                
+                LOGGER.info(f"[Training] Results saved to {result_file}")
             
-            # 保存到文件
-            log_dir = config.BACKEND_LOG_DIR
-            os.makedirs(log_dir, exist_ok=True)
-            
-            result_file = os.path.join(log_dir, f'training_results_{agent.agent_id}.json')
-            with open(result_file, 'w') as f:
-                json.dump(results, f, indent=2)
-            
-            LOGGER.info(f"[Training] Results saved to {result_file}")
-            
-            # 保存模型
+            # 保存模型（使用 Agent 的默认路径或降级方案）
             if hasattr(agent, 'save_model'):
-                model_file = os.path.join(log_dir, f'agent_model_{agent.agent_id}.json')
-                agent.save_model(model_file)
+                model_path = agent.save_model()
+                if model_path:
+                    LOGGER.info(f"[Training] Model saved to {model_path}")
+            else:
+                # 降级方案：保存到 training_logs/models/ 目录
+                agent_name = getattr(agent, 'name', 'UnknownAgent')
+                model_dir = f"training_logs/models/{agent_name}"
+                os.makedirs(model_dir, exist_ok=True)
+                
+                model_file = os.path.join(model_dir, 'agent_model.json')
+                model_data = {
+                    'metadata': {
+                        'agent_name': agent_name,
+                        'agent_id': getattr(agent, 'agent_id', None),
+                        'save_time': time.strftime('%Y-%m-%d %H:%M:%S')
+                    }
+                }
+                
+                with open(model_file, 'w') as f:
+                    json.dump(model_data, f, indent=2)
+                
+                LOGGER.info(f"[Training] Model saved to {model_file}")
                 
         except Exception as e:
             LOGGER.error(f"[Training] Failed to save results: {e}")
 
     def _generate_evaluation_report(self, env, agent):
-        """生成评估报告"""
+        """
+        生成评估报告并保存到规范目录
+        :param env: 环境实例
+        :param agent: Agent 实例
+        """
         try:
+            # 准备评估结果
             report = {
                 'mode': EVALUATION,
                 'model_path': getattr(agent, 'model_path', None),
                 'makespan': env.env_timeline,
                 'decision_stats': agent.get_decision_stats() if hasattr(agent, 'get_decision_stats') else {},
                 'q_table_size': len(getattr(agent, 'q_table', {})),
-                'epsilon': getattr(agent, 'epsilon', 0)
+                'epsilon': getattr(agent, 'epsilon', 0),
+                'metadata': {
+                    'agent_name': getattr(agent, 'name', 'UnknownAgent'),
+                    'agent_id': getattr(agent, 'agent_id', None),
+                    'evaluation_time': time.strftime('%Y-%m-%d %H:%M:%S')
+                }
             }
-            
-            # 添加到 agent 的评估方法
-            if hasattr(agent, 'evaluate_and_save'):
-                agent.evaluate_and_save(report, save_path=None)
-            
-            # 保存到文件
-            log_dir = config.BACKEND_LOG_DIR
-            os.makedirs(log_dir, exist_ok=True)
-            
-            report_file = os.path.join(log_dir, f'evaluation_report_{agent.agent_id}.json')
-            with open(report_file, 'w') as f:
+
+            # 保存评估报告
+            agent_name = getattr(agent, 'name', 'UnknownAgent')
+            timestamp = time.strftime('%Y%m%d_%H%M%S')
+            eval_dir = f"training_logs/evaluations/{agent_name}_{timestamp}"
+            os.makedirs(eval_dir, exist_ok=True)
+
+            result_file = os.path.join(eval_dir, 'evaluation_report.json')
+            with open(result_file, 'w') as f:
                 json.dump(report, f, indent=2)
-            
-            LOGGER.info(f"[Evaluation] Report saved to {report_file}")
-            
+
+            LOGGER.info(f"[Evaluation] Report saved to {result_file}")
+
         except Exception as e:
             LOGGER.error(f"[Evaluation] Failed to generate report: {e}")
 

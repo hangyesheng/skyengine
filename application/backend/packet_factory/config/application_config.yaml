@@ -19,7 +19,7 @@ config:
 
     agent:
       agent_name: packet_factory.SimpleRLAgent
-      name: 1
+      name: SimpleRLAgent
       id: 1
       # 强化学习模式配置
       mode: training  # training | evaluation | inference
