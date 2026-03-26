@@ -61,7 +61,7 @@ class BackendCore:
 
     def bootstrap(self, stop_event: threading.Event, target_factory: str):
         specific_config = self.config_store[target_factory]
-        LOGGER.info(f"[Bootstrap] 从内存加载配置：{target_factory}, 配置内容：{specific_config}")
+        LOGGER.info(f"[Bootstrap] 从内存加载配置：{target_factory}")
 
         template_config_path = os.path.join(file_service.get_config_dir(), 'application_config.yaml')
 
@@ -105,19 +105,15 @@ class BackendCore:
         return self.env is not None
 
     def factory_start(self):
-        print("factory_start")
         self.env.env_visualizer.run()
 
     def factory_pause(self):
-        print("factory_pause")
         self.env.env_visualizer.pause()
 
     def factory_reset(self):
-        print("factory_reset")
         self.env.env_visualizer.restart()
 
     def change_factory_speed(self, speed_level: int):
-        print(f"change_factory_speed: {speed_level}")
         self.env.env_visualizer.change_speed(speed_level)
 
     def get_agvs(self):
@@ -128,11 +124,9 @@ class BackendCore:
         return agv_list
 
     def pause_agv(self, agv_id):
-        print("pause_agv")
         self.env.env_visualizer.pause_agv(agv_id)
 
     def resume_agv(self, agv_id):
-        print("resume_agv")
         self.env.env_visualizer.resume_agv(agv_id)
 
     def get_machines(self):
@@ -143,11 +137,9 @@ class BackendCore:
         return machine_list
 
     def pause_machine(self, machine_id):
-        print("pause_machine")
         self.env.env_visualizer.pause_machine(machine_id)
 
     def resume_machine(self, machine_id):
-        print("resume_machine")
         self.env.env_visualizer.resume_machine(machine_id)
 
     def get_job_templates(self):
@@ -158,7 +150,6 @@ class BackendCore:
         return job_list
 
     def add_job(self, job_id: int):
-        print(f"Job {job_id} added")
         self.env.env_visualizer.add_job(job_id)
 
     def get_jobs_progress(self):

@@ -1,4 +1,4 @@
-from .BaseAgent import BaseAgent
+from .BaseAgent import BaseAgent, DEFAULT_STEP_TIME
 from typing import List, Optional
 from executor.packet_factory.packet_factory.packet_factory_env.Machine.Machine import Machine
 from executor.packet_factory.packet_factory.packet_factory_env.Job.Operation import Operation
@@ -15,7 +15,7 @@ class GreedyAgent(BaseAgent):
         """
         贪心策略智能体
         :param name: 智能体名称
-        :param agent_id: 智能体ID或唯一标识
+        :param agent_id: 智能体 ID 或唯一标识
         :param context: 可选的上下文或环境句柄
         """
         super().__init__(name, agent_id, context)
@@ -39,7 +39,7 @@ class GreedyAgent(BaseAgent):
         return min_agv
 
     def reward(self, *args, **kwargs):
-        """Agent 计算自身的reward"""
+        """Agent 计算自身的 reward"""
         pass
 
     def train(self, *args, **kwargs):
@@ -48,11 +48,9 @@ class GreedyAgent(BaseAgent):
 
     def sample(self, agvs, machines, jobs):
         """
-        返回本次采样结果
+        返回本次采样结果（不包含时间统计，由 decision 方法统一处理）
         """
-        time_start = time.time()
         current_sample = []
-        total_timer = 0.0
         for i, job in enumerate(jobs):
             machine: Optional[Machine] = None
             for j in range(job.get_operation_count()):
@@ -71,7 +69,4 @@ class GreedyAgent(BaseAgent):
                 LOGGER.info(
                     f"Job {i}, Operation {j}: AGV={min_agv.get_id() if min_agv else -1}, Machine={machine.get_id() if machine else -1}, Duration={op.get_duration(machine.get_id()) if op and machine else 0}")
                 current_sample.append((op, min_agv, machine))
-                if machine:
-                    total_timer = max(total_timer, machine.get_timer())
-        time_end = time.time()
-        return current_sample, time_end - time_start
+        return current_sample, DEFAULT_STEP_TIME
