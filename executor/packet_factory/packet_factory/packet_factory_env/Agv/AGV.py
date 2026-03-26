@@ -324,7 +324,7 @@ class AGV:
                 else:
                     return
 
-    def work(self, final_time: float, action: Optional[Tuple[Operation, Machine]] = None):
+    def work(self, final_time: Optional[float], action: Optional[Tuple[Operation, Machine]] = None):
         """
         向todo队列中加入任务, 执行队列中的任务
         :param final_time: 模拟的截止时间
@@ -334,7 +334,9 @@ class AGV:
             self.todo_queue_push(("load", action[0]))
             self.todo_queue_push(("unload", action[1]))
             LOGGER.info(f"AGV id={self.id} assigned todo: {action}")
-        self.push_process(final_time)
+        if final_time is not None:
+            self.push_process(final_time)
+        
 
     # ---------- 修改状态的函数,便于事件使用 ----------
     def record(self, event:BaseEvent):

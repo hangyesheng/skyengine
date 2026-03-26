@@ -1,9 +1,8 @@
-from .BaseAgent import BaseAgent
+from .BaseAgent import BaseAgent, DEFAULT_STEP_TIME
 from executor.packet_factory.packet_factory.packet_factory_env.Job.Operation import Operation
 from executor.packet_factory.logger.logger import LOGGER
 from executor.packet_factory.packet_factory.packet_factory_env.Utils.util import OperationStatus
 
-import time
 import random
 
 # Agent:
@@ -33,9 +32,8 @@ class LifecycleAgent(BaseAgent):
 
     def sample(self, agvs, machines, jobs):
         """
-        返回本次采样结果
+        返回本次采样结果（不包含时间统计，由 decision 方法统一处理）
         """
-        time_start = time.time()
         current_sample = []
 
         cnt: int = 0
@@ -47,29 +45,28 @@ class LifecycleAgent(BaseAgent):
             for j in range(job.get_operation_count()):
                 op: Operation = job.get_operation(j)
 
-                # 分配所有尚未开始执行的operation, 其状态为ready或者waiting
+                # 分配所有尚未开始执行的 operation, 其状态为 ready 或者 waiting
                 if op.get_status() == OperationStatus.READY or op.get_status() == OperationStatus.WAITING:
 
                     # 随机选择可处理当前操作的机器
                     valid_machines = [m for m in machines if op.is_machine_capable(m.id) and m.is_available()]
                     machine = random.choice(valid_machines) if valid_machines else None
 
-                    # 随机选择可用AGV, 由于是对AGV的未来分配指令, 无需考虑当前是否正在运输
+                    # 随机选择可用 AGV, 由于是对 AGV 的未来分配指令，无需考虑当前是否正在运输
                     agv = random.choice(agvs) if agvs else None
 
-                    # 如果有机器和AGV则分配任务
+                    # 如果有机器和 AGV 则分配任务
                     if agv and op and machine:
-                        # 都存在, 添加该op的调度
+                        # 都存在，添加该 op 的调度
                         current_sample.append((op, agv, machine))
                     else:
                         continue
 
-        time_end = time.time()
         LOGGER.info(f"Finished jobs: {cnt}")
         if cnt == len(jobs):
             self.alive = False
-            return [],0
-        return current_sample, (time_end - time_start)*500+1
+            return [], 0
+        return current_sample, DEFAULT_STEP_TIME
 
     def __repr__(self):
         return f"<{self.__class__.__name__} id={self.agent_id} name={self.name}>"
