@@ -2,6 +2,7 @@ import os
 import threading
 from typing import List
 from typing import Callable
+import json
 
 import yaml
 
@@ -15,6 +16,7 @@ import config
 from application.backend.packet_factory.service import file_service
 
 from executor.packet_factory.logger.logger import Logger
+from executor.packet_factory.packet_factory.Agent.BaseAgent import TRAINING, EVALUATION, INFERENCE
 
 LOGGER = Logger(log_path=config.BACKEND_LOG_DIR, name="backend").logger
 
@@ -79,27 +81,178 @@ class BackendCore:
 
         self.env = env
 
+        # 获取 Agent 模式
+        agent_mode = getattr(agent, 'mode', TRAINING)
+        LOGGER.info(f"[Bootstrap] Agent mode: {agent_mode}, model_path: {getattr(agent, 'model_path', None)}")
+
         # 重置环境
         observations = env.reset()
 
+        # 根据模式执行不同的流程
+        if agent_mode == TRAINING:
+            self._run_training(env, agent, stop_event)
+        elif agent_mode == EVALUATION:
+            self._run_evaluation(env, agent, stop_event)
+        elif agent_mode == INFERENCE:
+            self._run_inference(env, agent, stop_event)
+        else:
+            LOGGER.warning(f"[Bootstrap] Unknown agent mode: {agent_mode}, running default loop")
+            self._run_default(env, agent, stop_event)
+
+    def _run_training(self, env, agent, stop_event: threading.Event):
+        """
+        训练模式：快速迭代，不渲染
+        :param env: 环境
+        :param agent: Agent
+        :param stop_event: 停止事件
+        """
+        LOGGER.info("[Training] Starting training mode...")
+        
         # 运行一个 episode（直到结束）
-        while not env.env_is_finished() and not stop_event.is_set():
+        while not (env.env_is_finished() and not stop_event.is_set()):
             # 输入获得环境状态并决策
             actions = env.action_space(agent)
 
-            # agent在外部决策
+            # agent 在外部决策
             observations, rewards, terminations, truncations, infos = env.step(actions)
 
-            # if agent.mode == TRAINING:
-            #     agent.update(observations, rewards)
+            # 训练更新
+            if hasattr(agent, 'update'):
+                agent.update(observations, rewards)
 
-            # 渲染当前状态（控制台打印）
-            env.render()
+        
+        # 保存训练结果
+        self._save_training_results(env, agent)
+        
+        LOGGER.info(f"[Training] Total makespan: {env.env_timeline}s")
 
-            # 更新 done 状态
-            done = terminations
+    def _run_evaluation(self, env, agent, stop_event: threading.Event):
+        """
+        评估模式：快速迭代，生成评估报告
+        :param env: 环境
+        :param agent: Agent
+        :param stop_event: 停止事件
+        """
+        LOGGER.info("[Evaluation] Starting evaluation mode...")
+        
+        # 验证 model_path
+        model_path = getattr(agent, 'model_path', None)
+        if not model_path:
+            LOGGER.error("[Evaluation] model_path is required for evaluation mode")
+            return
+        
+        # 运行一个 episode（直到结束）
+        while not (env.env_is_finished() and not stop_event.is_set()):
+            # 输入获得环境状态并决策
+            actions = env.action_space(agent)
+
+            # agent 在外部决策
+            observations, rewards, terminations, truncations, infos = env.step(actions)
+
+        
+        # 生成评估报告
+        self._generate_evaluation_report(env, agent)
+        
+        LOGGER.info(f"[Evaluation] Total makespan: {env.env_timeline}s")
+
+    def _run_inference(self, env, agent, stop_event: threading.Event):
+        """
+        推理模式：启用可视化，实时推送状态到前端
+        :param env: 环境
+        :param agent: Agent
+        :param stop_event: 停止事件
+        """
+        LOGGER.info("[Inference] Starting inference mode with visualization...")
+        
+        # 验证 model_path
+        model_path = getattr(agent, 'model_path', None)
+        if not model_path:
+            LOGGER.error("[Inference] model_path is required for inference mode")
+            return
+        
+        # 运行一个 episode（直到结束）
+        while not (env.env_is_finished() and not stop_event.is_set()):
+            # 输入获得环境状态并决策
+            actions = env.action_space(agent)
+
+            # agent 在外部决策
+            observations, rewards, terminations, truncations, infos = env.step(actions)
+
+        
+        LOGGER.info(f"[Inference] Total makespan: {env.env_timeline}s")
+
+    def _run_default(self, env, agent, stop_event: threading.Event):
+        """
+        默认模式：兼容旧版本
+        :param env: 环境
+        :param agent: Agent
+        :param stop_event: 停止事件
+        """
+        # 运行一个 episode（直到结束）
+        while not (env.env_is_finished() and not stop_event.is_set()):
+            # 输入获得环境状态并决策
+            actions = env.action_space(agent)
+
+            # agent 在外部决策
+            observations, rewards, terminations, truncations, infos = env.step(actions)
 
         LOGGER.info(f"total makespan: {env.env_timeline}s")
+
+    def _save_training_results(self, env, agent):
+        """保存训练结果"""
+        try:
+            results = {
+                'makespan': env.env_timeline,
+                'decision_stats': agent.get_decision_stats() if hasattr(agent, 'get_decision_stats') else {},
+                'q_table_size': len(getattr(agent, 'q_table', {}))
+            }
+            
+            # 保存到文件
+            log_dir = config.BACKEND_LOG_DIR
+            os.makedirs(log_dir, exist_ok=True)
+            
+            result_file = os.path.join(log_dir, f'training_results_{agent.agent_id}.json')
+            with open(result_file, 'w') as f:
+                json.dump(results, f, indent=2)
+            
+            LOGGER.info(f"[Training] Results saved to {result_file}")
+            
+            # 保存模型
+            if hasattr(agent, 'save_model'):
+                model_file = os.path.join(log_dir, f'agent_model_{agent.agent_id}.json')
+                agent.save_model(model_file)
+                
+        except Exception as e:
+            LOGGER.error(f"[Training] Failed to save results: {e}")
+
+    def _generate_evaluation_report(self, env, agent):
+        """生成评估报告"""
+        try:
+            report = {
+                'mode': EVALUATION,
+                'model_path': getattr(agent, 'model_path', None),
+                'makespan': env.env_timeline,
+                'decision_stats': agent.get_decision_stats() if hasattr(agent, 'get_decision_stats') else {},
+                'q_table_size': len(getattr(agent, 'q_table', {})),
+                'epsilon': getattr(agent, 'epsilon', 0)
+            }
+            
+            # 添加到 agent 的评估方法
+            if hasattr(agent, 'evaluate_and_save'):
+                agent.evaluate_and_save(report, save_path=None)
+            
+            # 保存到文件
+            log_dir = config.BACKEND_LOG_DIR
+            os.makedirs(log_dir, exist_ok=True)
+            
+            report_file = os.path.join(log_dir, f'evaluation_report_{agent.agent_id}.json')
+            with open(report_file, 'w') as f:
+                json.dump(report, f, indent=2)
+            
+            LOGGER.info(f"[Evaluation] Report saved to {report_file}")
+            
+        except Exception as e:
+            LOGGER.error(f"[Evaluation] Failed to generate report: {e}")
 
     def is_factory_alive(self):
         return self.env is not None

@@ -12,14 +12,21 @@ from executor.packet_factory.registry import register_component
 # 默认最小步长时间（秒）
 DEFAULT_STEP_TIME = 1
 
+# Agent 运行模式
+TRAINING = "training"
+EVALUATION = "evaluation"
+INFERENCE = "inference"
+
 @register_component("packet_factory.BaseAgent")
 class BaseAgent(ABC):
-    def __init__(self, name=None, agent_id=None, context=None):
+    def __init__(self, name=None, agent_id=None, context=None, mode: str = TRAINING, model_path: Optional[str] = None):
         """
         通用智能体基类
         :param name: 智能体名称
         :param agent_id: 智能体 ID 或唯一标识
         :param context: 可选的上下文或环境句柄
+        :param mode: 运行模式 training | evaluation | inference
+        :param model_path: 模型文件路径
         """
         self.name = name or self.__class__.__name__
         self.agent_id = agent_id
@@ -30,6 +37,10 @@ class BaseAgent(ABC):
         # 决策时间统计
         self.total_decision_time = 0.0  # 总决策时间
         self.decision_count = 0  # 决策次数
+        
+        # 强化学习相关配置
+        self.mode = mode
+        self.model_path = model_path
 
     def is_alive(self):
         return self.alive

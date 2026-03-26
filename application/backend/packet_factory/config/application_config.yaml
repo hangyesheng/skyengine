@@ -3,6 +3,10 @@ config:
 
   simulation:
     env_name: packet_factory
+    # 环境运行模式配置
+    mode: drl  # drl | optimization
+               # drl: 事件驱动强化学习模式
+               # optimization: 传统优化调度模式
 
     # map_config:
     #   由配置文件生成
@@ -14,9 +18,12 @@ config:
     #   由配置文件生成
 
     agent:
-      agent_name: packet_factory.RandomAgent
+      agent_name: packet_factory.SimpleRLAgent
       name: 1
       id: 1
+      # 强化学习模式配置
+      mode: training  # training | evaluation | inference
+      model_path: null  # 模型文件路径，evaluation 和 inference 模式必须提供
 
     callback:
       map_callback:
