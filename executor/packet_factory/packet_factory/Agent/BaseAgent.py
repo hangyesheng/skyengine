@@ -46,7 +46,7 @@ class BaseAgent(ABC):
         return self.alive
 
     @abstractmethod
-    def reward(self, *args, **kwargs):
+    def reward(self, *args, **kwargs) -> float:
         """Agent 计算自身的 reward"""
         pass
 
