@@ -103,6 +103,9 @@ class AGV:
     def set_status(self, status: AGVStatus):
         self.status = status
 
+    def is_available(self) -> bool:
+        return self.get_status() == AGVStatus.READY or self.get_status() == AGVStatus.ASSIGNED or self.get_status() == AGVStatus.LOADED
+
     def dist(self, target_x: float, target_y: float) -> float:
         """
         计算与给定坐标之间的距离

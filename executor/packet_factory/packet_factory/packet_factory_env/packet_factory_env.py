@@ -21,7 +21,7 @@ class PacketFactoryEnv(ParallelEnv):
 
     def __init__(self,
                  agent: BaseAgent,
-                 mode: str = 'optimization'  # 'drl' 或 'optimization'
+                 mode: str = 'drl'  # 'drl' 或 'optimization'，默认从配置文件读取
                  ):
         # 物料仓库与目标存储仓库
         self.source = []
@@ -130,7 +130,7 @@ class PacketFactoryEnv(ParallelEnv):
             res = False
             if cnt == len(self.jobs):
                 self.agent.alive = False
-                self.status = EnvStatus.WAITING
+                self.status = EnvStatus.FINISHED
                 res = True
         return res
 
@@ -203,14 +203,12 @@ class PacketFactoryEnv(ParallelEnv):
         event_happen = False
         if self.status == EnvStatus.WAITING:
             # ---------- 更新可视化（支持为空）----------
-            if self.env_visualizer is not None and hasattr(self.env_visualizer, 'visualize_env'):
-                self.env_visualizer.visualize_env()
+            self.render()
             # ---------- 触发事件队列相关机制 ----------
             event_happen = self.deal_event()
         elif self.status == EnvStatus.PAUSED:
             # ---------- 更新可视化（支持为空）----------
-            if self.env_visualizer is not None and hasattr(self.env_visualizer, 'visualize_env'):
-                self.env_visualizer.visualize_env()
+            self.render()
             # ---------- 触发事件队列相关机制 ----------
             event_happen = self.deal_event()
         elif self.status == EnvStatus.RUNNING:
@@ -233,8 +231,7 @@ class PacketFactoryEnv(ParallelEnv):
             self.render_observation()
 
             # ---------- 更新可视化（支持为空）----------
-            if self.env_visualizer is not None and hasattr(self.env_visualizer, 'visualize_env'):
-                self.env_visualizer.visualize_env()
+            self.render()
 
             # ---------- 触发事件队列相关机制 ----------
             event_happen = self.deal_event()
@@ -293,8 +290,7 @@ class PacketFactoryEnv(ParallelEnv):
         obs = self._get_obs()
     
         # ---------- 更新可视化（支持为空）----------
-        if self.env_visualizer is not None and hasattr(self.env_visualizer, 'visualize_env'):
-            self.env_visualizer.visualize_env()
+        self.render()
 
         LOGGER.info(f"--------- 结束当前循环步 ---------")
 
@@ -329,15 +325,21 @@ class PacketFactoryEnv(ParallelEnv):
 
     # ---------- 渲染函数 ----------
     def render_observation(self):
-        # 展示作业、机器和AGV数量
-        # LOGGER.info(f"\n📊 系统资源状态:")
-        LOGGER.info(f"  - 作业: {self.jobs}")
-        LOGGER.info(f"  - 机器: {self.machines}")
-        LOGGER.info(f"  - AGV: {self.agvs}")
+        # 展示作业、机器和AGV概况
+
+        job_status = [f"Job {job.id}: {'Finished' if job.is_finished() else 'In Progress'}" for job in self.jobs]
+        machine_status = [f"Machine {machine.id}: {'Available' if machine.is_available() else 'Busy'}" for machine in self.machines]
+        agv_status = [f"AGV {agv.id}: {'Available' if agv.is_available() else 'Busy'}" for agv in self.agvs]
+
+        LOGGER.info(f"Job Status: {job_status}")
+        LOGGER.info(f"Machine Status: {machine_status}")
+        LOGGER.info(f"AGV Status: {agv_status}")
 
     def render(self):
         """可视化系统当前状态 功能拆分到不同函数中"""
-        pass
+        # ---------- 更新可视化（支持为空）----------
+        if self.env_visualizer is not None and hasattr(self.env_visualizer, 'visualize_env'):
+            self.env_visualizer.visualize_env()
 
     def createHashIndex(self):
         """
