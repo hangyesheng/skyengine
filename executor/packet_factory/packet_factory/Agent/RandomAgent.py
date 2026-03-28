@@ -13,7 +13,7 @@ from executor.packet_factory.registry import register_component
 
 @register_component("packet_factory.RandomAgent")
 class RandomAgent(BaseAgent):
-    def __init__(self, name=None, agent_id=None, context=None):
+    def __init__(self, name=None, agent_id=None, context=None, **kwargs):
         """
         通用智能体基类
         :param name: 智能体名称

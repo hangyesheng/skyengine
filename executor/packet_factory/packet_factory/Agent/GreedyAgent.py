@@ -3,6 +3,7 @@ from typing import List, Optional
 from executor.packet_factory.packet_factory.packet_factory_env.Machine.Machine import Machine
 from executor.packet_factory.packet_factory.packet_factory_env.Job.Operation import Operation
 from executor.packet_factory.packet_factory.packet_factory_env.Agv.AGV import AGV
+from executor.packet_factory.packet_factory.packet_factory_env.Utils.util import OperationStatus
 import time
 
 from executor.packet_factory.registry import register_component
@@ -11,7 +12,7 @@ from executor.packet_factory.logger.logger import LOGGER
 
 @register_component("packet_factory.GreedyAgent")
 class GreedyAgent(BaseAgent):
-    def __init__(self, name=None, agent_id=None, context=None):
+    def __init__(self, name=None, agent_id=None, context=None, **kwargs):
         """
         贪心策略智能体
         :param name: 智能体名称
@@ -24,7 +25,7 @@ class GreedyAgent(BaseAgent):
         min_timer = float("inf")
         min_machine: Machine = machines[0]
         for machine in machines:
-            if operation.is_machine_available(machine.get_id()) and machine.get_timer() < min_timer:
+            if operation.is_machine_capable(machine.get_id()) and machine.get_timer() < min_timer:
                 min_timer = machine.get_timer()
                 min_machine = machine
         return min_machine
@@ -33,8 +34,8 @@ class GreedyAgent(BaseAgent):
         min_timer = float("inf")
         min_agv: AGV = agvs[0]
         for agv in agvs:
-            if agv.get_timer() < min_timer:
-                min_timer = agv.get_timer()
+            if agv.get_travel_time() < min_timer:
+                min_timer = agv.get_travel_time()
                 min_agv = agv
         return min_agv
 
@@ -55,18 +56,10 @@ class GreedyAgent(BaseAgent):
             machine: Optional[Machine] = None
             for j in range(job.get_operation_count()):
                 op = job.get_operation(j)
-                if machine is None and op:
+                if op and op.get_status() == OperationStatus.READY:
                     machine = self.get_min_machine(machines, op)
-                min_agv = self.get_min_agv(agvs)
-                if j == 0 and min_agv and op and machine:
-                    min_agv.set_operation(op)
-                elif min_agv and machine:
-                    current_op = min_agv.get_operation()
-                    if current_op:
-                        new_machine = self.get_min_machine(machines, current_op)
-                        if new_machine:
-                            machine = new_machine
-                LOGGER.info(
-                    f"Job {i}, Operation {j}: AGV={min_agv.get_id() if min_agv else -1}, Machine={machine.get_id() if machine else -1}, Duration={op.get_duration(machine.get_id()) if op and machine else 0}")
-                current_sample.append((op, min_agv, machine))
+                    min_agv = self.get_min_agv(agvs)
+                    LOGGER.info(
+                        f"Job {i}, Operation {j}: AGV={min_agv.get_id() if min_agv else -1}, Machine={machine.get_id() if machine else -1}, Duration={op.get_duration(machine.get_id()) if op and machine else 0}")
+                    current_sample.append((op, min_agv, machine))
         return current_sample, DEFAULT_STEP_TIME

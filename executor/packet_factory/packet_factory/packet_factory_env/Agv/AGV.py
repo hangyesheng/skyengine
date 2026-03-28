@@ -114,6 +114,30 @@ class AGV:
         dy = self.y - target_y
         return math.sqrt(dx * dx + dy * dy)
 
+    def get_travel_time(self):
+        if self.running_queue_is_empty():
+            return 0
+        todo = self.running_queue[0]
+        if todo[0] == "load":
+            if type(todo[1]) != Operation:
+                raise ValueError(f"Invalid todo type: {todo}")
+            operation = todo[1]
+            machine = operation.get_current_machine()
+        elif todo[0] == "unload":
+            if type(todo[1]) != Machine:
+                raise ValueError(f"Invalid todo type: {todo}")
+            machine = todo[1]
+
+        path = self.graph.get_path(self.point_id, machine.point_id)
+        point = self.graph.get_point_by_id(path[self.path_stage])
+        if point is None:
+            LOGGER.info(f"AGV id={self.id} can't go to point {path[self.path_stage]}")
+            return 0
+        nx, ny = point.get_xy()
+        distance = self.dist(nx, ny)
+        travel_time = distance / self.velocity
+        return travel_time
+
     def load_from_warehouse(self, operation: Operation):
         """
         将AGV从仓库中获取operation, 目前没有仓库, 直接赋值

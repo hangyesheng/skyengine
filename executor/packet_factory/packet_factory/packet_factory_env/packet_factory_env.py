@@ -328,8 +328,8 @@ class PacketFactoryEnv(ParallelEnv):
         # 展示作业、机器和AGV概况
 
         job_status = [f"Job {job.id}: {'Finished' if job.is_finished() else 'In Progress'}" for job in self.jobs]
-        machine_status = [f"Machine {machine.id}: {'Available' if machine.is_available() else 'Busy'}" for machine in self.machines]
-        agv_status = [f"AGV {agv.id}: {'Available' if agv.is_available() else 'Busy'}" for agv in self.agvs]
+        machine_status = [f"Machine {machine.id}: Timer={machine.get_timer()}" for machine in self.machines]
+        agv_status = [f"AGV {agv.id}: Timer={agv.get_timer()}" for agv in self.agvs]
 
         LOGGER.info(f"Job Status: {job_status}")
         LOGGER.info(f"Machine Status: {machine_status}")
