@@ -1,5 +1,6 @@
 from typing import List
 import pygame
+import os
 
 from executor.packet_factory.call_back.EnvCallback import EnvCallback
 from executor.packet_factory.logger.logger import LOGGER
@@ -14,7 +15,7 @@ from executor.packet_factory.packet_factory.packet_factory_env.Utils.util import
 # 仿真环境创建前的初始化
 @register_component("base_callback.Visualizer")
 class EnvVisualizer(EnvCallback):
-    WIDTH, HEIGHT = 1024, 768
+    WIDTH, HEIGHT = 1920, 1080
 
     # 颜色
     WHITE = (255, 255, 255)
@@ -72,6 +73,47 @@ class EnvVisualizer(EnvCallback):
 
         self.overall_scale = None
         self.overall_shift = None
+        
+        # 加载 Emoji 字体（支持彩色 Emoji）
+        self._load_emoji_fonts()
+
+    def _load_emoji_fonts(self):
+        """加载支持 Emoji 的字体"""
+        # 尝试加载系统自带的 Emoji 字体
+        emoji_font_paths = [
+            "seguiemj.ttf",  # Windows Segoe UI Emoji
+            "Apple Color Emoji.ttc",  # macOS
+            "NotoColorEmoji.ttf",  # Linux Noto Color Emoji
+            "Symbola.ttf",  # Linux Symbola
+        ]
+        
+        self.emoji_font = None
+        for font_path in emoji_font_paths:
+            try:
+                # 尝试从系统字体目录加载
+                system_font_dirs = [
+                    os.path.join(os.environ.get('WINDIR', 'C:\\Windows'), 'Fonts'),
+                    "/usr/share/fonts/truetype/",
+                    "/System/Library/Fonts/",
+                ]
+                
+                for font_dir in system_font_dirs:
+                    full_path = os.path.join(font_dir, font_path)
+                    if os.path.exists(full_path):
+                        self.emoji_font = pygame.font.Font(full_path, 1)
+                        LOGGER.info(f"✅ 成功加载 Emoji 字体: {full_path}")
+                        return
+                        
+            except Exception as e:
+                continue
+        
+        # 如果找不到专门的 Emoji 字体，使用默认字体（部分系统也支持 Emoji）
+        try:
+            self.emoji_font = pygame.font.SysFont("segoeuiemoji, apple color emoji, noto color emoji, symbola, arial", 1)
+            LOGGER.info("✅ 使用系统默认字体（可能支持 Emoji）")
+        except:
+            self.emoji_font = pygame.font.Font(None, 1)
+            LOGGER.warning("⚠️ 未找到 Emoji 字体，将使用简单符号替代")
 
     def __call__(self):
         """使类的实例可以像函数一样被调用"""
@@ -115,38 +157,168 @@ class EnvVisualizer(EnvCallback):
         return (int((pos[0] + shift[0]) * self.overall_scale + self.overall_shift[0]), int((pos[1] + shift[1]) * self.overall_scale + self.overall_shift[1] ))
 
     def draw_agv(self, screen, agv: AGV):
+        """绘制 AGV - 使用 Emoji 图标"""
         color = self.AGV_STATE_COLOR.get(agv.status, self.BLACK)
         position = self.scaling(agv.get_xy(), shift=self.AGV_SHIFT)
-        pygame.draw.circle(screen, color, position, int(0.15 * self.overall_scale))
-        font = pygame.font.SysFont(None, int(0.24 * self.overall_scale))
-        label = font.render(str(agv.id), True, self.WHITE)
-        screen.blit(label, (position[0], position[1]))
+        
+        # 根据 AGV 状态选择不同的 Emoji
+        emoji_map = {
+            AGVStatus.READY: "🚗",      # 绿色小车 - 可用
+            AGVStatus.ASSIGNED: "🚙",  # 蓝色小车 - 已分配
+            AGVStatus.LOADED: "🚚",    # 货车 - 已装载
+            AGVStatus.EXCEPTION: "⚠️",  # 警告标志 - 异常
+        }
+        
+        emoji = emoji_map.get(agv.status, "🔵")  # 默认蓝色圆点
+        
+        # 计算字体大小（基于缩放比例）
+        font_size = max(int(0.35 * self.overall_scale), 16)
+        
+        # 创建字体对象并渲染 Emoji
+        try:
+            agv_font = pygame.font.SysFont("segoeuiemoji, apple color emoji, noto color emoji, symbola, arial", font_size)
+            emoji_surface = agv_font.render(emoji, True, color)
+        except:
+            # 降级方案：使用彩色圆圈
+            radius = int(0.15 * self.overall_scale)
+            pygame.draw.circle(screen, color, position, radius)
+            # 添加边框
+            pygame.draw.circle(screen, self.BLACK, position, radius, 2)
+            
+            # 绘制 AGV ID 标签
+            label_font_size = max(int(0.20 * self.overall_scale), 12)
+            label_font = pygame.font.SysFont(None, label_font_size)
+            label = label_font.render(str(agv.id), True, self.BLACK)
+            label_rect = label.get_rect(center=(position[0], position[1] + radius + label_font_size // 2 + 3))
+            screen.blit(label, label_rect)
+            return
+        
+        # 将 Emoji 居中绘制在 AGV 位置
+        emoji_rect = emoji_surface.get_rect(center=position)
+        screen.blit(emoji_surface, emoji_rect)
+        
+        # 绘制 AGV ID 标签（在 Emoji 下方）
+        label_font_size = max(int(0.20 * self.overall_scale), 12)
+        label_font = pygame.font.SysFont(None, label_font_size)
+        label = label_font.render(str(agv.id), True, self.BLACK)
+        label_rect = label.get_rect(center=(position[0], position[1] + font_size // 2 + 5))
+        screen.blit(label, label_rect)
 
     def draw_machine(self, screen, machine: Machine):
+        """绘制机器 - 使用 Emoji 图标"""
         color = self.MACHINE_STATE_COLOR.get(machine.status, self.BLACK)
         position = self.scaling(machine.get_xy(), shift=self.MACHINE_SHIFT)
-        rect = pygame.Rect(position[0], position[1], int(0.40 * self.overall_scale), int(0.40 * self.overall_scale))
-        pygame.draw.rect(screen, color, rect)
-        font = pygame.font.SysFont(None, int(0.24 * self.overall_scale))
-        label = font.render(str(machine.id), True, self.BLACK)
-        screen.blit(label, (position[0], position[1]))
+        
+        # 根据机器状态选择不同的 Emoji
+        emoji_map = {
+            MachineStatus.READY: "🏭",      # 工厂 - 就绪
+            MachineStatus.WORKING: "⚙️",    # 齿轮 - 工作中
+            MachineStatus.FAILED: "🔧",     # 扳手 - 故障（需要维修）
+            MachineStatus.EXCEPTION: "❌",  # 叉号 - 异常
+        }
+        
+        emoji = emoji_map.get(machine.status, "🏢")  # 默认建筑物
+        
+        # 计算字体大小（机器比 AGV 大一些）
+        font_size = max(int(0.45 * self.overall_scale), 20)
+        
+        # 创建字体对象并渲染 Emoji
+        try:
+            machine_font = pygame.font.SysFont("segoeuiemoji, apple color emoji, noto color emoji, symbola, arial", font_size)
+            emoji_surface = machine_font.render(emoji, True, color)
+        except:
+            # 降级方案：使用彩色方块
+            rect_size = int(0.40 * self.overall_scale)
+            rect = pygame.Rect(position[0], position[1], rect_size, rect_size)
+            pygame.draw.rect(screen, color, rect)
+            pygame.draw.rect(screen, self.BLACK, rect, 2)  # 边框
+            
+            # 绘制机器 ID 标签
+            label_font_size = max(int(0.20 * self.overall_scale), 12)
+            label_font = pygame.font.SysFont(None, label_font_size)
+            label = label_font.render(str(machine.id), True, self.BLACK)
+            label_rect = label.get_rect(center=(position[0] + rect_size // 2, position[1] + rect_size + label_font_size // 2 + 3))
+            screen.blit(label, label_rect)
+            return
+        
+        # 将 Emoji 居中绘制在机器位置
+        emoji_rect = emoji_surface.get_rect(center=position)
+        screen.blit(emoji_surface, emoji_rect)
+        
+        # 绘制机器 ID 标签（在 Emoji 下方，增加偏移量以确保可见性）
+        label_font_size = max(int(0.20 * self.overall_scale), 12)
+        label_font = pygame.font.SysFont(None, label_font_size)
+        label = label_font.render(str(machine.id), True, self.BLACK)
+        # 增加垂直偏移量，从原来的 +8 改为 +12，确保 ID 不会被 Emoji 遮挡
+        label_rect = label.get_rect(center=(position[0], position[1] + font_size // 2 + 12))
+        screen.blit(label, label_rect)
 
     def draw_operation(self, screen, operation: Operation, position):
+        """绘制操作/工件 - 使用 Emoji 图标"""
         color = self.OPERATION_STATE_COLOR.get(operation.status, self.BLACK)
-        rect = pygame.Rect(position[0], position[1], int(0.16 * self.overall_scale), int(0.16 * self.overall_scale))
-        pygame.draw.rect(screen, color, rect)
-        font = pygame.font.SysFont(None, int(0.2 * self.overall_scale))
-        label = font.render(str(operation.id), True, self.WHITE)
-        screen.blit(label, (position[0], position[1]))
+        
+        # 根据操作状态选择不同的 Emoji
+        emoji_map = {
+            OperationStatus.WAITING: "⏸️",     # 暂停 - 等待
+            OperationStatus.READY: "📦",       # 包裹 - 就绪
+            OperationStatus.MOVING: "📦",      # 运输中
+            OperationStatus.WORKING: "📦",     # 锤子 - 加工中
+            OperationStatus.FINISHED: "✅",    # 对勾 - 完成
+            OperationStatus.EXCEPTION: "❗",   # 感叹号 - 异常
+        }
+        
+        emoji = emoji_map.get(operation.status, "📋")  # 默认剪贴板
+        
+        # 计算字体大小（操作图标较小）
+        font_size = max(int(0.22 * self.overall_scale), 14)
+        
+        # 创建字体对象并渲染 Emoji
+        try:
+            op_font = pygame.font.SysFont("segoeuiemoji, apple color emoji, noto color emoji, symbola, arial", font_size)
+            emoji_surface = op_font.render(emoji, True, color)
+        except:
+            # 降级方案：使用彩色小方块
+            rect_size = int(0.16 * self.overall_scale)
+            rect = pygame.Rect(position[0], position[1], rect_size, rect_size)
+            pygame.draw.rect(screen, color, rect)
+            pygame.draw.rect(screen, self.BLACK, rect, 1)  # 细边框
+            
+            # 即使在降级模式下也显示 ID
+            label_font_size = max(int(0.14 * self.overall_scale), 10)
+            label_font = pygame.font.SysFont(None, label_font_size)
+            label = label_font.render(str(operation.id), True, self.WHITE)
+            label_rect = label.get_rect(center=(position[0] + rect_size // 2, position[1] + rect_size + label_font_size // 2))
+            screen.blit(label, label_rect)
+            return
+        
+        # 将 Emoji 居中绘制
+        emoji_rect = emoji_surface.get_rect(center=position)
+        screen.blit(emoji_surface, emoji_rect)
+        
+        # 绘制操作 ID 标签（始终显示）
+        label_font_size = max(int(0.14 * self.overall_scale), 10)
+        label_font = pygame.font.SysFont(None, label_font_size)
+        label = label_font.render(str(operation.id), True, self.WHITE)
+        label_rect = label.get_rect(center=(position[0], position[1] + font_size // 2 + 6))
+        screen.blit(label, label_rect)
 
     def draw_point(self, screen, point):
+        """绘制路径节点 - 使用小圆点"""
         pos = self.scaling(point)
-        pygame.draw.circle(screen, self.BLACK, pos, int(0.06 * self.overall_scale))
+        radius = int(0.06 * self.overall_scale)
+        pygame.draw.circle(screen, self.BLACK, pos, radius)
+        # 添加白色边框使其更明显
+        pygame.draw.circle(screen, self.WHITE, pos, radius, 1)
 
     def draw_link(self, screen, point1, point2):
+        """绘制路径连线 - 使用虚线表示可通行路径"""
         pos1 = self.scaling(point1)
         pos2 = self.scaling(point2)
-        pygame.draw.line(screen, self.BLACK, pos1, pos2, int(0.02 * self.overall_scale))
+        line_width = max(int(0.02 * self.overall_scale), 1)
+        
+        # 使用灰色虚线表示路径
+        gray_color = (150, 150, 150)
+        pygame.draw.line(screen, gray_color, pos1, pos2, line_width)
 
     def visualize_env(self, env=None):
         # 渲染
