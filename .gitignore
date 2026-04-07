@@ -741,3 +741,4 @@ model
 experiment/data/*
 sky_logs/metrics/*
 sky_logs/renders/*
+training_logs/*
