@@ -36,7 +36,9 @@ class AGV:
 
         # 事件相关 字段包括
         self.history_stack: List = []
-
+        
+        # ========== 甘特图监控字段 ==========
+        self.operation_history: List[dict] = []  # 记录历史操作及时间
 
     def pack(self) -> dict:
         return {
@@ -174,6 +176,12 @@ class AGV:
             # 上个阶段结束顺利获得物料
             self.set_status(AGVStatus.LOADED)
             self.set_operation(operation)
+            
+            # ========== 记录AGV运输时间（从Machine到下一个位置）==========
+            operation.agv_transport_start_time = self.timer
+            operation.assigned_agv_id = self.id
+            operation.previous_machine_id = machine.id
+            
             # operation.set_status(OperationStatus.MOVING)
             operation.set_current_machine(None)
             machine.output_pop_operation(operation)
@@ -250,6 +258,22 @@ class AGV:
             return False
         
         agv_operation: Operation = self.operation
+        
+        # ========== 记录AGV运输结束时间 ==========
+        agv_operation.agv_transport_end_time = self.timer
+        agv_operation.assigned_machine_id = machine.id
+        
+        # ========== 记录到AGV的operation_history ==========
+        transport_record = {
+            "operation_id": agv_operation.id,
+            "job_id": agv_operation.job_id,
+            "start_time": agv_operation.agv_transport_start_time,
+            "end_time": agv_operation.agv_transport_end_time,
+            "from_machine": agv_operation.previous_machine_id if hasattr(agv_operation, 'previous_machine_id') else None,
+            "to_machine": agv_operation.assigned_machine_id if hasattr(agv_operation, 'assigned_machine_id') else None
+        }
+        self.operation_history.append(transport_record)
+        
         machine.input_push_operation(agv_operation)
         agv_operation.set_current_machine(machine)
         agv_operation.set_status(OperationStatus.WORKING)

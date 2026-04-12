@@ -12,6 +12,11 @@ class Job:
         """
         self.id = job_id
         self.operations: List[Operation] = operations
+        
+        # ========== 为所有Operation设置job_id ==========
+        for op in self.operations:
+            op.job_id = job_id
+        
         for i in range(len(self.operations)):
             if i + 1 < len(self.operations):
                 self.operations[i].set_next_operation(self.operations[i + 1])

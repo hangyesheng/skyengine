@@ -121,6 +121,10 @@ class Machine:
 
             work_time: float = duration - current_operation.process_time
             if self.timer + work_time > final_time:
+                # ========== 记录Machine加工开始时间 ==========
+                if current_operation.start_time is None:
+                    current_operation.start_time = self.timer
+
                 current_operation.process_time += final_time - self.timer
                 self.set_timer(final_time)
                 return False
@@ -128,6 +132,10 @@ class Machine:
             # 设置完成
             current_operation.set_process_time(duration)
             current_operation.set_status(OperationStatus.FINISHED)
+            
+            # ========== 记录Machine加工结束时间 ==========
+            current_operation.end_time = self.timer
+            
             current_operation.set_current_machine(None)
 
             next_operation = current_operation.get_next_operation()

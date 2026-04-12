@@ -111,7 +111,38 @@
 
     <!-- 中间面板 - 主要显示区域 -->
     <div class="middle-panel">
-      <ElRow style="height: 100%">
+      <!-- 视图切换按钮 -->
+      <el-card style="margin-bottom: 10px;">
+        <el-button-group>
+          <el-button 
+            :type="ganttViewMode === 'map' ? 'primary' : ''" 
+            @click="ganttViewMode = 'map'"
+          >
+            🗺️ 地图视图
+          </el-button>
+          <el-button 
+            :type="ganttViewMode === 'agv' ? 'primary' : ''" 
+            @click="ganttViewMode = 'agv'"
+          >
+            🚛 AGV甘特图
+          </el-button>
+          <el-button 
+            :type="ganttViewMode === 'machine' ? 'primary' : ''" 
+            @click="ganttViewMode = 'machine'"
+          >
+            ⚙️ Machine甘特图
+          </el-button>
+          <el-button 
+            :type="ganttViewMode === 'both' ? 'primary' : ''" 
+            @click="ganttViewMode = 'both'"
+          >
+            📊 双视图
+          </el-button>
+        </el-button-group>
+      </el-card>
+
+      <!-- 地图视图 -->
+      <ElRow v-if="ganttViewMode === 'map'" style="height: calc(100% - 60px)">
         <ElCol :span="24">
           <div class="block">
             <el-image 
@@ -134,46 +165,25 @@
         </ElCol>
       </ElRow>
 
-      <!-- <FactoryPlayerSSE :hide-control-panel="true" />
+      <!-- AGV甘特图视图 -->
+      <div v-else-if="ganttViewMode === 'agv'" class="gantt-view-container">
+        <GanttChart type="agv" :auto-refresh="true" :refresh-interval="3000" />
+      </div>
 
-      <div class="floating-toolbar-wrapper">
-        <div class="floating-toolbar">
-          <div class="toolbar-left">
-            <span class="toolbar-title">📦 包裹工厂管理</span>
-            <span class="divider">|</span>
-            <span class="toolbar-label">状态：{{ isRunningTest ? "运行中..." : "就绪" }}</span>
-            <span class="divider">|</span>
-            <span
-              class="toolbar-label connection-status"
-              :class="connectionStatus.scenario === '已连接' ? 'connected' : 'disconnected'"
-            >
-              包裹场景：{{ connectionStatus.scenario }}
-            </span>
-          </div>
-          <div class="toolbar-right">
-            <select v-model="selectedEnvironment" class="plan-select" :disabled="isRunningTest">
-              <option value="simulation">仿真环境</option>
-              <option value="real">真实现场环境</option>
-            </select>
-            <select v-model="selectedAlgorithm" class="plan-select" :disabled="isRunningTest">
-              <option value="default">默认路由策略</option>
-              <option value="greedy">优化路由策略</option>
-            </select>
-            <button
-              @click="handleExecutePlan"
-              class="glass-btn primary"
-              :disabled="isRunningTest"
-              title="执行选中的方案"
-            >
-              🚀 执行
-            </button>
-          </div>
-        </div>
-      </div> -->
+      <!-- Machine甘特图视图 -->
+      <div v-else-if="ganttViewMode === 'machine'" class="gantt-view-container">
+        <GanttChart type="machine" :auto-refresh="true" :refresh-interval="3000" />
+      </div>
 
-
-    
-
+      <!-- 双视图模式 -->
+      <ElRow v-else-if="ganttViewMode === 'both'" :gutter="10" style="height: calc(100% - 60px)">
+        <ElCol :span="12">
+          <GanttChart type="agv" :auto-refresh="true" :refresh-interval="3000" />
+        </ElCol>
+        <ElCol :span="12">
+          <GanttChart type="machine" :auto-refresh="true" :refresh-interval="3000" />
+        </ElCol>
+      </ElRow>
     </div>
 
     <!-- 右侧面板 - 日志与进度 -->
@@ -246,7 +256,7 @@
             <el-progress :percentage="job.progress" :status="job.status === 'FINISHED' ? 'success' : undefined"/>
           </div>
         </el-card>
-      </div>
+    </div>
   </div>
 </template>
 
@@ -259,6 +269,7 @@ import { runFullSystemTest } from "@/scenarios/fullSystemTest";
 import { sseManager } from "@/utils/sse";
 import { createFactoryConnectionManager } from "@/utils/factoryConnection";
 import axios from "axios";
+import GanttChart from "@/components/GanttChart.vue";
 
 const store = useFactoryStore();
 const monitorStore = useMonitorStore();
@@ -297,6 +308,9 @@ const agvList = ref([]);
 const machineList = ref([]);
 const jobList = ref([]);
 const services = ref([]);
+
+// ========== 甘特图视图模式 ==========
+const ganttViewMode = ref('map'); // 'map', 'agv', 'machine', 'both'
 
 let agvIntervalId = null;
 let machineIntervalId = null;
@@ -974,4 +988,9 @@ onUnmounted(() => {
   margin-bottom: 20px;
 }
 
+/* 甘特图视图容器 */
+.gantt-view-container {
+  height: calc(100% - 60px);
+  overflow: hidden;
+}
 </style>

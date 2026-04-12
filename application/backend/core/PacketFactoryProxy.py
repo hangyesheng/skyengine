@@ -124,6 +124,19 @@ class PacketFactoryProxy(BaseFactoryProxy):
             job_progress_list = self._backend_core.get_jobs_progress()
             return JSONResponse({"jobs": job_progress_list})
 
+        # ========== 甘特图数据路由 ==========
+        @RouteRegistry.register_route("/gantt/agv", method="GET")
+        async def api_gantt_agv():
+            """获取AGV运输甘特图数据"""
+            gantt_data = self._backend_core.get_gantt_agv_data()
+            return JSONResponse(gantt_data)
+        
+        @RouteRegistry.register_route("/gantt/machine", method="GET")
+        async def api_gantt_machine():
+            """获取Machine加工甘特图数据"""
+            gantt_data = self._backend_core.get_gantt_machine_data()
+            return JSONResponse(gantt_data)
+
         @RouteRegistry.register_route("/yaml/upload", method="POST")
         async def api_yaml_upload(
             config_name: str = Query(..., description="Name of the config to upload"),
