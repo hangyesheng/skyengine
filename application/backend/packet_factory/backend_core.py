@@ -385,3 +385,96 @@ class BackendCore:
         except Exception as e:
             print(e)
         return pic
+
+    def get_gantt_agv_data(self) -> dict:
+        """
+        获取AGV运输甘特图数据
+        返回格式: {
+            "agvs": [
+                {
+                    "id": agv_id,
+                    "operations": [
+                        {
+                            "operation_id": op_id,
+                            "job_id": job_id,
+                            "start_time": start_time,
+                            "end_time": end_time,
+                            "from_machine": from_machine_id,
+                            "to_machine": to_machine_id
+                        }
+                    ]
+                }
+            ]
+        }
+        """
+        if self.env is None:
+            return {"agvs": []}
+        
+        agvs = self.env.getAGVs()
+        gantt_data = []
+        
+        for agv in agvs:
+            agv_info = {
+                "id": agv.id,
+                "operations": []
+            }
+            
+            # 从AGV的operation_history中获取历史记录
+            if hasattr(agv, 'operation_history'):
+                for hist in agv.operation_history:
+                    agv_info["operations"].append(hist)
+            
+            gantt_data.append(agv_info)
+        
+        return {"agvs": gantt_data}
+
+    def get_gantt_machine_data(self) -> dict:
+        """
+        获取Machine加工甘特图数据
+        返回格式: {
+            "machines": [
+                {
+                    "id": machine_id,
+                    "operations": [
+                        {
+                            "operation_id": op_id,
+                            "job_id": job_id,
+                            "start_time": start_time,
+                            "end_time": end_time
+                        }
+                    ]
+                }
+            ]
+        }
+        """
+        if self.env is None:
+            return {"machines": []}
+        
+        machines = self.env.getMachines()
+        gantt_data = []
+        
+        for machine in machines:
+            machine_info = {
+                "id": machine.id,
+                "operations": []
+            }
+            
+            # 从machine的input_queue和output_queue中查找已完成的operations
+            # 这里需要遍历所有jobs来获取已完成的操作
+            if self.env:
+                jobs = self.env.getJobs()
+                for job in jobs:
+                    for operation in job.operations:
+                        # 只添加已分配给当前机器且有结束时间的操作
+                        if (operation.assigned_machine_id == machine.id and 
+                            operation.end_time is not None):
+                            machine_info["operations"].append({
+                                "operation_id": operation.id,
+                                "job_id": operation.job_id,
+                                "start_time": operation.start_time,
+                                "end_time": operation.end_time
+                            })
+            
+            gantt_data.append(machine_info)
+        
+        return {"machines": gantt_data}

@@ -32,6 +32,16 @@ class Operation:
         self.current_progress = 0  # 当前物品的加工进度
         self.current_start_time = None
 
+        # ========== 甘特图监控字段 ==========
+        self.job_id: Optional[int] = None  # 所属Job ID
+        self.start_time: Optional[float] = None  # Machine加工开始时间
+        self.end_time: Optional[float] = None  # Machine加工结束时间
+        self.agv_transport_start_time: Optional[float] = None  # AGV运输开始时间
+        self.agv_transport_end_time: Optional[float] = None  # AGV运输结束时间
+        self.assigned_agv_id: Optional[int] = None  # 分配的AGV ID
+        self.previous_machine_id: Optional[int] = None  # 上一个Machine ID
+        self.assigned_machine_id: Optional[int] = None  # 分配的Machine ID
+
     def __repr__(self):
         # 格式化持续时间列表（最多显示前3个）
         durations_str = "[...]"
