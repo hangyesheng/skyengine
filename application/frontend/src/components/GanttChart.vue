@@ -40,12 +40,12 @@
           {{ type === 'agv' ? 'AGV' : 'Machine' }} {{ resource.id }}
         </div>
         <div class="resource-timeline">
-          <!-- 操作条 -->
+          <!-- 有负载的运输操作条 -->
           <div
             v-for="op in resource.operations"
-            :key="op.operation_id"
+            :key="'op-' + op.operation_id"
             class="operation-bar"
-            :class="type"
+            :class="{ 'agv': type === 'agv', 'machine': type === 'machine' }"
             :style="{
               left: calculatePosition(op.start_time) + '%',
               width: calculateWidth(op.start_time, op.end_time) + '%'
@@ -55,6 +55,24 @@
           >
             <span class="op-label">Op{{ op.operation_id }}</span>
           </div>
+          
+          <!-- 空载移动操作条（仅AGV类型显示） -->
+          <template v-if="type === 'agv' && resource.empty_moves">
+            <div
+              v-for="(emptyMove, idx) in resource.empty_moves"
+              :key="'empty-' + idx"
+              class="operation-bar empty-move"
+              :style="{
+                left: calculatePosition(emptyMove.start_time) + '%',
+                width: calculateWidth(emptyMove.start_time, emptyMove.end_time) + '%'
+              }"
+              @mouseenter="showTooltip($event, emptyMove)"
+              @mouseleave="hideTooltip"
+            >
+              <span class="op-label">Empty</span>
+            </div>
+          </template>
+
         </div>
       </div>
       
@@ -64,8 +82,12 @@
         class="tooltip"
         :style="{ top: tooltip.y + 'px', left: tooltip.x + 'px' }"
       >
-        <div class="tooltip-item"><strong>Operation:</strong> {{ tooltip.data?.operation_id }}</div>
-        <div class="tooltip-item"><strong>Job:</strong> {{ tooltip.data?.job_id }}</div>
+        <template v-if="type === 'agv'">
+          <div v-if="tooltip.data?.is_empty_move" class="tooltip-item"><strong>Type:</strong> Empty Move (空载)</div>
+          <div v-else class="tooltip-item"><strong>Type:</strong> Loaded Transport (有负载)</div>
+        </template>
+        <div v-if="!tooltip.data?.is_empty_move" class="tooltip-item"><strong>Operation:</strong> {{ tooltip.data?.operation_id }}</div>
+        <div v-if="!tooltip.data?.is_empty_move" class="tooltip-item"><strong>Job:</strong> {{ tooltip.data?.job_id }}</div>
         <div class="tooltip-item"><strong>Start:</strong> {{ tooltip.data?.start_time?.toFixed(2) }}s</div>
         <div class="tooltip-item"><strong>End:</strong> {{ tooltip.data?.end_time?.toFixed(2) }}s</div>
         <div class="tooltip-item"><strong>Duration:</strong> {{ (tooltip.data?.end_time - tooltip.data?.start_time)?.toFixed(2) }}s</div>
@@ -381,6 +403,18 @@ onUnmounted(() => {
 
 .operation-bar.machine .op-label {
   color: white;
+}
+
+/* 空载移动样式 - 灰色虚线边框 */
+.operation-bar.empty-move {
+  background: linear-gradient(135deg, #e0e0e0 0%, #bdbdbd 100%);
+  border: 2px dashed #9e9e9e;
+  opacity: 0.7;
+}
+
+.operation-bar.empty-move .op-label {
+  color: #616161;
+  font-style: italic;
 }
 
 .op-label {

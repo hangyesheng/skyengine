@@ -388,7 +388,7 @@ class BackendCore:
 
     def get_gantt_agv_data(self) -> dict:
         """
-        获取AGV运输甘特图数据
+        获取AGV运输甘特图数据（包含有负载运输和空载移动）
         返回格式: {
             "agvs": [
                 {
@@ -400,7 +400,19 @@ class BackendCore:
                             "start_time": start_time,
                             "end_time": end_time,
                             "from_machine": from_machine_id,
-                            "to_machine": to_machine_id
+                            "to_machine": to_machine_id,
+                            "is_empty_move": false
+                        }
+                    ],
+                    "empty_moves": [
+                        {
+                            "operation_id": null,
+                            "job_id": null,
+                            "start_time": start_time,
+                            "end_time": end_time,
+                            "from_machine": from_machine_id,
+                            "to_machine": to_machine_id,
+                            "is_empty_move": true
                         }
                     ]
                 }
@@ -416,13 +428,22 @@ class BackendCore:
         for agv in agvs:
             agv_info = {
                 "id": agv.id,
-                "operations": []
+                "operations": [],
+                "empty_moves": []
             }
             
-            # 从AGV的operation_history中获取历史记录
+            # 从AGV的operation_history中获取有负载的运输记录
             if hasattr(agv, 'operation_history'):
                 for hist in agv.operation_history:
-                    agv_info["operations"].append(hist)
+                    # 确保标记为非空载移动
+                    hist_with_flag = hist.copy()
+                    hist_with_flag["is_empty_move"] = False
+                    agv_info["operations"].append(hist_with_flag)
+            
+            # 从AGV的empty_move_history中获取空载移动记录
+            if hasattr(agv, 'empty_move_history'):
+                for empty_hist in agv.empty_move_history:
+                    agv_info["empty_moves"].append(empty_hist)
             
             gantt_data.append(agv_info)
         
