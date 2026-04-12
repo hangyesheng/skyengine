@@ -39,6 +39,10 @@ class AGV:
         
         # ========== 甘特图监控字段 ==========
         self.operation_history: List[dict] = []  # 记录历史操作及时间
+        self.empty_move_start_time: Optional[float] = None  # 记录空载移动开始时间
+        self.from_machine_id: Optional[int] = None  # 记录空载移动的起始机器ID
+        self.to_machine_id: Optional[int] = None # 记录空载移动的目标机器ID
+        self.empty_move_history: List[dict] = []  # 记录空载移动及时间
 
     def pack(self) -> dict:
         return {
@@ -145,6 +149,8 @@ class AGV:
         将AGV从仓库中获取operation, 目前没有仓库, 直接赋值
         """
         self.set_operation(operation)
+        operation.agv_transport_start_time = self.timer
+        operation.assigned_agv_id = self.id
         self.status = AGVStatus.LOADED
 
     # ---------- ready和assigned态使用 ----------
@@ -166,6 +172,11 @@ class AGV:
             return False
         machine: Machine = operation.current_machine
 
+        # ========== 记录空载移动（从上一个位置到当前load位置）==========
+        if self.empty_move_start_time is None:
+            self.empty_move_start_time = self.timer
+            self.to_machine_id = machine.id  # 目标位置（当前load的目标机器位置）
+
         path = self.graph.get_path(self.point_id, machine.point_id)
         if not self.heading(machine, path, final_time):
             return False
@@ -185,6 +196,19 @@ class AGV:
             # operation.set_status(OperationStatus.MOVING)
             operation.set_current_machine(None)
             machine.output_pop_operation(operation)
+            
+            # ========== 记录空载移动到operation_history ==========
+            if self.from_machine_id != self.to_machine_id:
+                empty_move_record = {
+                    "operation_id": None,  # 空载移动没有关联的operation
+                    "job_id": None,
+                    "start_time": self.empty_move_start_time,
+                    "end_time": self.timer,
+                    "from_machine": self.from_machine_id,
+                    "to_machine": self.to_machine_id,
+                    "is_empty_move": True  # 标记为空载移动
+                }
+                self.empty_move_history.append(empty_move_record)
         else:
             LOGGER.info(f"Machine id={machine.id} is not finished.")
             return False
@@ -284,6 +308,7 @@ class AGV:
         machine.set_timer(max(machine.get_timer(), self.timer))
         machine.work(final_time)
 
+        self.from_machine_id = machine.id  # 下一次空载移动的起始位置（当前unload的机器位置）
         self.point_id = machine.point_id
         self.path_stage = 1
         return True
@@ -292,6 +317,9 @@ class AGV:
         self.todo_queue.append(todo)
 
     def todo_queue_pop(self) -> Optional[Tuple[str, Machine | Operation]]:
+        # 重置空载移动记录
+        self.empty_move_start_time = None
+
         if len(self.todo_queue) == 0:
             return None
         else:
@@ -301,6 +329,9 @@ class AGV:
         return len(self.todo_queue) == 0
     
     def todo_queue_clear(self):
+        # 重置空载移动记录
+        self.empty_move_start_time = None
+        
         self.todo_queue.clear()
     
     def running_queue_push(self, todo: Tuple[str, Machine | Operation]):
