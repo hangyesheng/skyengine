@@ -3,4 +3,5 @@ from .GreedyAgent import *
 from .RandomAgent import *
 from .SimpleRLAgent import *
 from .AdvancedRLAgent import *
-__all__ = ['BaseAgent', 'GreedyAgent', 'RandomAgent', 'SimpleRLAgent', 'AdvancedRLAgent']
+from .DualDRLAgent import *
+__all__ = ['BaseAgent', 'GreedyAgent', 'RandomAgent', 'SimpleRLAgent', 'AdvancedRLAgent', 'DualDRLAgent']
