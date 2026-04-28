@@ -1,6 +1,7 @@
 from typing import List, Optional, Tuple
 import math
 from heapq import heappush, heappop
+from executor.packet_factory.logger.logger import LOGGER
 
 class Point:
     def __init__(self, id, x, y):
@@ -12,11 +13,12 @@ class Point:
         return self.x, self.y
 
 class Link:
-    def __init__(self, id, point1, point2):
+    def __init__(self, id, point1, point2, weight=None):
         self.id = id
         self.point1 = point1
         self.point2 = point2
-        self.weight = 1.0
+        # 如果提供了权重，使用提供的权重；否则在 Graph 初始化时计算
+        self.weight = weight if weight is not None else None
 
 class Graph:
     def __init__(self, points: List[Point], links: List[Link]):
@@ -27,10 +29,24 @@ class Graph:
         self._build_adjacency_map()
         self._precompute_all_paths()
 
-        
     def get_weight(self, link):
+        """
+        获取边的权重
+        如果 Link 对象已经有预设的 weight，则使用它；否则计算欧氏距离作为默认值
+        """
+        # 如果 Link 已经有预设权重（从配置文件读取），直接使用
+        if link.weight is not None:
+            return link.weight
+        
+        # 否则计算欧氏距离作为默认权重
         point1 = self.get_point_by_id(link.point1)
         point2 = self.get_point_by_id(link.point2)
+        
+        # 安全检查：确保点存在
+        if point1 is None or point2 is None:
+            LOGGER.warning(f"Link {link.id}: one or both points not found")
+            return float('inf')  # 返回无穷大表示无效边
+        
         dx = point1.x - point2.x
         dy = point1.y - point2.y
         return math.hypot(dx, dy)  # 欧氏距离
@@ -50,7 +66,9 @@ class Graph:
         for link in self.links:
             p1 = link.point1
             p2 = link.point2
-            link.weight = self.get_weight(link)
+            # 如果 Link 没有预设权重，则计算欧氏距离
+            if link.weight is None:
+                link.weight = self.get_weight(link)
             self.adj_map[p1].append((p2, link.weight))
             self.adj_map[p2].append((p1, link.weight))  # 无向图
 
@@ -90,6 +108,41 @@ class Graph:
     def get_path(self, source_id, target_id) -> List[int]:
         """O(1) 查询从 source_id 到 target_id 的最短路径"""
         return self.path_cache.get(source_id, {}).get(target_id, [])
+    
+    def get_path_weight(self, path: List[int]) -> float:
+        """
+        计算路径的总权重（基于边权）
+        :param path: 路径节点 ID 列表
+        :return: 路径总权重
+        """
+        if not path or len(path) < 2:
+            return 0.0
+        
+        total_weight = 0.0
+        for i in range(len(path) - 1):
+            # 查找连接这两个点的边的权重
+            p1_id = path[i]
+            p2_id = path[i + 1]
+            
+            # 在邻接表中查找权重
+            for neighbor, weight in self.adj_map.get(p1_id, []):
+                if neighbor == p2_id:
+                    total_weight += weight
+                    break
+        
+        return total_weight
+    
+    def get_segment_weight(self, from_point_id: int, to_point_id: int) -> float:
+        """
+        获取两个点之间的边权重
+        :param from_point_id: 起始点 ID
+        :param to_point_id: 目标点 ID
+        :return: 边权重，如果不存在则返回 0
+        """
+        for neighbor, weight in self.adj_map.get(from_point_id, []):
+            if neighbor == to_point_id:
+                return weight
+        return 0.0
     
 
 if __name__ == '__main__':

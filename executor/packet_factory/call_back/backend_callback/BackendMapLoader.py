@@ -54,7 +54,11 @@ class FactoryMapLoader(EnvCallback):
         links = []
         for link in map_config.get('links', []):
             l = link['link']
-            links.append(Link(l['id'], l['begin'], l['end']))
+            # 支持可选的 weight 字段，如果未提供则为 None（后续会使用欧氏距离）
+            weight = l.get('weight', None)
+            if weight is not None:
+                weight = float(weight)
+            links.append(Link(l['id'], l['begin'], l['end'], weight))
 
         graph = Graph(points, links)
         return graph
