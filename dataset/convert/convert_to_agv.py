@@ -1,16 +1,24 @@
 """
-FJSP 实例转 AGV 版本转换脚本
+FJSP 实例转 AGV 版本转换脚本（基于带权无向图拓扑）
 
 功能：
 1. 读取 dataset/fjsp-instances 下的所有 .txt 文件
-2. 为每个实例添加 AGV 相关信息（机器位置、AGV 配置）
+2. 为每个实例添加基于带权无向图的工厂拓扑结构
 3. 保存到 dataset/agv-instances 目录下，保持相同的目录结构
 
-AGV 版本格式说明：
-- 第一行：<作业数量> <机器数量> <AGV数量>
+AGV 版本格式说明（新版 - 基于图拓扑）：
+- 第一行：<作业数量> <机器数量> <AGV数量> <节点数量> <边数量>
 - 接下来 N 行：作业工序数据（与原格式相同）
-- 接下来 M 行：机器位置信息 (x, y)
-- 最后 A 行：AGV 初始位置和速度 (x, y, velocity)
+- 接下来 P 行：节点/点信息 (point_id, x, y)
+- 接下来 L 行：边/链接信息 (link_id, point1_id, point2_id, weight)
+- 接下来 M 行：机器绑定信息 (machine_id, point_id)
+- 最后 A 行：AGV 配置信息 (agv_id, point_id, velocity)
+
+注意：
+- 移除了机器和 AGV 的直接坐标信息
+- 使用 Point（节点）+ Link（带权边）构建工厂拓扑图
+- Machine 和 AGV 通过 point_id 关联到图中的节点
+- Link 的 weight 表示通行代价（时间/距离）
 """
 
 import os
@@ -49,57 +57,72 @@ def parse_fjsp_instance(filepath):
     }
 
 
-def generate_machine_positions(machine_count, grid_size=20):
+def generate_graph_topology(machine_count, grid_size=20):
     """
-    生成机器位置坐标
+    生成基于网格的带权无向图拓扑结构
     
     Args:
         machine_count: 机器数量
         grid_size: 网格大小
         
     Returns:
-        list: 机器位置列表 [(x, y), ...]
+        tuple: (points, links, machine_point_mapping)
+            - points: 节点列表 [(point_id, x, y), ...]
+            - links: 边列表 [(link_id, point1_id, point2_id, weight), ...]
+            - machine_point_mapping: 机器到节点的映射 {machine_idx: point_id}
     """
-    positions = []
-    # 将机器均匀分布在网格上
+    # 计算网格行列数（确保能容纳所有机器）
     cols = int(machine_count ** 0.5) + 1
     rows = (machine_count + cols - 1) // cols
     
-    for i in range(machine_count):
-        row = i // cols
-        col = i % cols
-        x = col * (grid_size // cols) + 1
-        y = row * (grid_size // rows) + 1
-        positions.append((x, y))
+    # 生成节点（Point）- 在网格交叉点放置节点
+    points = []
+    point_id_counter = 1
+    point_grid = {}  # (row, col) -> point_id
     
-    return positions
-
-
-def generate_agv_config(agv_count, machine_positions):
-    """
-    生成 AGV 配置（初始位置和速度）
+    for row in range(rows + 1):  # +1 为了有额外的连接路径
+        for col in range(cols + 1):
+            x = col * (grid_size // cols)
+            y = row * (grid_size // rows)
+            point_id = point_id_counter
+            points.append((point_id, x, y))
+            point_grid[(row, col)] = point_id
+            point_id_counter += 1
     
-    Args:
-        agv_count: AGV 数量
-        machine_positions: 机器位置列表
-        
-    Returns:
-        list: AGV 配置列表 [(x, y, velocity), ...]
-    """
-    agvs = []
-    # 将 AGV 放置在靠近机器的位置
-    for i in range(agv_count):
-        # 选择对应的机器位置作为 AGV 起始位置
-        machine_idx = i % len(machine_positions)
-        x, y = machine_positions[machine_idx]
-        # 稍微偏移一点，避免与机器重叠
-        x = x + (i % 2) * 0.5
-        y = y + ((i + 1) % 2) * 0.5
-        # 设置速度（可以根据实际情况调整）
-        velocity = 1  # 默认速度为 1
-        agvs.append((int(x), int(y), velocity))
+    # 生成边（Link）- 连接相邻节点形成网格图
+    links = []
+    link_id_counter = 1
     
-    return agvs
+    # 水平边
+    for row in range(rows + 1):
+        for col in range(cols):
+            point1_id = point_grid[(row, col)]
+            point2_id = point_grid[(row, col + 1)]
+            # 权重可以基于距离或随机生成（模拟不同的通行难度）
+            weight = 1.0 + (row + col) % 3 * 0.5  # 1.0, 1.5, 2.0 交替
+            links.append((link_id_counter, point1_id, point2_id, weight))
+            link_id_counter += 1
+    
+    # 垂直边
+    for row in range(rows):
+        for col in range(cols + 1):
+            point1_id = point_grid[(row, col)]
+            point2_id = point_grid[(row + 1, col)]
+            weight = 1.0 + (row + col) % 3 * 0.5
+            links.append((link_id_counter, point1_id, point2_id, weight))
+            link_id_counter += 1
+    
+    # 为每个机器分配一个节点（优先选择网格内部节点）
+    machine_point_mapping = {}
+    available_points = list(point_grid.values())
+    
+    # 简单策略：均匀分配机器到不同节点
+    step = max(1, len(available_points) // machine_count)
+    for machine_idx in range(machine_count):
+        point_idx = (machine_idx * step) % len(available_points)
+        machine_point_mapping[machine_idx] = available_points[point_idx]
+    
+    return points, links, machine_point_mapping
 
 
 def determine_agv_count(job_count, machine_count):
@@ -119,9 +142,33 @@ def determine_agv_count(job_count, machine_count):
     return agv_count
 
 
+def assign_agvs_to_points(points, agv_count):
+    """
+    为 AGV 分配起始节点
+    
+    Args:
+        points: 节点列表 [(point_id, x, y), ...]
+        agv_count: AGV 数量
+        
+    Returns:
+        list: AGV 配置 [(agv_id, point_id, velocity), ...]
+    """
+    agvs = []
+    point_ids = [p[0] for p in points]
+    
+    for agv_id in range(agv_count):
+        # 均匀分布 AGV 到不同节点
+        point_idx = agv_id % len(point_ids)
+        point_id = point_ids[point_idx]
+        velocity = 1.0  # 默认速度
+        agvs.append((agv_id + 1, point_id, velocity))
+    
+    return agvs
+
+
 def convert_to_agv_format(parsed_data, output_filepath):
     """
-    将 FJSP 数据转换为 AGV 格式并写入文件
+    将 FJSP 数据转换为基于图拓扑的 AGV 格式并写入文件
     
     Args:
         parsed_data: 解析后的 FJSP 数据
@@ -133,31 +180,42 @@ def convert_to_agv_format(parsed_data, output_filepath):
     # 确定 AGV 数量
     agv_count = determine_agv_count(job_count, machine_count)
     
-    # 生成机器位置
-    machine_positions = generate_machine_positions(machine_count)
+    # 生成图拓扑结构
+    points, links, machine_point_mapping = generate_graph_topology(machine_count)
     
     # 生成 AGV 配置
-    agv_config = generate_agv_config(agv_count, machine_positions)
+    agvs = assign_agvs_to_points(points, agv_count)
     
     # 写入文件
     with open(output_filepath, 'w', encoding='utf-8') as f:
-        # 第一行：作业数 机器数 AGV数
-        f.write(f"{job_count} {machine_count} {agv_count}\n")
+        # 第一行：作业数 机器数 AGV数 节点数 边数
+        f.write(f"{job_count} {machine_count} {agv_count} {len(points)} {len(links)}\n")
         
         # 作业数据
         for job_line in parsed_data['jobs']:
             f.write(f"{job_line}\n")
         
-        # 机器位置
-        for x, y in machine_positions:
-            f.write(f"{x} {y}\n")
+        # 节点信息 (point_id, x, y)
+        for point_id, x, y in points:
+            f.write(f"{point_id} {x} {y}\n")
         
-        # AGV 配置
-        for x, y, v in agv_config:
-            f.write(f"{x} {y} {v}\n")
+        # 边信息 (link_id, point1_id, point2_id, weight)
+        for link_id, point1_id, point2_id, weight in links:
+            f.write(f"{link_id} {point1_id} {point2_id} {weight}\n")
+        
+        # 机器绑定信息 (machine_id, point_id)
+        for machine_idx in range(machine_count):
+            machine_id = machine_idx + 1
+            point_id = machine_point_mapping[machine_idx]
+            f.write(f"{machine_id} {point_id}\n")
+        
+        # AGV 配置信息 (agv_id, point_id, velocity)
+        for agv_id, point_id, velocity in agvs:
+            f.write(f"{agv_id} {point_id} {velocity}\n")
     
     print(f"  ✓ 已转换: {output_filepath}")
     print(f"    - 作业数: {job_count}, 机器数: {machine_count}, AGV数: {agv_count}")
+    print(f"    - 图拓扑: {len(points)} 个节点, {len(links)} 条边")
 
 
 def convert_directory(source_dir, target_dir):
@@ -200,6 +258,8 @@ def convert_directory(source_dir, target_dir):
             
         except Exception as e:
             print(f"  ✗ 转换失败 {txt_file.name}: {str(e)}")
+            import traceback
+            traceback.print_exc()
     
     print(f"✓ 成功转换 {converted_count}/{len(txt_files)} 个文件\n")
 
@@ -214,7 +274,7 @@ def main():
     target_base = base_dir / 'agv-instances'
     
     print("=" * 70)
-    print("FJSP 实例转 AGV 版本转换工具")
+    print("FJSP 实例转 AGV 版本转换工具（基于带权无向图拓扑）")
     print("=" * 70)
     print(f"源目录: {source_base}")
     print(f"目标目录: {target_base}")
@@ -266,7 +326,18 @@ def main():
         'target_directory': str(target_base),
         'total_files_processed': total_files,
         'subdirectories': [d.name for d in subdirs],
-        'note': 'AGV 数量为自动估算（机器数量的一半），可根据实际需求调整'
+        'format_version': 'graph_topology_v2',
+        'note': (
+            '新版本使用带权无向图表示工厂拓扑结构。\n'
+            '文件格式：\n'
+            '  1. 第一行: 作业数 机器数 AGV数 节点数 边数\n'
+            '  2. 作业数据行\n'
+            '  3. 节点信息: point_id x y\n'
+            '  4. 边信息: link_id point1_id point2_id weight\n'
+            '  5. 机器绑定: machine_id point_id\n'
+            '  6. AGV配置: agv_id point_id velocity\n'
+            'Machine 和 AGV 不再直接存储坐标，而是通过 point_id 关联到图节点。'
+        )
     }
     
     with open(report_path, 'w', encoding='utf-8') as f:
