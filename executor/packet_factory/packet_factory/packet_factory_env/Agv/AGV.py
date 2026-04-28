@@ -133,15 +133,22 @@ class AGV:
             if type(todo[1]) != Machine:
                 raise ValueError(f"Invalid todo type: {todo}")
             machine = todo[1]
-
+        
         path = self.graph.get_path(self.point_id, machine.point_id)
-        point = self.graph.get_point_by_id(path[self.path_stage])
-        if point is None:
-            LOGGER.info(f"AGV id={self.id} can't go to point {path[self.path_stage]}")
+        if not path or len(path) < 2:
+            LOGGER.info(f"AGV id={self.id} can't find valid path")
             return 0
-        nx, ny = point.get_xy()
-        distance = self.dist(nx, ny)
-        travel_time = distance / self.velocity
+        
+        # 获取当前段的边权重
+        current_point_id = path[self.path_stage - 1]
+        next_point_id = path[self.path_stage]
+        edge_weight = self.graph.get_segment_weight(current_point_id, next_point_id)
+        
+        # 计算剩余比例
+        remaining_ratio = self._calculate_remaining_ratio(current_point_id, next_point_id)
+        
+        # 使用边权 * 剩余比例计算移动时间
+        travel_time = (edge_weight * remaining_ratio) / self.velocity
         return travel_time
 
     def load_from_warehouse(self, operation: Operation):
@@ -240,28 +247,76 @@ class AGV:
             if point is None:
                 LOGGER.info(f"AGV id={self.id} can't go to point {path[self.path_stage]}")
                 return False
-            nx, ny = point.get_xy()
-            distance = self.dist(nx, ny)
-            travel_time = distance / self.velocity
+            
+            # 获取当前点到下一个点的边权重
+            current_point_id = path[self.path_stage - 1]
+            next_point_id = path[self.path_stage]
+            edge_weight = self.graph.get_segment_weight(current_point_id, next_point_id)
+            
+            # 计算 AGV 在当前边上的剩余比例
+            remaining_ratio = self._calculate_remaining_ratio(current_point_id, next_point_id)
+            
+            # 使用边权 * 剩余比例计算移动时间
+            travel_time = (edge_weight * remaining_ratio) / self.velocity
+            
             # agv_operation_id = None if self.operation is None else self.operation.id
             # travel_time *= self.uncertainty_simulator.uncertain_event_ratio(self.id, machine.id, agv_operation_id)
 
             if self.get_timer() + travel_time > final_time:
+                # 根据边权比例计算当前位置
+                progress_ratio = (final_time - self.get_timer()) / travel_time if travel_time > 0 else 0
                 agv_x, agv_y = self.get_xy()
+                nx, ny = point.get_xy()
                 dx: float = nx - agv_x
                 dy: float = ny - agv_y
-                agv_x = agv_x + dx * (final_time - self.get_timer()) / travel_time
-                agv_y = agv_y + dy * (final_time - self.get_timer()) / travel_time
+                agv_x = agv_x + dx * progress_ratio
+                agv_y = agv_y + dy * progress_ratio
                 self.set_xy(agv_x, agv_y)
                 self.set_timer(final_time)
                 return False
 
+            # 到达下一个点
+            nx, ny = point.get_xy()
             self.set_xy(nx, ny)
             self.timer += travel_time
 
             self.path_stage += 1
 
         return True
+
+    def _calculate_remaining_ratio(self, from_point_id: int, to_point_id: int) -> float:
+        """
+        计算 AGV 在当前边上从当前位置到终点的剩余比例
+        
+        :param from_point_id: 当前边的起点 ID
+        :param to_point_id: 当前边的终点 ID
+        :return: 剩余比例 (0.0 ~ 1.0)，1.0 表示在起点，0.0 表示已在终点
+        """
+        # 获取边的两个端点坐标
+        from_point = self.graph.get_point_by_id(from_point_id)
+        to_point = self.graph.get_point_by_id(to_point_id)
+        
+        if from_point is None or to_point is None:
+            LOGGER.warning(f"Points not found for edge {from_point_id}->{to_point_id}")
+            return 1.0  # 默认从头开始
+        
+        # 计算边的总长度（欧氏距离）
+        total_distance = math.hypot(to_point.x - from_point.x, to_point.y - from_point.y)
+        
+        if total_distance < 1e-6:
+            # 两点重合，直接到达
+            return 0.0
+        
+        # 计算 AGV 当前位置到终点的距离
+        current_distance_to_end = math.hypot(to_point.x - self.x, to_point.y - self.y)
+        
+        # 计算剩余比例
+        remaining_ratio = current_distance_to_end / total_distance
+        
+        # 确保比例在 [0, 1] 范围内
+        remaining_ratio = max(0.0, min(1.0, remaining_ratio))
+        
+        return remaining_ratio
 
     # ---------- loaded态使用 ----------
     def unload(self, machine: Machine, final_time: float) -> bool:
