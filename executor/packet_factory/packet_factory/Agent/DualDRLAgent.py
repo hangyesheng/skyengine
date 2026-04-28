@@ -9,7 +9,7 @@ Sequencing Agent: 负责从队列中选择作业执行（排序决策）
 - Sequencing Agent: 双路径输入 -> InstanceNorm -> Concat -> FC(48,36,36,24,24,12,tanh) -> Output
 """
 
-from .BaseAgent import BaseAgent, DEFAULT_STEP_TIME, TRAINING, EVALUATION, INFERENCE
+from .BaseAgent import BaseAgent, DEFAULT_STEP_TIME, FRONTEND, BACKEND, TRAINING, INFERENCE
 from executor.packet_factory.packet_factory.packet_factory_env.Job.Operation import Operation
 from executor.packet_factory.packet_factory.packet_factory_env.Machine.Machine import Machine
 from executor.packet_factory.packet_factory.packet_factory_env.Agv.AGV import AGV
@@ -280,7 +280,8 @@ class DualDRLAgent(BaseAgent):
     包含 Routing Agent（路由决策）和 Sequencing Agent（排序决策）
     """
     
-    def __init__(self, name=None, agent_id=None, context=None, mode: str = TRAINING, 
+    def __init__(self, name=None, agent_id=None, context=None, 
+                 ui_mode: str = BACKEND, task_mode: str = TRAINING, 
                  model_path: Optional[str] = None):
         """
         初始化双层 DRL Agent
@@ -288,10 +289,11 @@ class DualDRLAgent(BaseAgent):
         :param name: 智能体名称
         :param agent_id: 智能体 ID
         :param context: 环境上下文
-        :param mode: 运行模式 training | evaluation | inference
+        :param ui_mode: 界面模式 frontend | backend（是否有可视化界面）
+        :param task_mode: 任务模式 training | inference（训练还是推理）
         :param model_path: 模型文件路径
         """
-        super().__init__(name, agent_id, context, mode, model_path)
+        super().__init__(name, agent_id, context, ui_mode, task_mode, model_path)
         
         # ========== 网络配置 ==========
         # Routing Agent 配置

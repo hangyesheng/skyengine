@@ -1,4 +1,4 @@
-from .BaseAgent import BaseAgent, DEFAULT_STEP_TIME, TRAINING, EVALUATION, INFERENCE
+from .BaseAgent import BaseAgent, DEFAULT_STEP_TIME, FRONTEND, BACKEND, TRAINING, INFERENCE
 from executor.packet_factory.packet_factory.packet_factory_env.Job.Operation import Operation
 from executor.packet_factory.packet_factory.packet_factory_env.Machine.Machine import Machine
 from executor.packet_factory.packet_factory.packet_factory_env.Agv.AGV import AGV
@@ -30,17 +30,20 @@ class AdvancedRLAgent(BaseAgent):
     8. 异质性指标（变异系数 CV）
     """
     
-    def __init__(self, name=None, agent_id=None, context=None, mode: str = TRAINING, model_path: Optional[str] = None):
+    def __init__(self, name=None, agent_id=None, context=None, 
+                 ui_mode: str = BACKEND, task_mode: str = TRAINING, 
+                 model_path: Optional[str] = None):
         """
         初始化高级 DRL Agent
         
         :param name: 智能体名称
         :param agent_id: 智能体 ID
         :param context: 环境上下文
-        :param mode: 运行模式 training | evaluation | inference
+        :param ui_mode: 界面模式 frontend | backend（是否有可视化界面）
+        :param task_mode: 任务模式 training | inference（训练还是推理）
         :param model_path: 模型文件路径
         """
-        super().__init__(name, agent_id, context, mode, model_path)
+        super().__init__(name, agent_id, context, ui_mode, task_mode, model_path)
         
         # ========== Q-learning / DQN 参数 ==========
         self.q_table: Dict[str, Dict[Tuple[int, int, int], float]] = {}
