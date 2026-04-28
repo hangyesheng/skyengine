@@ -18,12 +18,19 @@ config:
     #   由配置文件生成
 
     agent:
-      agent_name: packet_factory.SimpleRLAgent
-      name: SimpleRLAgent
+      agent_name: packet_factory.DualDRLAgent
+      name: DualDRLAgent
       id: 1
-      # 强化学习模式配置
-      mode: training  # training | evaluation | inference
-      model_path: null  # 模型文件路径，evaluation 和 inference 模式必须提供
+      # 强化学习模式配置 - 2x2 分类
+      ui_mode: frontend      # frontend | backend（是否有可视化界面）
+      task_mode: training   # training | inference（训练还是推理）
+      model_path: null  # 模型文件路径，inference 模式必须提供
+      
+      # 模式组合说明：
+      # 1. ui_mode=frontend + task_mode=training: 前台训练模式（有界面，进行训练）
+      # 2. ui_mode=frontend + task_mode=inference: 前台推理模式（有界面，使用模型）- 原 inference
+      # 3. ui_mode=backend + task_mode=training: 后台训练模式（无界面，进行训练）- 原 training
+      # 4. ui_mode=backend + task_mode=inference: 后台推理模式（无界面，使用模型）- 原 evaluation
 
     callback:
       map_callback:

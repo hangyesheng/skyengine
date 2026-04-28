@@ -12,12 +12,13 @@ from executor.packet_factory.packet_factory.packet_factory_env.packet_factory_en
 from executor.packet_factory.packet_factory.packet_factory_env.Job.Job import Job
 from executor.packet_factory.packet_factory.packet_factory_env.Machine.Machine import Machine
 from executor.packet_factory.packet_factory.packet_factory_env.Agv.AGV import AGV
+from executor.packet_factory.packet_factory.packet_factory_env.Utils.util import EnvStatus
 import config
 
 from application.backend.packet_factory.service import file_service
 
 from executor.packet_factory.logger.logger import Logger
-from executor.packet_factory.packet_factory.Agent.BaseAgent import TRAINING, EVALUATION, INFERENCE
+from executor.packet_factory.packet_factory.Agent.BaseAgent import FRONTEND, BACKEND, TRAINING, INFERENCE
 
 LOGGER = Logger(log_path=config.BACKEND_LOG_DIR, name="backend").logger
 
@@ -82,32 +83,41 @@ class BackendCore:
 
         self.env = env
 
-        # 获取 Agent 模式
-        agent_mode = getattr(agent, 'mode', TRAINING)
-        LOGGER.info(f"[Bootstrap] Agent mode: {agent_mode}, model_path: {getattr(agent, 'model_path', None)}")
+        # 获取 Agent 的 2x2 模式配置
+        ui_mode = getattr(agent, 'ui_mode', BACKEND)
+        task_mode = getattr(agent, 'task_mode', TRAINING)
+        model_path = getattr(agent, 'model_path', None)
+        
+        LOGGER.info(f"[Bootstrap] UI mode: {ui_mode}, Task mode: {task_mode}, model_path: {model_path}")
 
         # 重置环境
         observations = env.reset()
 
-        # 根据模式执行不同的流程
-        if agent_mode == TRAINING:
-            self._run_training(env, agent, stop_event)
-        elif agent_mode == EVALUATION:
-            self._run_evaluation(env, agent, stop_event)
-        elif agent_mode == INFERENCE:
-            self._run_inference(env, agent, stop_event)
+        # 根据 2x2 模式组合执行不同的流程
+        if ui_mode == FRONTEND and task_mode == TRAINING:
+            # 前台+训练：有界面，进行训练
+            self._run_frontend_training(env, agent, stop_event)
+        elif ui_mode == FRONTEND and task_mode == INFERENCE:
+            # 前台+推理：有界面，使用模型
+            self._run_frontend_inference(env, agent, stop_event)
+        elif ui_mode == BACKEND and task_mode == TRAINING:
+            # 后台+训练：无界面，进行训练（原 training）
+            self._run_backend_training(env, agent, stop_event)
+        elif ui_mode == BACKEND and task_mode == INFERENCE:
+            # 后台+推理：无界面，使用模型（原 evaluation）
+            self._run_backend_inference(env, agent, stop_event)
         else:
-            LOGGER.warning(f"[Bootstrap] Unknown agent mode: {agent_mode}, running default loop")
+            LOGGER.warning(f"[Bootstrap] Unknown mode combination: ui={ui_mode}, task={task_mode}, running default loop")
             self._run_default(env, agent, stop_event)
 
-    def _run_training(self, env, agent, stop_event: threading.Event):
+    def _run_frontend_training(self, env, agent, stop_event: threading.Event):
         """
-        训练模式：快速迭代，不渲染
+        前台+训练模式：有界面，进行训练更新
         :param env: 环境
         :param agent: Agent
         :param stop_event: 停止事件
         """
-        LOGGER.info("[Training] Starting training mode...")
+        LOGGER.info("[Frontend+Training] Starting frontend training mode with visualization...")
         
         # 运行一个 episode（直到结束）
         while not (env.env_is_finished() and not stop_event.is_set()):
@@ -121,25 +131,24 @@ class BackendCore:
             if hasattr(agent, 'update'):
                 agent.update(observations, rewards)
 
-        
         # 保存训练结果
         self._save_training_results(env, agent)
         
-        LOGGER.info(f"[Training] Total makespan: {env.env_timeline}s")
+        LOGGER.info(f"[Frontend+Training] Total makespan: {env.env_timeline}s")
 
-    def _run_evaluation(self, env, agent, stop_event: threading.Event):
+    def _run_frontend_inference(self, env, agent, stop_event: threading.Event):
         """
-        评估模式：快速迭代，生成评估报告
+        前台+推理模式：有界面，使用模型决策（原 inference）
         :param env: 环境
         :param agent: Agent
         :param stop_event: 停止事件
         """
-        LOGGER.info("[Evaluation] Starting evaluation mode...")
+        LOGGER.info("[Frontend+Inference] Starting frontend inference mode with visualization...")
         
         # 验证 model_path
         model_path = getattr(agent, 'model_path', None)
         if not model_path:
-            LOGGER.error("[Evaluation] model_path is required for evaluation mode")
+            LOGGER.error("[Frontend+Inference] model_path is required for inference mode")
             return
         
         # 运行一个 episode（直到结束）
@@ -150,37 +159,101 @@ class BackendCore:
             # agent 在外部决策
             observations, rewards, terminations, truncations, infos = env.step(actions)
 
+        LOGGER.info(f"[Frontend+Inference] Total makespan: {env.env_timeline}s")
+
+    def _run_backend_training(self, env, agent, stop_event: threading.Event):
+        """
+        后台+训练模式：无界面，快速训练（原 training）
+        :param env: 环境
+        :param agent: Agent
+        :param stop_event: 停止事件
+        """
+        LOGGER.info("[Backend+Training] Starting backend training mode (no visualization)...")
         
+        # 设置环境状态为 RUNNING，禁用可视化
+        env.status = EnvStatus.RUNNING
+        env.env_visualizer = None
+        LOGGER.info("[Backend+Training] Visualizer disabled, status set to RUNNING")
+
+        # 运行一个 episode（直到结束）
+        while not (env.env_is_finished() and not stop_event.is_set()):
+            # 输入获得环境状态并决策
+            actions = env.action_space(agent)
+
+            # agent 在外部决策
+            observations, rewards, terminations, truncations, infos = env.step(actions)
+
+            # 训练更新
+            if hasattr(agent, 'update'):
+                agent.update(observations, rewards)
+
+        # 保存训练结果
+        self._save_training_results(env, agent)
+        
+        LOGGER.info(f"[Backend+Training] Total makespan: {env.env_timeline}s")
+
+    def _run_backend_inference(self, env, agent, stop_event: threading.Event):
+        """
+        后台+推理模式：无界面，使用模型评估（原 evaluation）
+        :param env: 环境
+        :param agent: Agent
+        :param stop_event: 停止事件
+        """
+        LOGGER.info("[Backend+Inference] Starting backend inference mode (no visualization)...")
+        
+        # 设置环境状态为 RUNNING，禁用可视化
+        env.status = EnvStatus.RUNNING
+        env.env_visualizer = None
+        LOGGER.info("[Backend+Inference] Visualizer disabled, status set to RUNNING")
+
+        # 验证 model_path
+        model_path = getattr(agent, 'model_path', None)
+        if not model_path:
+            LOGGER.error("[Backend+Inference] model_path is required for inference mode")
+            return
+        
+        # 运行一个 episode（直到结束）
+        while not (env.env_is_finished() and not stop_event.is_set()):
+            # 输入获得环境状态并决策
+            actions = env.action_space(agent)
+
+            # agent 在外部决策
+            observations, rewards, terminations, truncations, infos = env.step(actions)
+
         # 生成评估报告
         self._generate_evaluation_report(env, agent)
         
-        LOGGER.info(f"[Evaluation] Total makespan: {env.env_timeline}s")
+        LOGGER.info(f"[Backend+Inference] Total makespan: {env.env_timeline}s")
 
-    def _run_inference(self, env, agent, stop_event: threading.Event):
+    def _run_training(self, env, agent, stop_event: threading.Event):
         """
-        推理模式：启用可视化，实时推送状态到前端
+        训练模式：快速迭代，不渲染（兼容旧版本，映射到 backend_training）
         :param env: 环境
         :param agent: Agent
         :param stop_event: 停止事件
         """
-        LOGGER.info("[Inference] Starting inference mode with visualization...")
-        
-        # 验证 model_path
-        model_path = getattr(agent, 'model_path', None)
-        if not model_path:
-            LOGGER.error("[Inference] model_path is required for inference mode")
-            return
-        
-        # 运行一个 episode（直到结束）
-        while not (env.env_is_finished() and not stop_event.is_set()):
-            # 输入获得环境状态并决策
-            actions = env.action_space(agent)
+        LOGGER.warning("[Training] Deprecated method called, using _run_backend_training instead")
+        self._run_backend_training(env, agent, stop_event)
 
-            # agent 在外部决策
-            observations, rewards, terminations, truncations, infos = env.step(actions)
+    def _run_evaluation(self, env, agent, stop_event: threading.Event):
+        """
+        评估模式：快速迭代，生成评估报告（兼容旧版本，映射到 backend_inference）
+        :param env: 环境
+        :param agent: Agent
+        :param stop_event: 停止事件
+        """
+        LOGGER.warning("[Evaluation] Deprecated method called, using _run_backend_inference instead")
+        self._run_backend_inference(env, agent, stop_event)
 
-        
-        LOGGER.info(f"[Inference] Total makespan: {env.env_timeline}s")
+    def _run_inference(self, env, agent, stop_event: threading.Event):
+        """
+        推理模式：启用可视化，实时推送状态到前端（兼容旧版本，映射到 frontend_inference）
+        :param env: 环境
+        :param agent: Agent
+        :param stop_event: 停止事件
+        """
+        LOGGER.warning("[Inference] Deprecated method called, using _run_frontend_inference instead")
+        self._run_frontend_inference(env, agent, stop_event)
 
     def _run_default(self, env, agent, stop_event: threading.Event):
         """

@@ -12,21 +12,28 @@ from executor.packet_factory.registry import register_component
 # 默认最小步长时间（秒）
 DEFAULT_STEP_TIME = 1
 
-# Agent 运行模式
-TRAINING = "training"
-EVALUATION = "evaluation"
-INFERENCE = "inference"
+# Agent 运行模式 - 2x2 分类
+# 界面维度
+FRONTEND = "frontend"  # 有界面（启用可视化）
+BACKEND = "backend"    # 无界面（不启用可视化）
+
+# 功能维度
+TRAINING = "training"      # 训练模式（进行学习和更新）
+INFERENCE = "inference"    # 推理模式（使用模型决策）
 
 @register_component("packet_factory.BaseAgent")
 class BaseAgent(ABC):
-    def __init__(self, name=None, agent_id=None, context=None, mode: str = TRAINING, model_path: Optional[str] = None):
+    def __init__(self, name=None, agent_id=None, context=None, 
+                 ui_mode: str = BACKEND, task_mode: str = TRAINING, 
+                 model_path: Optional[str] = None):
         """
         通用智能体基类
         :param name: 智能体名称
         :param agent_id: 智能体 ID 或唯一标识
         :param context: 可选的上下文或环境句柄
-        :param mode: 运行模式 training | evaluation | inference
-        :param model_path: 模型文件路径
+        :param ui_mode: 界面模式 frontend | backend（是否有可视化界面）
+        :param task_mode: 任务模式 training | inference（训练还是推理）
+        :param model_path: 模型文件路径（inference 模式必须提供）
         """
         self.name = name or self.__class__.__name__
         self.agent_id = agent_id
@@ -38,9 +45,13 @@ class BaseAgent(ABC):
         self.total_decision_time = 0.0  # 总决策时间
         self.decision_count = 0  # 决策次数
         
-        # 强化学习相关配置
-        self.mode = mode
+        # 强化学习相关配置 - 2x2 模式
+        self.ui_mode = ui_mode      # frontend | backend
+        self.task_mode = task_mode  # training | inference
         self.model_path = model_path
+        
+        # 兼容旧版本的 mode 属性（由两个维度组合而成）
+        self.mode = f"{ui_mode}_{task_mode}"
 
     def is_alive(self):
         return self.alive
