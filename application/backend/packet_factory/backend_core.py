@@ -435,8 +435,23 @@ class BackendCore:
 
     def render_map(self, target_factory):
         """插入配置文件，启动当前渲染地图"""
-        # 启动系统!
+        # 先关闭之前的线程池，确保干净的状态
+        self.thread_pool.shutdown(wait=False)
+        self.env = None
+        # 启动新的训练
         self.thread_pool.submit(self.bootstrap, target_factory)
+
+    def shutdown(self, wait=True):
+        """关闭线程池，重置环境状态"""
+        self.thread_pool.shutdown(wait=wait)
+        self.env = None
+        LOGGER.info("[BackendCore] 已关闭并重置")
+
+    def is_env_alive(self) -> bool:
+        """检查环境是否正在运行"""
+        if self.env is None:
+            return False
+        return hasattr(self.env, 'status') and self.env.status.value != 'FINISHED'
 
     def save_config_to_memory(self, config_name: str, config_data: dict):
         """将配置保存到内存"""
