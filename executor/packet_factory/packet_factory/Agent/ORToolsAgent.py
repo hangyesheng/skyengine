@@ -30,6 +30,7 @@ class ORToolsAgent(BaseAgent):
 
     def __init__(self, name=None, agent_id=None, context=None,
                  ui_mode: str = BACKEND, task_mode: str = TRAINING,
+                 model_path: str = None,
                  time_limit_seconds: int = 30,
                  fallback_enabled: bool = True,
                  **kwargs):
@@ -42,11 +43,12 @@ class ORToolsAgent(BaseAgent):
             context: Reference to environment (PacketFactoryEnv)
             ui_mode: frontend | backend (visualization control)
             task_mode: training | inference (learning vs. model usage)
+            model_path: Model file path (not used for OR-Tools)
             time_limit_seconds: Maximum solving time per decision
             fallback_enabled: Whether to fall back to greedy on failure
-            **kwargs: Additional arguments passed to BaseAgent
+            **kwargs: Additional arguments
         """
-        super().__init__(name, agent_id, context, ui_mode, task_mode, **kwargs)
+        super().__init__(name, agent_id, context, ui_mode, task_mode, model_path)
 
         self.optimizer = ORToolsOptimizer(time_limit_seconds=time_limit_seconds)
         self.fallback_enabled = fallback_enabled

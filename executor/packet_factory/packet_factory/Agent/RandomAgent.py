@@ -1,4 +1,4 @@
-from .BaseAgent import BaseAgent, DEFAULT_STEP_TIME
+from .BaseAgent import BaseAgent, DEFAULT_STEP_TIME, BACKEND, TRAINING
 from executor.packet_factory.packet_factory.packet_factory_env.Job.Operation import Operation
 from executor.packet_factory.logger.logger import LOGGER
 from executor.packet_factory.packet_factory.packet_factory_env.Utils.util import OperationStatus
@@ -13,14 +13,19 @@ from executor.packet_factory.registry import register_component
 
 @register_component("packet_factory.RandomAgent")
 class RandomAgent(BaseAgent):
-    def __init__(self, name=None, agent_id=None, context=None, **kwargs):
+    def __init__(self, name=None, agent_id=None, context=None,
+                 ui_mode: str = BACKEND, task_mode: str = TRAINING,
+                 model_path: str = None, **kwargs):
         """
-        通用智能体基类
+        随机策略智能体
         :param name: 智能体名称
         :param agent_id: 智能体ID或唯一标识
         :param context: 可选的上下文或环境句柄
+        :param ui_mode: 界面模式 frontend | backend
+        :param task_mode: 任务模式 training | inference
+        :param model_path: 模型文件路径
         """
-        super().__init__(name, agent_id, context)
+        super().__init__(name, agent_id, context, ui_mode, task_mode, model_path)
 
     def reward(self, *args, **kwargs):
         """Agent 计算自身的reward"""

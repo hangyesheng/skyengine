@@ -827,12 +827,32 @@ class AdvancedRLAgent(BaseAgent):
             if path is None:
                 agent_name = self.name or "AdvancedRLAgent"
                 agent_dir = f"training_logs/models/{agent_name}"
-                path = f"{agent_dir}/agent_model.json"
-            
-            # 确保目录存在（仅当 path 包含目录时）
-            dir_name = os.path.dirname(path)
-            if dir_name:
-                os.makedirs(dir_name, exist_ok=True)
+                default_path = f"{agent_dir}/agent_model.json"
+                
+                # 确保目录存在
+                os.makedirs(agent_dir, exist_ok=True)
+                
+                # 检查默认路径的文件是否存在且为空
+                if os.path.exists(default_path):
+                    file_size = os.path.getsize(default_path)
+                    if file_size == 0:
+                        # 文件为空，创建带时间戳的新文件
+                        timestamp = time.strftime('%Y%m%d_%H%M%S')
+                        path = f"{agent_dir}/agent_model_{timestamp}.json"
+                        LOGGER.info(f"[AdvancedRLAgent] 检测到默认模型文件为空，创建新文件：{path}")
+                    else:
+                        # 文件非空，覆盖原有文件
+                        path = default_path
+                        LOGGER.info(f"[AdvancedRLAgent] 覆盖现有模型文件：{path}")
+                else:
+                    # 文件不存在，创建默认文件
+                    path = default_path
+                    LOGGER.info(f"[AdvancedRLAgent] 创建新模型文件：{path}")
+            else:
+                # 指定了路径，确保目录存在（仅当 path 包含目录时）
+                dir_name = os.path.dirname(path)
+                if dir_name:
+                    os.makedirs(dir_name, exist_ok=True)
             
             # 保存 Q 表和超参数
             model_data = {

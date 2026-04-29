@@ -1,4 +1,4 @@
-from .BaseAgent import BaseAgent, DEFAULT_STEP_TIME
+from .BaseAgent import BaseAgent, DEFAULT_STEP_TIME, BACKEND, TRAINING
 from typing import List, Optional
 from executor.packet_factory.packet_factory.packet_factory_env.Machine.Machine import Machine
 from executor.packet_factory.packet_factory.packet_factory_env.Job.Operation import Operation
@@ -12,14 +12,19 @@ from executor.packet_factory.logger.logger import LOGGER
 
 @register_component("packet_factory.GreedyAgent")
 class GreedyAgent(BaseAgent):
-    def __init__(self, name=None, agent_id=None, context=None, **kwargs):
+    def __init__(self, name=None, agent_id=None, context=None,
+                 ui_mode: str = BACKEND, task_mode: str = TRAINING,
+                 model_path: str = None, **kwargs):
         """
         贪心策略智能体
         :param name: 智能体名称
         :param agent_id: 智能体 ID 或唯一标识
         :param context: 可选的上下文或环境句柄
+        :param ui_mode: 界面模式 frontend | backend
+        :param task_mode: 任务模式 training | inference
+        :param model_path: 模型文件路径
         """
-        super().__init__(name, agent_id, context)
+        super().__init__(name, agent_id, context, ui_mode, task_mode, model_path)
 
     def get_min_machine(self, machines: List[Machine], operation: Operation) -> Machine:
         min_timer = float("inf")
