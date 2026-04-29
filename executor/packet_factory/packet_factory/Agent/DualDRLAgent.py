@@ -282,7 +282,7 @@ class DualDRLAgent(BaseAgent):
     
     def __init__(self, name=None, agent_id=None, context=None, 
                  ui_mode: str = BACKEND, task_mode: str = TRAINING, 
-                 model_path: Optional[str] = None):
+                 model_path: Optional[str] = None, **kwargs):
         """
         初始化双层 DRL Agent
         
@@ -345,6 +345,8 @@ class DualDRLAgent(BaseAgent):
         if model_path and os.path.exists(model_path):
             self.load_model(model_path)
             LOGGER.info(f"[DualDRLAgent] 加载模型成功：{model_path}")
+        else:
+            LOGGER.info(f"[DualDRLAgent] 模型{model_path}未找到，将使用随机初始化网络")
     
     def _initialize_networks(self):
         """初始化 Routing 和 Sequencing 网络"""
@@ -879,8 +881,7 @@ class DualDRLAgent(BaseAgent):
             'seq_path2_dim': self.seq_path2_dim,
             'seq_output_dim': self.seq_output_dim
         }
-        metadata_path = path.replace('.json', '_metadata.json')
-        with open(metadata_path, 'w') as f:
+        with open(path, 'w') as f:
             json.dump(metadata, f, indent=2)
         
         LOGGER.info(f"[DualDRLAgent] 模型已保存至: {path}")
