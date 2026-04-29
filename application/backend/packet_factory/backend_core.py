@@ -144,13 +144,7 @@ class BackendCore:
         :param stop_event: 停止事件
         """
         LOGGER.info("[Frontend+Inference] Starting frontend inference mode with visualization...")
-        
-        # 验证 model_path
-        model_path = getattr(agent, 'model_path', None)
-        if not model_path:
-            LOGGER.error("[Frontend+Inference] model_path is required for inference mode")
-            return
-        
+                
         # 运行一个 episode（直到结束）
         while not (env.env_is_finished() and not stop_event.is_set()):
             # 输入获得环境状态并决策
@@ -158,6 +152,9 @@ class BackendCore:
 
             # agent 在外部决策
             observations, rewards, terminations, truncations, infos = env.step(actions)
+
+        # 生成评估报告
+        self._generate_evaluation_report(env, agent)
 
         LOGGER.info(f"[Frontend+Inference] Total makespan: {env.env_timeline}s")
 
@@ -205,12 +202,6 @@ class BackendCore:
         env.status = EnvStatus.RUNNING
         env.env_visualizer = None
         LOGGER.info("[Backend+Inference] Visualizer disabled, status set to RUNNING")
-
-        # 验证 model_path
-        model_path = getattr(agent, 'model_path', None)
-        if not model_path:
-            LOGGER.error("[Backend+Inference] model_path is required for inference mode")
-            return
         
         # 运行一个 episode（直到结束）
         while not (env.env_is_finished() and not stop_event.is_set()):
@@ -346,7 +337,6 @@ class BackendCore:
         try:
             # 准备评估结果
             report = {
-                'mode': EVALUATION,
                 'model_path': getattr(agent, 'model_path', None),
                 'makespan': env.env_timeline,
                 'decision_stats': agent.get_decision_stats() if hasattr(agent, 'get_decision_stats') else {},
