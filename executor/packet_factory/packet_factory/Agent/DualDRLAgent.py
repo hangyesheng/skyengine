@@ -825,14 +825,35 @@ class DualDRLAgent(BaseAgent):
         :param path: 保存路径
         """
         if path is None:
-            path = self.model_path
-        
-        if path is None:
-            LOGGER.warning("[DualDRLAgent] 未指定模型保存路径")
-            return
-        
-        # 创建目录
-        os.makedirs(os.path.dirname(path) if os.path.dirname(path) else '.', exist_ok=True)
+            # 获取 Agent 名称作为目录名
+            agent_name = self.name or "DualDRLAgent"
+            agent_dir = f"training_logs/models/{agent_name}"
+            default_path = f"{agent_dir}/agent_model.json"
+            
+            # 确保目录存在
+            os.makedirs(agent_dir, exist_ok=True)
+            
+            # 检查默认路径的文件是否存在且为空
+            if os.path.exists(default_path):
+                file_size = os.path.getsize(default_path)
+                if file_size == 0:
+                    # 文件为空，创建带时间戳的新文件
+                    timestamp = time.strftime('%Y%m%d_%H%M%S')
+                    path = f"{agent_dir}/agent_model_{timestamp}.json"
+                    LOGGER.info(f"[DualDRLAgent] 检测到默认模型文件为空，创建新文件：{path}")
+                else:
+                    # 文件非空，覆盖原有文件
+                    path = default_path
+                    LOGGER.info(f"[DualDRLAgent] 覆盖现有模型文件：{path}")
+            else:
+                # 文件不存在，创建默认文件
+                path = default_path
+                LOGGER.info(f"[DualDRLAgent] 创建新模型文件：{path}")
+        else:
+            # 指定了路径，创建目录
+            dir_name = os.path.dirname(path)
+            if dir_name:
+                os.makedirs(dir_name, exist_ok=True)
         
         # 保存 Routing Network
         if self.routing_network is not None:
