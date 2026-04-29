@@ -250,16 +250,21 @@ class PacketFactoryProxy(BaseFactoryProxy):
         await super().pause()
     
     async def reset(self):
-        """重置工厂"""
+        """重置工厂（异步关闭，不等待线程结束）"""
         self._ensure_backend()
-        self._backend_core.factory_reset()
+        self._backend_core.shutdown(wait=False)
         await super().reset()
     
     def is_running(self) -> bool:
         """检查是否运行中"""
         self._ensure_backend()
         return self._backend_core.is_factory_alive()
-    
+
+    def is_env_alive(self) -> bool:
+        """检查环境是否正在运行"""
+        self._ensure_backend()
+        return self._backend_core.is_env_alive()
+
     # ========== 代理方法（供 server.py 直接调用） ==========
     
     def get_agvs(self) -> List[dict]:
