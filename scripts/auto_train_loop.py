@@ -620,6 +620,19 @@ def get_latest_training_result() -> Optional[dict]:
     return None
 
 
+def get_actual_makespan_from_result() -> float:
+    """
+    从最新的训练结果文件获取实际的 makespan
+
+    Returns:
+        float: 实际的 makespan 值，如果不存在则返回 0.0
+    """
+    result = get_latest_training_result()
+    if result and 'makespan' in result:
+        return float(result['makespan'])
+    return 0.0
+
+
 def get_cumulative_reward() -> float:
     """
     获取累积 reward
@@ -755,18 +768,27 @@ def run_training_iteration(iteration: int, data_file: Path) -> Tuple[bool, float
 
         # 6. 轮询完成
         print("[INFO] 等待训练完成...")
-        success, jobs, makespan = poll_jobs_completion()
+        success, jobs, elapsed_time = poll_jobs_completion()
+
+        # 获取实际的 makespan（从训练结果文件）
+        actual_makespan = get_actual_makespan_from_result()
 
         if success:
-            print(f"[INFO] 训练完成! Makespan: {makespan:.2f}s")
+            if actual_makespan > 0:
+                print(f"[INFO] 训练完成! Makespan: {actual_makespan:.2f}s")
+            else:
+                print(f"[INFO] 训练完成! Makespan: {elapsed_time:.2f}s (估计)")
         else:
-            print(f"[WARN] 训练超时! Makespan: {makespan:.2f}s")
+            if actual_makespan > 0:
+                print(f"[WARN] 训练超时! Makespan: {actual_makespan:.2f}s")
+            else:
+                print(f"[WARN] 训练超时! Makespan: {elapsed_time:.2f}s (估计)")
 
         # 训练完成后，等待一段时间让线程完全结束
         print("[INFO] 等待线程完全结束...")
         time.sleep(3)
 
-        return success, makespan
+        return success, actual_makespan if actual_makespan > 0 else elapsed_time
 
     except Exception as e:
         print(f"[ERROR] 训练迭代失败: {e}")
