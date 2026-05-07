@@ -85,6 +85,8 @@ class Job:
         """
         计算当前Job的进度
         """
+        if len(self.operations) == 0:
+            return 0.0
         count = 0
         for operation in self.operations:
             if operation.get_status() == OperationStatus.FINISHED:
