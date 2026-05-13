@@ -803,10 +803,8 @@ class DualDRLAgent(BaseAgent):
             # Sequencing Agent: 从队列中选择（这里简化为直接执行）
             # 实际应用中，Sequencing Agent 会在机器队列有多个作业时决定执行顺序
             
-            # 选择 AGV（使用 AVAILABLE 或 READY 状态）
-            available_agvs = [agv for agv in agvs if hasattr(agv, 'status') and 
-                             agv.status in [AGVStatus.READY, AGVStatus.ASSIGNED]]
-            selected_agv = random.choice(available_agvs) if available_agvs else None
+            # 选择 AGV
+            selected_agv = random.choice(agvs) if agvs else None
             
             if selected_agv:
                 decisions.append((op, selected_agv, selected_machine))
