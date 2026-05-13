@@ -325,15 +325,29 @@ class PacketFactoryEnv(ParallelEnv):
 
     # ---------- 渲染函数 ----------
     def render_observation(self):
-        # 展示作业、机器和AGV概况
+        # 展示作业、机器、AGV和Operation概况
 
         job_status = [f"Job {job.id}: {'Finished' if job.is_finished() else 'In Progress'}" for job in self.jobs]
         machine_status = [f"Machine {machine.id}: Timer={machine.get_timer()}" for machine in self.machines]
         agv_status = [f"AGV {agv.id}: Timer={agv.get_timer()}" for agv in self.agvs]
+        
+        # 收集所有Operation的状态信息
+        operation_status = []
+        for job in self.jobs:
+            for op in job.operations:
+                status_info = (
+                    f"Op {op.id}(Job{job.id}): "
+                    f"Status={op.status.value}, "
+                    f"Progress={op.current_progress}, "
+                    f"Machine={op.current_machine.id if op.current_machine else 'None'}, "
+                    f"Time={op.process_time:.1f}"
+                )
+                operation_status.append(status_info)
 
         LOGGER.info(f"Job Status: {job_status}")
         LOGGER.info(f"Machine Status: {machine_status}")
         LOGGER.info(f"AGV Status: {agv_status}")
+        LOGGER.info(f"Operation Status: {operation_status}")
 
     def render(self):
         """可视化系统当前状态 功能拆分到不同函数中"""
