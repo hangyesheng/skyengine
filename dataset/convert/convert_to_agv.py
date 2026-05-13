@@ -203,9 +203,9 @@ def convert_to_agv_format(parsed_data, output_filepath):
         for link_id, point1_id, point2_id, weight in links:
             f.write(f"{link_id} {point1_id} {point2_id} {weight}\n")
         
-        # 机器绑定信息 (machine_id, point_id)
+        # 机器绑定信息 (machine_id, point_id) - 机器编号从0开始
         for machine_idx in range(machine_count):
-            machine_id = machine_idx + 1
+            machine_id = machine_idx  # 从0开始编号
             point_id = machine_point_mapping[machine_idx]
             f.write(f"{machine_id} {point_id}\n")
         
@@ -220,7 +220,7 @@ def convert_to_agv_format(parsed_data, output_filepath):
 
 def convert_directory(source_dir, target_dir):
     """
-    转换整个目录下的所有 FJSP 实例
+    转换整个目录下的所有 FJSP 实例（递归处理子目录）
     
     Args:
         source_dir: 源目录路径
@@ -232,15 +232,15 @@ def convert_directory(source_dir, target_dir):
     # 创建目标目录
     target_path.mkdir(parents=True, exist_ok=True)
     
-    # 查找所有 .txt 文件
-    txt_files = list(source_path.glob('*.txt'))
+    # 递归查找所有 .txt 文件（包括子目录）
+    txt_files = list(source_path.rglob('*.txt'))
     
     if not txt_files:
         print(f"⚠ 在 {source_dir} 中未找到 .txt 文件")
         return
     
     print(f"\n处理目录: {source_dir.name}")
-    print(f"找到 {len(txt_files)} 个实例文件")
+    print(f"找到 {len(txt_files)} 个实例文件（包含子目录）")
     
     converted_count = 0
     for txt_file in sorted(txt_files):
@@ -248,9 +248,12 @@ def convert_directory(source_dir, target_dir):
             # 解析原始文件
             parsed_data = parse_fjsp_instance(txt_file)
             
-            # 生成输出文件名（添加 _agv 后缀）
-            output_filename = txt_file.stem + '_agv.txt'
-            output_filepath = target_path / output_filename
+            # 保持相对目录结构
+            relative_path = txt_file.relative_to(source_path)
+            output_filepath = target_path / relative_path.parent / (txt_file.stem + '_agv.txt')
+            
+            # 确保输出文件的父目录存在
+            output_filepath.parent.mkdir(parents=True, exist_ok=True)
             
             # 转换并保存
             convert_to_agv_format(parsed_data, output_filepath)
@@ -285,14 +288,14 @@ def main():
         print(f"✗ 错误: 源目录不存在: {source_base}")
         return
     
-    # 获取所有子目录（排除 instances.json 等文件）
+    # 获取所有子目录（递归处理，排除 instances.json 等文件）
     subdirs = [d for d in source_base.iterdir() if d.is_dir()]
     
     if not subdirs:
         print("✗ 错误: 源目录中没有子目录")
         return
     
-    print(f"\n找到 {len(subdirs)} 个子目录需要转换:")
+    print(f"\n找到 {len(subdirs)} 个顶级子目录需要转换:")
     for subdir in subdirs:
         print(f"  - {subdir.name}")
     
@@ -301,13 +304,13 @@ def main():
     total_converted = 0
     total_files = 0
     
-    # 遍历每个子目录
+    # 遍历每个子目录（递归处理所有层级）
     for subdir in sorted(subdirs):
-        # 统计文件数量
-        txt_files = list(subdir.glob('*.txt'))
+        # 统计文件数量（包括子目录）
+        txt_files = list(subdir.rglob('*.txt'))
         total_files += len(txt_files)
         
-        # 转换目录
+        # 转换目录（递归处理）
         target_subdir = target_base / subdir.name
         convert_directory(subdir, target_subdir)
         total_converted += len(txt_files)
