@@ -796,14 +796,18 @@ def check_reward_threshold() -> bool:
 
 def select_random_data_file() -> Optional[Path]:
     """
-    随机选择一个数据文件
+    随机选择一个数据文件（递归搜索所有子文件夹）
 
     Returns:
         Optional[Path]: 数据文件路径，如果没有找到则返回 None
     """
     data_files = list(DATA_DIR.glob('**/*_agv.txt'))
     if data_files:
-        return random.choice(data_files)
+        selected_file = random.choice(data_files)
+        # 显示相对于 DATA_DIR 的路径，方便用户识别
+        relative_path = selected_file.relative_to(DATA_DIR)
+        print(f"[INFO] 从 {len(data_files)} 个文件中随机选择: {relative_path}")
+        return selected_file
     return None
 
 
@@ -845,10 +849,12 @@ def run_training_iteration(iteration: int, data_file: Path) -> Tuple[bool, float
     Returns:
         Tuple[bool, float]: (是否成功, makespan)
     """
+    # 显示相对于 DATA_DIR 的路径
+    relative_path = data_file.relative_to(DATA_DIR)
     config_name = f"auto_train_{iteration}_{data_file.stem}"
 
     print(f"\n{'='*60}")
-    print(f"[迭代 {iteration}] 使用数据文件: {data_file.name}")
+    print(f"[迭代 {iteration}] 使用数据文件: {relative_path}")
     print(f"{'='*60}")
 
     try:
