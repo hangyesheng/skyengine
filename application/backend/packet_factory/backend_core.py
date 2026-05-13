@@ -27,31 +27,43 @@ class ThreadPool:
     def __init__(self):
         self.threads = []
         self.stop_event = threading.Event()
+        self._lock = threading.Lock()
 
     def __len__(self):
         return len(self.threads)
 
     def submit(self, func: Callable, *args, **kwargs):
         """提交任务到线程池,确保当前只有单个在修改env"""
-        if len(self.threads) >= 1:
-            self.shutdown()
-        try:
-            thread = threading.Thread(target=func, args=(self.stop_event, *args), kwargs=kwargs)
-            thread.daemon = True
-            thread.start()
-            self.threads.append(thread)
-        except Exception as e:
-            LOGGER.error(e)
+        with self._lock:
+            if len(self.threads) >= 1:
+                self._wait_and_clear_threads()
+            # 创建新的 stop_event
+            self.stop_event = threading.Event()
+            try:
+                thread = threading.Thread(target=func, args=(self.stop_event, *args), kwargs=kwargs)
+                thread.daemon = True
+                thread.start()
+                self.threads.append(thread)
+            except Exception as e:
+                LOGGER.error(e)
+
+    def _wait_and_clear_threads(self):
+        """等待所有线程结束并清理"""
+        self.stop_event.set()  # 通知所有线程退出
+        for thread in self.threads:
+            thread.join(timeout=5)  # 最多等待5秒
+        self.threads = []
 
     def shutdown(self, wait=True):
         """请求线程退出（通过事件标志）"""
-        self.stop_event.set()  # 通知线程退出
-        if wait:
-            for thread in self.threads:
-                thread.join()
-        self.threads = []  # 清空缓冲池
-        self.stop_event.clear()  # 清除退出标志
-        LOGGER.info("[INFO] 线程池已关闭")
+        with self._lock:
+            self.stop_event.set()  # 通知线程退出
+            if wait:
+                self._wait_and_clear_threads()
+            else:
+                # 不等待，但要确保线程列表被清空（下次 submit 时会等待）
+                self.threads = []
+            # 注意：不再 clear stop_event，因为新的 submit 会创建新的 Event
 
 
 class BackendCore:
@@ -62,6 +74,9 @@ class BackendCore:
         self.thread_pool = ThreadPool()
         # 内存中的配置存储 {config_name: config_data}
         self.config_store = {}
+        # 训练完成标记（用于客户端检测快速完成的训练）
+        self._training_completed = False
+        self._last_makespan = 0
 
     def bootstrap(self, stop_event: threading.Event, target_factory: str):
         specific_config = self.config_store[target_factory]
@@ -166,14 +181,20 @@ class BackendCore:
         :param stop_event: 停止事件
         """
         LOGGER.info("[Backend+Training] Starting backend training mode (no visualization)...")
-        
+
         # 设置环境状态为 RUNNING，禁用可视化
         env.status = EnvStatus.RUNNING
         env.env_visualizer = None
         LOGGER.info("[Backend+Training] Visualizer disabled, status set to RUNNING")
 
+        step_count = 0
         # 运行一个 episode（直到结束）
         while not (env.env_is_finished() and not stop_event.is_set()):
+            step_count += 1
+            if step_count <= 5 or step_count % 50 == 0:
+                LOGGER.info(f"[Backend+Training] Step {step_count}, env_is_finished={env.env_is_finished()}, "
+                           f"stop_event={stop_event.is_set()}, env_timeline={env.env_timeline}")
+
             # 输入获得环境状态并决策
             actions = env.action_space(agent)
 
@@ -186,7 +207,9 @@ class BackendCore:
 
         # 保存训练结果
         self._save_training_results(env, agent)
-        
+        self._training_completed = True
+        self._last_makespan = env.env_timeline
+
         LOGGER.info(f"[Backend+Training] Total makespan: {env.env_timeline}s")
 
     def _run_backend_inference(self, env, agent, stop_event: threading.Event):
@@ -365,7 +388,11 @@ class BackendCore:
             LOGGER.error(f"[Evaluation] Failed to generate report: {e}")
 
     def is_factory_alive(self):
-        return self.env is not None
+        """检查环境是否存活"""
+        if self.env is None:
+            return False
+        # 使用 env_is_finished() 方法判断，更准确
+        return not self.env.env_is_finished()
 
     def factory_start(self):
         self.env.env_visualizer.run()
@@ -416,18 +443,52 @@ class BackendCore:
         self.env.env_visualizer.add_job(job_id)
 
     def get_jobs_progress(self):
+        """获取任务进度列表（非阻塞，带超时保护）
+
+        使用 getJobTemplates() 而不是 getJobs()，因为后者在训练期间可能被修改
+        """
         if self.env is None:
             return []
-        jobs: List[Job] = self.env.getJobs()
-        job_list = [{"id": job.id, "status": job.get_status().name, "progress": round(job.get_progress() * 100.0, 2)}
-                    for job in jobs]
-        return job_list
+        try:
+            import threading
+            result = [None]
+            exception = [None]
+
+            def fetch_jobs():
+                try:
+                    # 使用 getJobTemplates() 获取模板作业（稳定数据）
+                    templates: List[Job] = self.env.getJobTemplates()
+                    result[0] = [{"id": job.id, "status": job.get_status().name, "progress": round(job.get_progress() * 100.0, 2)}
+                                 for job in templates]
+                except Exception as e:
+                    exception[0] = e
+
+            thread = threading.Thread(target=fetch_jobs)
+            thread.daemon = True
+            thread.start()
+            thread.join(timeout=3)  # 最多等待3秒
+
+            if thread.is_alive():
+                LOGGER.warning("[get_jobs_progress] Timeout after 3s, returning empty list")
+                return []
+            elif exception[0]:
+                LOGGER.error(f"[get_jobs_progress] Error: {exception[0]}")
+                return []
+            else:
+                return result[0] if result[0] else []
+        except Exception as e:
+            LOGGER.error(f"[get_jobs_progress] Unexpected error: {e}")
+            return []
 
     def render_map(self, target_factory):
         """插入配置文件，启动当前渲染地图"""
-        # 先关闭之前的线程池，确保干净的状态
+        # 先关闭之前的线程池（不等待，避免阻塞事件循环）
+        LOGGER.info("[render_map] 关闭之前的训练线程...")
         self.thread_pool.shutdown(wait=False)
         self.env = None
+        self._training_completed = False
+        self._last_makespan = 0
+        LOGGER.info(f"[render_map] 启动新训练: {target_factory}")
         # 启动新的训练
         self.thread_pool.submit(self.bootstrap, target_factory)
 
@@ -441,7 +502,7 @@ class BackendCore:
         """检查环境是否正在运行"""
         if self.env is None:
             return False
-        return hasattr(self.env, 'status') and self.env.status.value != 'FINISHED'
+        return hasattr(self.env, 'status') and self.env.status != EnvStatus.FINISHED
 
     def save_config_to_memory(self, config_name: str, config_data: dict):
         """将配置保存到内存"""

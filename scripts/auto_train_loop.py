@@ -44,8 +44,15 @@ RESULTS_DIR = TRAINING_LOGS / "results"
 # 结束条件配置
 REWARD_THRESHOLD = 1000.0  # 累积 reward 阈值
 MAX_ITERATIONS = 1000  # 最大迭代次数（防止无限循环）
-POLL_INTERVAL = 1  # 轮询间隔（秒）
-POLL_TIMEOUT = 3600  # 单次训练超时（秒）
+POLL_INTERVAL = 2  # 轮询间隔（秒）
+POLL_TIMEOUT = 7200  # 单次训练超时（秒）= 2小时
+
+# 请求重试配置
+REQUEST_MAX_RETRIES = 3  # 最大重试次数
+REQUEST_RETRY_DELAY = 1  # 重试间隔（秒）
+REQUEST_SHORT_TIMEOUT = 5  # 短请求超时（秒）
+REQUEST_MEDIUM_TIMEOUT = 15  # 中等请求超时（秒）
+REQUEST_LONG_TIMEOUT = 30  # 长请求超时（秒）
 
 # === API 端点 ===
 API_FACTORY_SWITCH = f"{BACKEND_URL}/factory/control/switch"
@@ -60,6 +67,41 @@ backend_process: Optional[subprocess.Popen] = None
 _backend_initialized: bool = False
 
 
+def retry_request(func, *args, max_retries: int = REQUEST_MAX_RETRIES, **kwargs) -> Optional[requests.Response]:
+    """
+    带重试机制的请求函数
+    
+    Args:
+        func: requests 请求函数 (session.get, session.post 等)
+        *args: 位置参数
+        max_retries: 最大重试次数
+        **kwargs: 关键字参数
+        
+    Returns:
+        Optional[requests.Response]: 响应对象，失败返回 None
+    """
+    last_error = None
+    for attempt in range(1, max_retries + 1):
+        try:
+            resp = func(*args, **kwargs)
+            if resp.status_code == 200:
+                return resp
+            else:
+                print(f"[WARN] 请求失败 (尝试 {attempt}/{max_retries}): HTTP {resp.status_code}")
+                if attempt < max_retries:
+                    time.sleep(REQUEST_RETRY_DELAY)
+                continue
+        except requests.exceptions.RequestException as e:
+            last_error = e
+            print(f"[WARN] 请求异常 (尝试 {attempt}/{max_retries}): {e}")
+            if attempt < max_retries:
+                time.sleep(REQUEST_RETRY_DELAY)
+            continue
+    
+    print(f"[ERROR] 请求失败，已重试 {max_retries} 次")
+    return None
+
+
 def reset_factory_state() -> bool:
     """
     重置工厂状态（清理之前的训练状态，准备下一次训练）
@@ -71,15 +113,17 @@ def reset_factory_state() -> bool:
         bool: 重置是否成功
     """
     print("[INFO] 重置工厂状态...")
-    try:
-        resp = session.post(f"{BACKEND_URL}/factory/control/reset", timeout=30)
-        if resp.status_code == 200:
-            print("[INFO] 工厂状态已重置")
-            return True
-        else:
-            print(f"[WARN] 重置请求失败: {resp.status_code} - {resp.text}")
-    except Exception as e:
-        print(f"[WARN] 重置失败: {e}")
+    resp = retry_request(
+        session.post,
+        f"{BACKEND_URL}/factory/control/reset",
+        timeout=REQUEST_MEDIUM_TIMEOUT
+    )
+    
+    if resp and resp.status_code == 200:
+        print("[INFO] 工厂状态已重置")
+        return True
+    else:
+        print(f"[WARN] 重置请求失败")
 
     # 重置失败，重启后端
     print("[INFO] 重置失败，尝试重启后端...")
@@ -103,20 +147,20 @@ def restart_backend() -> bool:
 
     # 重新初始化 packet_factory
     print("[INFO] 重新初始化 packet_factory...")
-    try:
-        resp = session.post(
-            API_FACTORY_SWITCH,
-            json={"factory_id": "packet_factory"},
-            timeout=60
-        )
-        if resp.status_code == 200:
-            data = resp.json()
-            if data.get("status") == "ok":
-                print("[INFO] packet_factory 重新初始化完成")
-                return True
-    except Exception as e:
-        print(f"[ERROR] 重新初始化失败: {e}")
-
+    resp = retry_request(
+        session.post,
+        API_FACTORY_SWITCH,
+        json={"factory_id": "packet_factory"},
+        timeout=REQUEST_LONG_TIMEOUT
+    )
+    
+    if resp and resp.status_code == 200:
+        data = resp.json()
+        if data.get("status") == "ok":
+            print("[INFO] packet_factory 重新初始化完成")
+            return True
+    
+    print(f"[ERROR] 重新初始化失败")
     return False
 
 
@@ -439,12 +483,14 @@ def wait_for_backend(timeout: int = 60) -> bool:
     time.sleep(2)
     start_time = time.time()
     while time.time() - start_time < timeout:
-        try:
-            resp = session.get(API_HEALTH, timeout=2)
-            if resp.status_code == 200:
-                return True
-        except requests.exceptions.RequestException:
-            pass
+        resp = retry_request(
+            session.get,
+            API_HEALTH,
+            timeout=REQUEST_SHORT_TIMEOUT,
+            max_retries=1  # 健康检查只重试1次，快速失败
+        )
+        if resp and resp.status_code == 200:
+            return True
         time.sleep(1)
     return False
 
@@ -476,22 +522,20 @@ def upload_config(config_name: str, yaml_content: str) -> bool:
     Returns:
         bool: 上传是否成功
     """
-    try:
-        files = {'file': (f'{config_name}.yaml', yaml_content, 'text/plain')}
-        # config_name 作为 query 参数传递
-        resp = session.post(
-            f"{BACKEND_URL}/yaml/upload?config_name={config_name}",
-            files=files,
-            timeout=30
-        )
-        if resp.status_code == 200:
-            print(f"[INFO] 配置 {config_name} 上传成功")
-            return True
-        else:
-            print(f"[ERROR] 配置上传失败: {resp.status_code} - {resp.text}")
-            return False
-    except Exception as e:
-        print(f"[ERROR] 配置上传异常: {e}")
+    files = {'file': (f'{config_name}.yaml', yaml_content, 'text/plain')}
+    # config_name 作为 query 参数传递
+    resp = retry_request(
+        session.post,
+        f"{BACKEND_URL}/yaml/upload?config_name={config_name}",
+        files=files,
+        timeout=REQUEST_MEDIUM_TIMEOUT
+    )
+    
+    if resp and resp.status_code == 200:
+        print(f"[INFO] 配置 {config_name} 上传成功")
+        return True
+    else:
+        print(f"[ERROR] 配置上传失败")
         return False
 
 
@@ -512,18 +556,17 @@ def render_factory(config_name: str) -> bool:
 
     def send_render_request():
         """后台发送渲染请求"""
-        try:
-            resp = session.post(
-                API_MAP_RENDER,
-                json={"target_factory": config_name},
-                timeout=300
-            )
-            if resp.status_code == 200:
-                print(f"[INFO] 工厂 {config_name} 渲染已启动")
-            else:
-                print(f"[ERROR] 工厂渲染启动失败: {resp.status_code} - {resp.text}")
-        except Exception as e:
-            print(f"[ERROR] 渲染请求异常: {e}")
+        resp = retry_request(
+            session.post,
+            API_MAP_RENDER,
+            json={"target_factory": config_name},
+            timeout=REQUEST_LONG_TIMEOUT
+        )
+        
+        if resp and resp.status_code == 200:
+            print(f"[INFO] 工厂 {config_name} 渲染已启动")
+        else:
+            print(f"[ERROR] 工厂渲染启动失败")
 
     try:
         # 在后台线程中发送请求，避免阻塞
@@ -548,16 +591,21 @@ def wait_for_env_ready(timeout: int = 30) -> bool:
     import time
     start_time = time.time()
     while time.time() - start_time < timeout:
-        try:
-            resp = session.get(f"{BACKEND_URL}/factory/alive", timeout=2)
-            if resp.status_code == 200:
-                data = resp.json()
-                # 如果 is_alive 为 False，说明环境已关闭，可以继续
-                if not data.get('is_alive', True):
-                    return True
-        except Exception:
-            pass
+        resp = retry_request(
+            session.get,
+            f"{BACKEND_URL}/factory/alive",
+            timeout=REQUEST_SHORT_TIMEOUT,
+            max_retries=1
+        )
+        
+        if resp and resp.status_code == 200:
+            data = resp.json()
+            # 如果 is_alive 为 False，说明环境已关闭，可以继续
+            if not data.get('is_alive', True):
+                return True
+        
         time.sleep(0.5)
+    
     # 超时也算准备好（可能有其他问题）
     return True
 
@@ -565,6 +613,11 @@ def wait_for_env_ready(timeout: int = 30) -> bool:
 def poll_jobs_completion(timeout: int = POLL_TIMEOUT) -> Tuple[bool, List[dict], float]:
     """
     轮询任务完成状态
+
+    通过检查 /factory/alive 端点来判断训练是否完成。
+    支持两种完成检测方式：
+    1. is_alive 从 True 变为 False（训练正常完成）
+    2. training_completed=True（训练快速完成，客户端没来得及看到 is_alive=True）
 
     Args:
         timeout: 超时时间（秒）
@@ -574,25 +627,86 @@ def poll_jobs_completion(timeout: int = POLL_TIMEOUT) -> Tuple[bool, List[dict],
     """
     start_time = time.time()
     makespan = 0.0
+    was_alive = False
 
+    # 开始轮询：使用 /factory/alive 判断训练是否完成
+    print("[INFO] 开始监控任务进度...")
+    last_status_log = 0
     while time.time() - start_time < timeout:
-        try:
-            resp = session.get(API_JOBS_PROGRESS, timeout=5)
-            if resp.status_code == 200:
-                data = resp.json()
-                jobs = data.get('jobs', [])
+        resp = retry_request(
+            session.get,
+            f"{BACKEND_URL}/factory/alive",
+            timeout=REQUEST_MEDIUM_TIMEOUT,
+            max_retries=2
+        )
+        
+        if resp and resp.status_code == 200:
+            data = resp.json()
+            is_alive = data.get('is_alive', False)
+            training_completed = data.get('training_completed', False)
+            makespan = float(data.get('makespan', 0))
 
-                # 检查是否所有任务都完成
-                if jobs and all(job.get('status') == 'FINISHED' for job in jobs):
-                    makespan = time.time() - start_time
-                    return True, jobs, makespan
+            # 检测训练完成：training_completed=True
+            if training_completed:
+                print(f"[INFO] 训练完成，检测到 training_completed=True (makespan: {makespan:.2f}s)")
 
-        except requests.exceptions.RequestException as e:
-            print(f"[WARN] 查询任务进度失败: {e}")
+                # 获取最终的任务状态
+                resp_jobs = retry_request(
+                    session.get,
+                    API_JOBS_PROGRESS,
+                    timeout=REQUEST_MEDIUM_TIMEOUT,
+                    max_retries=2
+                )
+                
+                if resp_jobs and resp_jobs.status_code == 200:
+                    jobs_data = resp_jobs.json().get('jobs', [])
+                    return True, jobs_data, makespan
+
+                return True, [], makespan
+
+            # 检测 is_alive 从 True 变为 False
+            if was_alive and not is_alive:
+                elapsed = time.time() - start_time
+                print(f"[INFO] 训练完成，检测到环境已结束 (elapsed: {elapsed:.2f}s)")
+
+                # 获取最终的任务状态
+                resp_jobs = retry_request(
+                    session.get,
+                    API_JOBS_PROGRESS,
+                    timeout=REQUEST_MEDIUM_TIMEOUT,
+                    max_retries=2
+                )
+                
+                if resp_jobs and resp_jobs.status_code == 200:
+                    jobs_data = resp_jobs.json().get('jobs', [])
+                    return True, jobs_data, elapsed
+
+                return True, [], elapsed
+
+            was_alive = is_alive
+
+            # 每30秒打印一次状态
+            if time.time() - last_status_log > 30:
+                elapsed = time.time() - start_time
+                print(f"[INFO] 训练进行中... ({int(elapsed)}s)")
+                last_status_log = time.time()
 
         time.sleep(POLL_INTERVAL)
 
-    return False, [], 0.0
+    # 超时，获取最终状态
+    elapsed = time.time() - start_time
+    resp_jobs = retry_request(
+        session.get,
+        API_JOBS_PROGRESS,
+        timeout=REQUEST_MEDIUM_TIMEOUT,
+        max_retries=2
+    )
+    
+    if resp_jobs and resp_jobs.status_code == 200:
+        jobs_data = resp_jobs.json().get('jobs', [])
+        return False, jobs_data, elapsed
+    
+    return False, [], elapsed
 
 
 def get_latest_training_result() -> Optional[dict]:
@@ -700,25 +814,23 @@ def switch_to_packet_factory() -> bool:
     Returns:
         bool: 切换是否成功
     """
-    try:
-        resp = session.post(
-            API_FACTORY_SWITCH,
-            json={"factory_id": "packet_factory"},
-            timeout=30
-        )
-        if resp.status_code == 200:
-            data = resp.json()
-            if data.get("status") == "ok":
-                print("[INFO] 已切换到 packet_factory")
-                return True
-            else:
-                print(f"[ERROR] 切换失败: {data}")
-                return False
+    resp = retry_request(
+        session.post,
+        API_FACTORY_SWITCH,
+        json={"factory_id": "packet_factory"},
+        timeout=REQUEST_MEDIUM_TIMEOUT
+    )
+    
+    if resp and resp.status_code == 200:
+        data = resp.json()
+        if data.get("status") == "ok":
+            print("[INFO] 已切换到 packet_factory")
+            return True
         else:
-            print(f"[ERROR] 切换请求失败: {resp.status_code} - {resp.text}")
+            print(f"[ERROR] 切换失败: {data}")
             return False
-    except Exception as e:
-        print(f"[ERROR] 切换异常: {e}")
+    else:
+        print(f"[ERROR] 切换请求失败")
         return False
 
 
@@ -751,22 +863,17 @@ def run_training_iteration(iteration: int, data_file: Path) -> Tuple[bool, float
         print("[INFO] 生成 pipeline_config...")
         yaml_content = generate_pipeline_config(parsed_data, config_name)
 
-        # 3. 每次都重新切换到 packet_factory（会清理之前的实例）
-        print("[INFO] 切换到 packet_factory...")
-        if not switch_to_packet_factory():
-            return False, 0.0
-
-        # 4. 上传配置
+        # 3. 上传配置
         print("[INFO] 上传配置...")
         if not upload_config(config_name, yaml_content):
             return False, 0.0
 
-        # 5. 启动渲染
+        # 4. 启动渲染
         print("[INFO] 启动工厂渲染...")
         if not render_factory(config_name):
             return False, 0.0
 
-        # 6. 轮询完成
+        # 5. 轮询完成
         print("[INFO] 等待训练完成...")
         success, jobs, elapsed_time = poll_jobs_completion()
 
@@ -797,9 +904,9 @@ def run_training_iteration(iteration: int, data_file: Path) -> Tuple[bool, float
         return False, 0.0
 
 
-def signal_handler(signum, frame):
-    """信号处理器：优雅地关闭后端"""
-    print("\n[INFO] 收到终止信号，正在关闭...")
+def signal_handler(sig, frame):
+    """信号处理器"""
+    print("\n[INFO] 收到信号，准备退出...")
     stop_backend()
     sys.exit(0)
 
@@ -818,13 +925,8 @@ def main():
     signal.signal(signal.SIGINT, signal_handler)
     signal.signal(signal.SIGTERM, signal_handler)
 
-    # 1. 启动后端
-    if not start_backend():
-        print("[ERROR] 后端启动失败，脚本退出")
-        sys.exit(1)
-
     try:
-        # 2. 训练循环
+        # 训练循环
         iteration = 0
         while iteration < MAX_ITERATIONS:
             # 检查是否达到阈值
@@ -837,6 +939,31 @@ def main():
             if not data_file:
                 print("[ERROR] 未找到数据文件")
                 break
+
+            # 每次迭代开始时重启后端
+            print(f"\n{'='*60}")
+            print(f"[迭代 {iteration}] 启动新的后端实例...")
+            print(f"{'='*60}")
+            
+            # 如果后端已在运行，先关闭
+            if backend_process is not None:
+                print("[INFO] 关闭上一次迭代的后端...")
+                stop_backend()
+                time.sleep(2)  # 等待端口释放
+            
+            # 启动新的后端
+            if not start_backend():
+                print("[ERROR] 后端启动失败，跳过本次迭代")
+                iteration += 1
+                continue
+
+            # 切换到 packet_factory
+            print("[INFO] 切换到 packet_factory...")
+            if not switch_to_packet_factory():
+                print("[ERROR] 工厂切换失败，跳过本次迭代")
+                stop_backend()
+                iteration += 1
+                continue
 
             # 执行训练
             success, makespan = run_training_iteration(iteration, data_file)

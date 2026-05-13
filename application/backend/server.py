@@ -352,13 +352,8 @@ async def switch_factory_proxy(factory_id: str = Body(..., embed=True)):
         # 获取工厂类型
         factory_type = factory_id
 
-        # 如果工厂类型相同，不需要切换
-        if current_factory_type == factory_type:
-            return {
-                "status": "ok",
-                "message": f"Factory already switched to {factory_id}",
-                "factory_type": factory_type,
-            }
+        # 每次都重新创建代理（确保路由正确注册）
+        # 即使工厂类型相同，也需要重新初始化
 
         # 清理之前的工厂代理实例
         if current_factory_proxy is not None:
@@ -382,12 +377,13 @@ async def switch_factory_proxy(factory_id: str = Body(..., embed=True)):
         try:
             current_factory_proxy = ProxyFactory.create(factory_type)
 
-            # todo 
             if factory_type == "packet_factory":
-                # todo fix 不成立，因为现在工厂代理的初始化是异步的，需要上传config之后才能init.不能在这里直接调用 initialize 方法
                 await current_factory_proxy.initialize()
-                
-                # 注册后端路由
+
+                # 设置动态 BackendCore 引用（路由处理器通过此引用访问当前活跃的 BackendCore）
+                RouteRegistry.set_current_backend_core(current_factory_proxy._backend_core)
+
+                # 注册后端路由（仅首次注册，后续切换仅更新 BackendCore 引用）
                 RouteRegistry.register_to_app(app)
                 print(f"✅ 已注册 {len(RouteRegistry.get_routes())} 条后端路由")
                 

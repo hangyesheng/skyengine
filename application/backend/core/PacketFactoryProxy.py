@@ -37,104 +37,111 @@ class PacketFactoryProxy(BaseFactoryProxy):
         """注册后端路由到注册表"""
         if self._routes_registered or self._api_handler is None:
             return
-        
+
         handler = self._api_handler
-        
+
         # ========== 工厂控制路由 ==========
         @RouteRegistry.register_route("/factory/alive", method="GET")
         async def api_factory_alive():
-            is_alive = self._backend_core.is_factory_alive()
-            return JSONResponse({"is_alive": is_alive})
-        
+            core = RouteRegistry._current_backend_core
+            if core is None:
+                return JSONResponse({"is_alive": False, "training_completed": False, "makespan": 0})
+            is_alive = core.is_factory_alive()
+            return JSONResponse({
+                "is_alive": is_alive,
+                "training_completed": core._training_completed,
+                "makespan": core._last_makespan
+            })
+
         @RouteRegistry.register_route("/factory/start", method="POST")
         async def api_factory_start():
-            self._backend_core.factory_start()
+            RouteRegistry._current_backend_core.factory_start()
             return JSONResponse({"action": "start"})
-        
+
         @RouteRegistry.register_route("/factory/pause", method="POST")
         async def api_factory_pause():
-            self._backend_core.factory_pause()
+            RouteRegistry._current_backend_core.factory_pause()
             return JSONResponse({"action": "pause"})
-        
+
         @RouteRegistry.register_route("/factory/reset", method="POST")
         async def api_factory_reset():
-            self._backend_core.factory_reset()
+            RouteRegistry._current_backend_core.factory_reset()
             return JSONResponse({"action": "reset"})
-        
+
         @RouteRegistry.register_route("/factory/speed", method="POST")
         async def api_factory_speed(data: dict):
             speedLevel = data.get("speedLevel", 3)
-            self._backend_core.change_factory_speed(speedLevel)
+            RouteRegistry._current_backend_core.change_factory_speed(speedLevel)
             return JSONResponse({
-                'state': 'success', 
+                'state': 'success',
                 'msg': f'change factory speed={speedLevel} success'
             })
-        
+
         # ========== AGV 控制路由 ==========
         @RouteRegistry.register_route("/agvs", method="GET")
         async def api_agvs():
-            agv_list = self._backend_core.get_agvs()
+            agv_list = RouteRegistry._current_backend_core.get_agvs()
             return JSONResponse({"agvs": agv_list})
-        
+
         @RouteRegistry.register_route("/agv/pause/{agvId}", method="POST")
         async def api_agv_pause(agvId: int):
-            self._backend_core.pause_agv(int(agvId))
+            RouteRegistry._current_backend_core.pause_agv(int(agvId))
             return JSONResponse({
-                'state': 'success', 
+                'state': 'success',
                 'msg': f'pause agv id={agvId} success'
             })
-        
+
         @RouteRegistry.register_route("/agv/resume/{agvId}", method="POST")
         async def api_agv_resume(agvId: int):
-            self._backend_core.resume_agv(int(agvId))
+            RouteRegistry._current_backend_core.resume_agv(int(agvId))
             return JSONResponse({
-                'state': 'success', 
+                'state': 'success',
                 'msg': f'resume agv id={agvId} success'
             })
-        
+
         # ========== 机器控制路由 ==========
         @RouteRegistry.register_route("/machines", method="GET")
         async def api_machines():
-            machine_list = self._backend_core.get_machines()
+            machine_list = RouteRegistry._current_backend_core.get_machines()
             return JSONResponse({"machines": machine_list})
-        
+
         @RouteRegistry.register_route("/machine/pause/{machineId}", method="POST")
         async def api_machine_pause(machineId: int):
-            self._backend_core.pause_machine(int(machineId))
+            RouteRegistry._current_backend_core.pause_machine(int(machineId))
             return JSONResponse({"machineId": machineId})
-        
+
         @RouteRegistry.register_route("/machine/resume/{machineId}", method="POST")
         async def api_machine_resume(machineId: int):
-            self._backend_core.resume_machine(int(machineId))
+            RouteRegistry._current_backend_core.resume_machine(int(machineId))
             return JSONResponse({"machineId": machineId})
-        
+
         # ========== Job 控制路由 ==========
         @RouteRegistry.register_route("/jobs", method="GET")
         async def api_jobs():
-            job_list = self._backend_core.get_job_templates()
+            job_list = RouteRegistry._current_backend_core.get_job_templates()
             return JSONResponse({"jobs": job_list})
-        
+
         @RouteRegistry.register_route("/job/add/{jobId}", method="POST")
         async def api_job_add(jobId: int):
-            self._backend_core.add_job(int(jobId))
+            RouteRegistry._current_backend_core.add_job(int(jobId))
             return JSONResponse({"jobId": jobId})
-        
+
         @RouteRegistry.register_route("/jobs/progress", method="GET")
         async def api_jobs_progress():
-            job_progress_list = self._backend_core.get_jobs_progress()
+            job_progress_list = RouteRegistry._current_backend_core.get_jobs_progress()
             return JSONResponse({"jobs": job_progress_list})
 
         # ========== 甘特图数据路由 ==========
         @RouteRegistry.register_route("/gantt/agv", method="GET")
         async def api_gantt_agv():
             """获取AGV运输甘特图数据"""
-            gantt_data = self._backend_core.get_gantt_agv_data()
+            gantt_data = RouteRegistry._current_backend_core.get_gantt_agv_data()
             return JSONResponse(gantt_data)
-        
+
         @RouteRegistry.register_route("/gantt/machine", method="GET")
         async def api_gantt_machine():
             """获取Machine加工甘特图数据"""
-            gantt_data = self._backend_core.get_gantt_machine_data()
+            gantt_data = RouteRegistry._current_backend_core.get_gantt_machine_data()
             return JSONResponse(gantt_data)
 
         @RouteRegistry.register_route("/yaml/upload", method="POST")
@@ -150,9 +157,9 @@ class PacketFactoryProxy(BaseFactoryProxy):
             yaml_content = yaml.safe_load(io.StringIO(content_str))
             LOGGER.info(f"Uploaded config: {config_name}, content: {yaml_content}")
             # 将配置保存到 BackendCore 的内存中
-            self._backend_core.save_config_to_memory(config_name, yaml_content)
+            RouteRegistry._current_backend_core.save_config_to_memory(config_name, yaml_content)
             return JSONResponse({"state": "success", "msg": f"Config {config_name} uploaded successfully"})
-        
+
         # ========== 配置上传路由 ==========
         @RouteRegistry.register_route("/standard/get", method="GET")
         async def api_standard_get():
@@ -162,7 +169,7 @@ class PacketFactoryProxy(BaseFactoryProxy):
                 filename="pipeline_config.yaml",
                 media_type="application/x-yaml"
             )
-        
+
         # ========== 日志下载路由 ==========
         @RouteRegistry.register_route("/log/download", method="POST")
         async def api_log_download(request:Request):
@@ -177,33 +184,35 @@ class PacketFactoryProxy(BaseFactoryProxy):
                 log_path = file_service.get_log(file_service.get_system_log_dir())
                 file_name = log_path.split("\\")[-1]
             return FileResponse(
-                path=log_path, 
-                filename=file_name, 
+                path=log_path,
+                filename=file_name,
                 media_type="text/plain"
             )
-        
+
         # ========== 地图路由 ==========
         @RouteRegistry.register_route("/map/update", method="GET")
         async def api_map_update():
-            image_bytes = self._backend_core.get_map_current()
+            image_bytes = RouteRegistry._current_backend_core.get_map_current()
             if image_bytes == b'':
-                from executor.packet_factory.logger.logger import BACKEND_LOGGER as LOGGER
                 LOGGER.warning("No Image Available.")
             return StreamingResponse(image_bytes, media_type="image/png")
-        
+
         @RouteRegistry.register_route("/map/render", method="POST")
         async def api_map_render(request: Request):
             body = await request.json()
-            self._backend_core.render_map(body.get("target_factory"))
+            # 使用 run_in_executor 避免阻塞事件循环
+            import asyncio
+            loop = asyncio.get_event_loop()
+            await loop.run_in_executor(None, RouteRegistry._current_backend_core.render_map, body.get("target_factory"))
             return JSONResponse({"success": True})
-        
+
         @RouteRegistry.register_route("/factory/list", method="GET")
         async def api_factory_list():
             # 从内存中读取配置列表
-            config_list = self._backend_core.get_all_config_names()
+            config_list = RouteRegistry._current_backend_core.get_all_config_names()
             factory_list = [{"id": config_name} for config_name in config_list]
             return JSONResponse({"factory_list": factory_list, "success": True})
-        
+
         self._routes_registered = True
         LOGGER.info(f"✅ PacketFactoryProxy 路由已注册，共 {len(RouteRegistry.get_routes())} 条")
     
@@ -234,8 +243,12 @@ class PacketFactoryProxy(BaseFactoryProxy):
 
     async def cleanup(self):
         """清理工厂"""
-        # todo: 停止后端核心线程池等资源
-        pass
+        if self._backend_core is not None:
+            LOGGER.info("[Cleanup] 正在关闭 BackendCore...")
+            self._backend_core.shutdown(wait=False)
+            self._backend_core = None
+            self._api_handler = None
+            LOGGER.info("[Cleanup] BackendCore 已关闭")
     
     async def start(self):
         """启动工厂"""
