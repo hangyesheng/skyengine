@@ -18,13 +18,13 @@ config:
     #   由配置文件生成
 
     agent:
-      agent_name: packet_factory.ORToolsBatchAgent
-      name: ORToolsBatchAgent
+      agent_name: packet_factory.DualDRLAgent
+      name: DualDRLAgent
       id: 1
       # agent 模式配置
-      ui_mode: frontend      # frontend | backend（是否有可视化界面）
-      task_mode: inference  # training | inference（训练还是推理，优化模式只支持inference）
-      model_path: null  # 模型文件路径
+      ui_mode: backend      # frontend | backend（是否有可视化界面）
+      task_mode: training  # training | inference（训练还是推理，优化模式只支持inference）
+      model_path: ./training_logs/models/DualDRLAgent/agent_model.json  # 模型文件路径
       time_limit_seconds: 30  # OR-Tools求解时间限制（秒）
       fallback_enabled: true  # 求解失败时是否回退到贪心算法
       
