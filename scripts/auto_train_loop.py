@@ -10,9 +10,19 @@
 6. 重复 2-5 直到达到结束条件（累积 reward 达到阈值）
 
 用法：
-    uv run python scripts/auto_train_loop.py [--log-level DEBUG|INFO|WARNING|ERROR] [--backend-log-level DEBUG|INFO|WARNING|ERROR] [--reward-threshold VALUE] [--max-iterations VALUE]
-"""
+    uv run python scripts/auto_train_loop.py [--log-level DEBUG|INFO|WARNING|ERROR] [--backend-log-level DEBUG|INFO|WARNING|ERROR] [--reward-threshold VALUE] [--max-iterations VALUE] [--port PORT]
 
+示例：
+    # 使用默认端口 8000
+    python scripts/auto_train_loop.py
+    
+    # 指定自定义端口
+    python scripts/auto_train_loop.py --port 8001
+    python scripts/auto_train_loop.py --port 9000 --log-level INFO
+    
+    # 组合多个参数
+    python scripts/auto_train_loop.py --port 8080 --reward-threshold 500 --max-iterations 100
+"""
 import subprocess
 import random
 import time
@@ -37,8 +47,8 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 
 # === 配置 ===
 BACKEND_HOST = "127.0.0.1"
-BACKEND_PORT = 8000
-BACKEND_URL = f"http://{BACKEND_HOST}:{BACKEND_PORT}"
+BACKEND_PORT = None  # 动态端口，可通过命令行指定
+BACKEND_URL = None  # 将在 parse_args() 后初始化
 DATA_DIR = Path(__file__).parent.parent / "dataset" / "agv-instances"
 TRAINING_LOGS = Path(__file__).parent.parent / "training_logs"
 RESULTS_DIR = TRAINING_LOGS / "results"
@@ -116,6 +126,8 @@ def parse_args():
   python scripts/auto_train_loop.py --log-level WARNING --backend-log-level ERROR
   python scripts/auto_train_loop.py --log-level WARNING --reward-threshold 500
   python scripts/auto_train_loop.py --max-iterations 100 --poll-interval 5
+  python scripts/auto_train_loop.py --port 8001
+  python scripts/auto_train_loop.py --port 9000 --log-level INFO
         """
     )
     
@@ -161,6 +173,13 @@ def parse_args():
         type=int,
         default=POLL_TIMEOUT,
         help=f'单次训练超时（秒）(默认: {POLL_TIMEOUT})'
+    )
+    
+    parser.add_argument(
+        '--port',
+        type=int,
+        default=8000,
+        help='后端服务端口号 (默认: 8000)'
     )
     
     return parser.parse_args()
@@ -1030,23 +1049,34 @@ def signal_handler(sig, frame):
 
 def main():
     """主函数"""
-    global backend_process
+    global backend_process, BACKEND_PORT, BACKEND_URL
 
     # 解析命令行参数
     args = parse_args()
     
     # 更新全局配置
     global REWARD_THRESHOLD, MAX_ITERATIONS, POLL_INTERVAL, POLL_TIMEOUT
+    BACKEND_PORT = args.port
+    BACKEND_URL = f"http://{BACKEND_HOST}:{BACKEND_PORT}"
     REWARD_THRESHOLD = args.reward_threshold
     MAX_ITERATIONS = args.max_iterations
     POLL_INTERVAL = args.poll_interval
     POLL_TIMEOUT = args.poll_timeout
+    
+    # 重新计算 API 端点（因为 BACKEND_URL 已更新）
+    global API_FACTORY_SWITCH, API_HEALTH, API_YAML_UPLOAD, API_MAP_RENDER, API_JOBS_PROGRESS
+    API_FACTORY_SWITCH = f"{BACKEND_URL}/factory/control/switch"
+    API_HEALTH = f"{BACKEND_URL}/health"
+    API_YAML_UPLOAD = f"{BACKEND_URL}/{{config_name}}/yaml/upload"
+    API_MAP_RENDER = f"{BACKEND_URL}/map/render"
+    API_JOBS_PROGRESS = f"{BACKEND_URL}/jobs/progress"
     
     # 设置前端脚本日志级别
     setup_logging(args.log_level)
 
     logger.info("="*60)
     logger.info("自动化训练循环脚本")
+    logger.info(f"后端端口: {BACKEND_PORT}")
     logger.info(f"Reward 阈值: {REWARD_THRESHOLD:.2f}")
     logger.info(f"最大迭代次数: {MAX_ITERATIONS}")
     logger.info(f"前端脚本日志级别: {args.log_level.upper()}")
