@@ -6,7 +6,7 @@ import executor.packet_factory.logger.system_logs as system_logs
 import executor.packet_factory.logger.backend_logs as backend_logs
 
 class Logger:
-    def __init__(self, log_path, name):
+    def __init__(self, log_path, name, log_level=None):
         # 定义时间戳格式（年-月-日_时-分）
         timestamp_format = "%Y%m%d-%H%M%S"  # 包含秒
         # 获取当前时间并格式化为字符串
@@ -33,7 +33,11 @@ class Logger:
         self.logger.addHandler(file_handler)
         # self.logger.addHandler(console_handler)
 
-        self.logLevel = 'INFO'
+        # 从环境变量或参数获取日志级别
+        if log_level is None:
+            log_level = os.environ.get('BACKEND_LOG_LEVEL', 'INFO')
+        
+        self.logLevel = log_level.upper()
         self.logger.setLevel(level=self.logLevel)
         self.logger.propagate = False
 
