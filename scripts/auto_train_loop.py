@@ -10,7 +10,7 @@
 6. 重复 2-5 直到达到结束条件（累积 reward 达到阈值）
 
 用法：
-    uv run python scripts/auto_train_loop.py
+    uv run python scripts/auto_train_loop.py [--log-level DEBUG|INFO|WARNING|ERROR] [--backend-log-level DEBUG|INFO|WARNING|ERROR] [--reward-threshold VALUE] [--max-iterations VALUE]
 """
 
 import subprocess
@@ -21,6 +21,8 @@ import json
 import sys
 import signal
 import os
+import argparse
+import logging
 from pathlib import Path
 from typing import Optional, Tuple, List, Dict
 import requests
@@ -65,6 +67,103 @@ API_JOBS_PROGRESS = f"{BACKEND_URL}/jobs/progress"
 backend_process: Optional[subprocess.Popen] = None
 # 标记是否已经初始化过后端（用于判断是否需要重启）
 _backend_initialized: bool = False
+# 日志记录器
+logger = logging.getLogger("auto_train_loop")
+
+
+def setup_logging(log_level: str = "INFO"):
+    """
+    配置日志系统
+    
+    Args:
+        log_level: 日志级别 (DEBUG, INFO, WARNING, ERROR)
+    """
+    # 映射字符串到 logging 常量
+    level_map = {
+        "DEBUG": logging.DEBUG,
+        "INFO": logging.INFO,
+        "WARNING": logging.WARNING,
+        "ERROR": logging.ERROR
+    }
+    
+    level = level_map.get(log_level.upper(), logging.INFO)
+    
+    # 配置根日志记录器
+    logging.basicConfig(
+        level=level,
+        format='[%(asctime)s] [%(levelname)s] %(message)s',
+        datefmt='%Y-%m-%d %H:%M:%S'
+    )
+    
+    logger.setLevel(level)
+    logger.info(f"日志级别已设置为: {log_level.upper()}")
+
+
+def parse_args():
+    """
+    解析命令行参数
+    
+    Returns:
+        argparse.Namespace: 解析后的参数
+    """
+    parser = argparse.ArgumentParser(
+        description="自动化训练循环脚本",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog="""
+示例:
+  python scripts/auto_train_loop.py
+  python scripts/auto_train_loop.py --log-level DEBUG
+  python scripts/auto_train_loop.py --log-level WARNING --backend-log-level ERROR
+  python scripts/auto_train_loop.py --log-level WARNING --reward-threshold 500
+  python scripts/auto_train_loop.py --max-iterations 100 --poll-interval 5
+        """
+    )
+    
+    parser.add_argument(
+        '--log-level',
+        type=str,
+        default='INFO',
+        choices=['DEBUG', 'INFO', 'WARNING', 'ERROR'],
+        help='前端脚本日志级别 (默认: INFO)'
+    )
+    
+    parser.add_argument(
+        '--backend-log-level',
+        type=str,
+        default='WARNING',
+        choices=['DEBUG', 'INFO', 'WARNING', 'ERROR'],
+        help='后端服务日志级别 (默认: INFO)'
+    )
+    
+    parser.add_argument(
+        '--reward-threshold',
+        type=float,
+        default=REWARD_THRESHOLD,
+        help=f'累积 reward 阈值 (默认: {REWARD_THRESHOLD})'
+    )
+    
+    parser.add_argument(
+        '--max-iterations',
+        type=int,
+        default=MAX_ITERATIONS,
+        help=f'最大迭代次数 (默认: {MAX_ITERATIONS})'
+    )
+    
+    parser.add_argument(
+        '--poll-interval',
+        type=int,
+        default=POLL_INTERVAL,
+        help=f'轮询间隔（秒）(默认: {POLL_INTERVAL})'
+    )
+    
+    parser.add_argument(
+        '--poll-timeout',
+        type=int,
+        default=POLL_TIMEOUT,
+        help=f'单次训练超时（秒）(默认: {POLL_TIMEOUT})'
+    )
+    
+    return parser.parse_args()
 
 
 def retry_request(func, *args, max_retries: int = REQUEST_MAX_RETRIES, **kwargs) -> Optional[requests.Response]:
@@ -87,18 +186,18 @@ def retry_request(func, *args, max_retries: int = REQUEST_MAX_RETRIES, **kwargs)
             if resp.status_code == 200:
                 return resp
             else:
-                print(f"[WARN] 请求失败 (尝试 {attempt}/{max_retries}): HTTP {resp.status_code}")
+                logger.warning(f"请求失败 (尝试 {attempt}/{max_retries}): HTTP {resp.status_code}")
                 if attempt < max_retries:
                     time.sleep(REQUEST_RETRY_DELAY)
                 continue
         except requests.exceptions.RequestException as e:
             last_error = e
-            print(f"[WARN] 请求异常 (尝试 {attempt}/{max_retries}): {e}")
+            logger.warning(f"请求异常 (尝试 {attempt}/{max_retries}): {e}")
             if attempt < max_retries:
                 time.sleep(REQUEST_RETRY_DELAY)
             continue
     
-    print(f"[ERROR] 请求失败，已重试 {max_retries} 次")
+    logger.error(f"请求失败，已重试 {max_retries} 次")
     return None
 
 
@@ -112,7 +211,7 @@ def reset_factory_state() -> bool:
     Returns:
         bool: 重置是否成功
     """
-    print("[INFO] 重置工厂状态...")
+    logger.info("重置工厂状态...")
     resp = retry_request(
         session.post,
         f"{BACKEND_URL}/factory/control/reset",
@@ -120,13 +219,13 @@ def reset_factory_state() -> bool:
     )
     
     if resp and resp.status_code == 200:
-        print("[INFO] 工厂状态已重置")
+        logger.info("工厂状态已重置")
         return True
     else:
-        print(f"[WARN] 重置请求失败")
+        logger.warning("重置请求失败")
 
     # 重置失败，重启后端
-    print("[INFO] 重置失败，尝试重启后端...")
+    logger.info("重置失败，尝试重启后端...")
     return restart_backend()
 
 
@@ -139,14 +238,14 @@ def restart_backend() -> bool:
     """
     global backend_process
 
-    print("[INFO] 重启后端服务...")
+    logger.info("重启后端服务...")
     stop_backend()
 
     if not start_backend():
         return False
 
     # 重新初始化 packet_factory
-    print("[INFO] 重新初始化 packet_factory...")
+    logger.info("重新初始化 packet_factory...")
     resp = retry_request(
         session.post,
         API_FACTORY_SWITCH,
@@ -157,10 +256,10 @@ def restart_backend() -> bool:
     if resp and resp.status_code == 200:
         data = resp.json()
         if data.get("status") == "ok":
-            print("[INFO] packet_factory 重新初始化完成")
+            logger.info("packet_factory 重新初始化完成")
             return True
     
-    print(f"[ERROR] 重新初始化失败")
+    logger.error("重新初始化失败")
     return False
 
 
@@ -415,9 +514,12 @@ def generate_pipeline_config(parsed_data: dict, config_name: str) -> str:
     return yaml.dump(pipeline_config, allow_unicode=True, sort_keys=False)
 
 
-def start_backend() -> bool:
+def start_backend(backend_log_level: str = "INFO") -> bool:
     """
     启动后端服务（后台模式）
+
+    Args:
+        backend_log_level: 后端日志级别 (DEBUG, INFO, WARNING, ERROR)
 
     Returns:
         bool: 启动是否成功
@@ -427,10 +529,18 @@ def start_backend() -> bool:
     backend_dir = Path(__file__).parent.parent / "application" / "backend"
     project_root = backend_dir.parent.parent
 
-    print("[INFO] 启动后端服务...")
-    print(f"[INFO] 工作目录: {project_root}")
+    logger.info("启动后端服务...")
+    logger.debug(f"工作目录: {project_root}")
+    logger.info(f"后端日志级别: {backend_log_level.upper()}")
 
     try:
+        # 设置环境变量，传递给后端进程
+        env = os.environ.copy()
+        env['BACKEND_LOG_LEVEL'] = backend_log_level.upper()
+        
+        # 确保 PYTHONPATH 包含项目根目录
+        env['PYTHONPATH'] = str(project_root) + os.pathsep + env.get('PYTHONPATH', '')
+
         # 启动 uvicorn，从项目根目录运行
         backend_process = subprocess.Popen(
             [
@@ -443,28 +553,29 @@ def start_backend() -> bool:
             cwd=str(project_root),
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
-            text=True
+            text=True,
+            env=env
         )
 
         # 等待后端就绪，最多等待60秒
-        print("[INFO] 等待后端就绪...")
+        logger.info("等待后端就绪...")
         if wait_for_backend(timeout=60):
-            print("[INFO] 后端服务已启动 ✅")
+            logger.info("后端服务已启动 ✅")
             return True
         else:
             # 读取错误信息
-            print("[ERROR] 后端服务启动超时 ❌")
+            logger.error("后端服务启动超时 ❌")
             # 检查进程状态
             if backend_process.poll() is not None:
                 _, stderr = backend_process.communicate(timeout=5)
-                print(f"[ERROR] 后端进程已退出，stderr: {stderr[:500] if stderr else 'N/A'}")
+                logger.error(f"后端进程已退出，stderr: {stderr[:500] if stderr else 'N/A'}")
             else:
-                print(f"[ERROR] 后端进程仍在运行但未响应")
+                logger.error("后端进程仍在运行但未响应")
             stop_backend()
             return False
 
     except Exception as e:
-        print(f"[ERROR] 启动后端失败: {e}")
+        logger.error(f"启动后端失败: {e}")
         return False
 
 
@@ -500,7 +611,7 @@ def stop_backend():
     global backend_process
 
     if backend_process:
-        print("[INFO] 关闭后端服务...")
+        logger.info("关闭后端服务...")
         backend_process.terminate()
         try:
             backend_process.wait(timeout=10)
@@ -508,7 +619,7 @@ def stop_backend():
             backend_process.kill()
             backend_process.wait()
         backend_process = None
-        print("[INFO] 后端服务已关闭 ✅")
+        logger.info("后端服务已关闭 ✅")
 
 
 def upload_config(config_name: str, yaml_content: str) -> bool:
@@ -532,10 +643,10 @@ def upload_config(config_name: str, yaml_content: str) -> bool:
     )
     
     if resp and resp.status_code == 200:
-        print(f"[INFO] 配置 {config_name} 上传成功")
+        logger.info(f"配置 {config_name} 上传成功")
         return True
     else:
-        print(f"[ERROR] 配置上传失败")
+        logger.error("配置上传失败")
         return False
 
 
@@ -564,9 +675,9 @@ def render_factory(config_name: str) -> bool:
         )
         
         if resp and resp.status_code == 200:
-            print(f"[INFO] 工厂 {config_name} 渲染已启动")
+            logger.info(f"工厂 {config_name} 渲染已启动")
         else:
-            print(f"[ERROR] 工厂渲染启动失败")
+            logger.error("工厂渲染启动失败")
 
     try:
         # 在后台线程中发送请求，避免阻塞
@@ -574,7 +685,7 @@ def render_factory(config_name: str) -> bool:
         thread.start()
         return True
     except Exception as e:
-        print(f"[ERROR] 启动渲染线程失败: {e}")
+        logger.error(f"启动渲染线程失败: {e}")
         return False
 
 
@@ -630,7 +741,7 @@ def poll_jobs_completion(timeout: int = POLL_TIMEOUT) -> Tuple[bool, List[dict],
     was_alive = False
 
     # 开始轮询：使用 /factory/alive 判断训练是否完成
-    print("[INFO] 开始监控任务进度...")
+    logger.info("开始监控任务进度...")
     last_status_log = 0
     while time.time() - start_time < timeout:
         resp = retry_request(
@@ -648,7 +759,7 @@ def poll_jobs_completion(timeout: int = POLL_TIMEOUT) -> Tuple[bool, List[dict],
 
             # 检测训练完成：training_completed=True
             if training_completed:
-                print(f"[INFO] 训练完成，检测到 training_completed=True (makespan: {makespan:.2f}s)")
+                logger.info(f"训练完成，检测到 training_completed=True (makespan: {makespan:.2f}s)")
 
                 # 获取最终的任务状态
                 resp_jobs = retry_request(
@@ -667,7 +778,7 @@ def poll_jobs_completion(timeout: int = POLL_TIMEOUT) -> Tuple[bool, List[dict],
             # 检测 is_alive 从 True 变为 False
             if was_alive and not is_alive:
                 elapsed = time.time() - start_time
-                print(f"[INFO] 训练完成，检测到环境已结束 (elapsed: {elapsed:.2f}s)")
+                logger.info(f"训练完成，检测到环境已结束 (elapsed: {elapsed:.2f}s)")
 
                 # 获取最终的任务状态
                 resp_jobs = retry_request(
@@ -688,7 +799,7 @@ def poll_jobs_completion(timeout: int = POLL_TIMEOUT) -> Tuple[bool, List[dict],
             # 每30秒打印一次状态
             if time.time() - last_status_log > 30:
                 elapsed = time.time() - start_time
-                print(f"[INFO] 训练进行中... ({int(elapsed)}s)")
+                logger.info(f"训练进行中... ({int(elapsed)}s)")
                 last_status_log = time.time()
 
         time.sleep(POLL_INTERVAL)
@@ -790,7 +901,7 @@ def check_reward_threshold() -> bool:
         bool: 是否达到阈值
     """
     cumulative_reward = get_cumulative_reward()
-    print(f"[INFO] 当前累积 reward: {cumulative_reward:.2f}, 阈值: {REWARD_THRESHOLD:.2f}")
+    logger.info(f"当前累积 reward: {cumulative_reward:.2f}, 阈值: {REWARD_THRESHOLD:.2f}")
     return cumulative_reward >= REWARD_THRESHOLD
 
 
@@ -806,7 +917,7 @@ def select_random_data_file() -> Optional[Path]:
         selected_file = random.choice(data_files)
         # 显示相对于 DATA_DIR 的路径，方便用户识别
         relative_path = selected_file.relative_to(DATA_DIR)
-        print(f"[INFO] 从 {len(data_files)} 个文件中随机选择: {relative_path}")
+        logger.info(f"从 {len(data_files)} 个文件中随机选择: {relative_path}")
         return selected_file
     return None
 
@@ -828,13 +939,13 @@ def switch_to_packet_factory() -> bool:
     if resp and resp.status_code == 200:
         data = resp.json()
         if data.get("status") == "ok":
-            print("[INFO] 已切换到 packet_factory")
+            logger.info("已切换到 packet_factory")
             return True
         else:
-            print(f"[ERROR] 切换失败: {data}")
+            logger.error(f"切换失败: {data}")
             return False
     else:
-        print(f"[ERROR] 切换请求失败")
+        logger.error("切换请求失败")
         return False
 
 
@@ -853,34 +964,34 @@ def run_training_iteration(iteration: int, data_file: Path) -> Tuple[bool, float
     relative_path = data_file.relative_to(DATA_DIR)
     config_name = f"auto_train_{iteration}_{data_file.stem}"
 
-    print(f"\n{'='*60}")
-    print(f"[迭代 {iteration}] 使用数据文件: {relative_path}")
-    print(f"{'='*60}")
+    logger.info("\n" + "="*60)
+    logger.info(f"[迭代 {iteration}] 使用数据文件: {relative_path}")
+    logger.info(f"{'='*60}")
 
     try:
         # 1. 解析数据文件
-        print("[INFO] 解析数据文件...")
+        logger.info("[INFO] 解析数据文件...")
         parsed_data = parse_agv_instance(data_file)
-        print(f"[INFO] 解析完成: {parsed_data['job_count']} jobs, "
+        logger.info(f"[INFO] 解析完成: {parsed_data['job_count']} jobs, "
               f"{parsed_data['machine_count']} machines, "
               f"{parsed_data['agv_count']} AGVs")
 
         # 2. 生成配置
-        print("[INFO] 生成 pipeline_config...")
+        logger.info("[INFO] 生成 pipeline_config...")
         yaml_content = generate_pipeline_config(parsed_data, config_name)
 
         # 3. 上传配置
-        print("[INFO] 上传配置...")
+        logger.info("[INFO] 上传配置...")
         if not upload_config(config_name, yaml_content):
             return False, 0.0
 
         # 4. 启动渲染
-        print("[INFO] 启动工厂渲染...")
+        logger.info("[INFO] 启动工厂渲染...")
         if not render_factory(config_name):
             return False, 0.0
 
         # 5. 轮询完成
-        print("[INFO] 等待训练完成...")
+        logger.info("[INFO] 等待训练完成...")
         success, jobs, elapsed_time = poll_jobs_completion()
 
         # 获取实际的 makespan（从训练结果文件）
@@ -888,23 +999,23 @@ def run_training_iteration(iteration: int, data_file: Path) -> Tuple[bool, float
 
         if success:
             if actual_makespan > 0:
-                print(f"[INFO] 训练完成! Makespan: {actual_makespan:.2f}s")
+                logger.info(f"[INFO] 训练完成! Makespan: {actual_makespan:.2f}s")
             else:
-                print(f"[INFO] 训练完成! Makespan: {elapsed_time:.2f}s (估计)")
+                logger.info(f"[INFO] 训练完成! Makespan: {elapsed_time:.2f}s (估计)")
         else:
             if actual_makespan > 0:
-                print(f"[WARN] 训练超时! Makespan: {actual_makespan:.2f}s")
+                logger.warning(f"[WARN] 训练超时! Makespan: {actual_makespan:.2f}s")
             else:
-                print(f"[WARN] 训练超时! Makespan: {elapsed_time:.2f}s (估计)")
+                logger.warning(f"[WARN] 训练超时! Makespan: {elapsed_time:.2f}s (估计)")
 
         # 训练完成后，等待一段时间让线程完全结束
-        print("[INFO] 等待线程完全结束...")
+        logger.info("[INFO] 等待线程完全结束...")
         time.sleep(3)
 
         return success, actual_makespan if actual_makespan > 0 else elapsed_time
 
     except Exception as e:
-        print(f"[ERROR] 训练迭代失败: {e}")
+        logger.error(f"[ERROR] 训练迭代失败: {e}")
         import traceback
         traceback.print_exc()
         return False, 0.0
@@ -912,7 +1023,7 @@ def run_training_iteration(iteration: int, data_file: Path) -> Tuple[bool, float
 
 def signal_handler(sig, frame):
     """信号处理器"""
-    print("\n[INFO] 收到信号，准备退出...")
+    logger.info("\n收到信号，准备退出...")
     stop_backend()
     sys.exit(0)
 
@@ -921,11 +1032,26 @@ def main():
     """主函数"""
     global backend_process
 
-    print("="*60)
-    print("自动化训练循环脚本")
-    print(f"Reward 阈值: {REWARD_THRESHOLD:.2f}")
-    print(f"最大迭代次数: {MAX_ITERATIONS}")
-    print("="*60)
+    # 解析命令行参数
+    args = parse_args()
+    
+    # 更新全局配置
+    global REWARD_THRESHOLD, MAX_ITERATIONS, POLL_INTERVAL, POLL_TIMEOUT
+    REWARD_THRESHOLD = args.reward_threshold
+    MAX_ITERATIONS = args.max_iterations
+    POLL_INTERVAL = args.poll_interval
+    POLL_TIMEOUT = args.poll_timeout
+    
+    # 设置前端脚本日志级别
+    setup_logging(args.log_level)
+
+    logger.info("="*60)
+    logger.info("自动化训练循环脚本")
+    logger.info(f"Reward 阈值: {REWARD_THRESHOLD:.2f}")
+    logger.info(f"最大迭代次数: {MAX_ITERATIONS}")
+    logger.info(f"前端脚本日志级别: {args.log_level.upper()}")
+    logger.info(f"后端服务日志级别: {args.backend_log_level.upper()}")
+    logger.info("="*60)
 
     # 注册信号处理器
     signal.signal(signal.SIGINT, signal_handler)
@@ -937,36 +1063,36 @@ def main():
         while iteration < MAX_ITERATIONS:
             # 检查是否达到阈值
             if iteration > 0 and check_reward_threshold():
-                print(f"\n[INFO] === 达到累积 reward 阈值，停止训练 ===")
+                logger.info("\n=== 达到累积 reward 阈值，停止训练 ===")
                 break
 
             # 随机选择数据文件
             data_file = select_random_data_file()
             if not data_file:
-                print("[ERROR] 未找到数据文件")
+                logger.error("未找到数据文件")
                 break
 
             # 每次迭代开始时重启后端
-            print(f"\n{'='*60}")
-            print(f"[迭代 {iteration}] 启动新的后端实例...")
-            print(f"{'='*60}")
+            logger.info("="*60)
+            logger.info(f"[迭代 {iteration}] 启动新的后端实例...")
+            logger.info("="*60)
             
             # 如果后端已在运行，先关闭
             if backend_process is not None:
-                print("[INFO] 关闭上一次迭代的后端...")
+                logger.info("关闭上一次迭代的后端...")
                 stop_backend()
                 time.sleep(2)  # 等待端口释放
             
-            # 启动新的后端
-            if not start_backend():
-                print("[ERROR] 后端启动失败，跳过本次迭代")
+            # 启动新的后端（传递后端日志级别）
+            if not start_backend(backend_log_level=args.backend_log_level):
+                logger.error("后端启动失败，跳过本次迭代")
                 iteration += 1
                 continue
 
             # 切换到 packet_factory
-            print("[INFO] 切换到 packet_factory...")
+            logger.info("切换到 packet_factory...")
             if not switch_to_packet_factory():
-                print("[ERROR] 工厂切换失败，跳过本次迭代")
+                logger.error("工厂切换失败，跳过本次迭代")
                 stop_backend()
                 iteration += 1
                 continue
@@ -979,22 +1105,22 @@ def main():
             time.sleep(2)
 
         if iteration >= MAX_ITERATIONS:
-            print(f"\n[WARN] 达到最大迭代次数 {MAX_ITERATIONS}")
+            logger.warning(f"\n达到最大迭代次数 {MAX_ITERATIONS}")
 
         # 打印最终统计
         cumulative_reward = get_cumulative_reward()
-        print("\n" + "="*60)
-        print("训练完成!")
-        print(f"总迭代次数: {iteration}")
-        print(f"累积 reward: {cumulative_reward:.2f}")
-        print("="*60)
+        logger.info("\n" + "="*60)
+        logger.info("训练完成!")
+        logger.info(f"总迭代次数: {iteration}")
+        logger.info(f"累积 reward: {cumulative_reward:.2f}")
+        logger.info("="*60)
 
     except KeyboardInterrupt:
-        print("\n[INFO] 收到键盘中断信号")
+        logger.info("\n收到键盘中断信号")
     finally:
         # 确保后端被关闭
         stop_backend()
-        print("="*60)
+        logger.info("="*60)
 
 
 if __name__ == "__main__":
