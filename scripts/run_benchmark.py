@@ -11,9 +11,14 @@
     uv run python scripts/run_benchmark.py --agents ORToolsAgent --families kacem --runs-opt 1
     uv run python scripts/run_benchmark.py --agents DualDRLAgent ORToolsAgent ORToolsBatchAgent
     uv run python scripts/run_benchmark.py --config-yaml custom.yaml --families brandimarte
+    uv run python scripts/run_benchmark.py --log-level DEBUG --backend-log-level INFO
 
 中断后续跑：
     再次运行相同命令即可，已完成的 trial 会自动跳过
+
+日志级别控制：
+    --log-level: 控制前端脚本的日志输出级别 (默认: INFO)
+    --backend-log-level: 控制后端 logger 的日志输出级别 (默认: WARNING)
 """
 
 import argparse
@@ -64,9 +69,9 @@ AGENT_CONFIGS = {
     },
     "ORToolsBatchAgent": {
         "agent_name": "packet_factory.ORToolsBatchAgent",
-        "mode": "drl",  # 用 drl 模式让 agent 被反复调用重新求解
+        "mode": "optimization",
         "task_mode": "inference",
-        "time_limit_seconds": 30,
+        "time_limit_seconds": 60,
     },
 }
 
@@ -76,11 +81,21 @@ ALL_FAMILIES = ["barnes", "behnke", "brandimarte", "dauzere", "fattahi", "hurink
 _shutdown_requested = False
 
 
-def setup_logging(log_level: str = "INFO"):
+def setup_logging(log_level: str = "INFO", backend_log_level: str = "WARNING"):
+    """设置前端和后端日志级别
+    
+    Args:
+        log_level: 前端脚本日志级别 (DEBUG, INFO, WARNING, ERROR)
+        backend_log_level: 后端 logger 日志级别 (DEBUG, INFO, WARNING, ERROR)，默认 WARNING
+    """
     level_map = {"DEBUG": logging.DEBUG, "INFO": logging.INFO, "WARNING": logging.WARNING, "ERROR": logging.ERROR}
     level = level_map.get(log_level.upper(), logging.INFO)
     logging.basicConfig(level=level, format="[%(asctime)s] [%(levelname)s] %(message)s", datefmt="%Y-%m-%d %H:%M:%S")
     logger.setLevel(level)
+    
+    # 设置后端日志级别环境变量，供 executor 层的 Logger 读取
+    os.environ['BACKEND_LOG_LEVEL'] = backend_log_level.upper()
+    logger.debug(f"后端日志级别已设置为: {backend_log_level.upper()}")
 
 
 # ==================== AGV 实例解析（复用 auto_train_loop） ====================
@@ -352,14 +367,15 @@ def append_result(results_path: Path, record: dict):
 # ==================== 数据集发现 ====================
 
 def discover_instances(families: List[str]) -> Dict[str, List[Path]]:
-    """按族发现 AGV 实例文件"""
+    """按族发现 AGV 实例文件（递归搜索子目录）"""
     result = {}
     for family in families:
         family_dir = DATA_DIR / family
         if not family_dir.exists():
             logger.warning(f"数据集族目录不存在: {family_dir}")
             continue
-        files = sorted(family_dir.glob("*_agv.txt"))
+        # 使用 rglob 递归搜索所有子目录中的 _agv.txt 文件
+        files = sorted(family_dir.rglob("*_agv.txt"))
         if files:
             result[family] = files
             logger.info(f"  {family}: {len(files)} 个实例")
@@ -562,14 +578,16 @@ def parse_args():
     parser.add_argument("--experiment-id", type=str, default=None, help="实验标识（默认自动生成时间戳）")
     parser.add_argument("--timeout", type=int, default=600, help="单次 episode 超时秒数 (默认: 600)")
     parser.add_argument("--time-limit", type=int, default=30, help="OR-Tools 求解时间限制秒数 (默认: 30)")
-    parser.add_argument("--log-level", type=str, default="INFO", choices=["DEBUG", "INFO", "WARNING", "ERROR"], help="日志级别")
+    parser.add_argument("--log-level", type=str, default="INFO", choices=["DEBUG", "INFO", "WARNING", "ERROR"], help="前端脚本日志级别")
+    parser.add_argument("--backend-log-level", type=str, default="WARNING", choices=["DEBUG", "INFO", "WARNING", "ERROR"], 
+                        help="后端 logger 日志级别 (默认: WARNING)")
 
     return parser.parse_args()
 
 
 if __name__ == "__main__":
     args = parse_args()
-    setup_logging(args.log_level)
+    setup_logging(args.log_level, args.backend_log_level)
 
     logger.info("=" * 60)
     logger.info("SkyEngine Benchmark Experiment")
@@ -577,6 +595,7 @@ if __name__ == "__main__":
     logger.info(f"Families: {args.families}")
     logger.info(f"Runs (DRL): {args.runs_drl}, Runs (Opt): {args.runs_opt}")
     logger.info(f"Timeout: {args.timeout}s, Time Limit: {args.time_limit}s")
+    logger.info(f"Backend Log Level: {args.backend_log_level.upper()}")
     if args.config_yaml:
         logger.info(f"Base YAML: {args.config_yaml}")
     logger.info("=" * 60)
