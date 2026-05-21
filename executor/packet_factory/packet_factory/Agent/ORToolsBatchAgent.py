@@ -2,12 +2,11 @@
 ORTools Batch Agent for Flexible Job Shop Scheduling.
 Uses OR-Tools CP-SAT solver to generate complete scheduling plans.
 
-Unlike ORToolsAgent which only schedules ready operations, this agent:
-1. Generates the complete scheduling plan for ALL operations in a job
-2. Includes operations that are not yet ready (waiting) but will be after predecessors complete
-3. Returns a comprehensive batch schedule that can be executed progressively
-
-This is more suitable for 'optimization' mode where we want a global view.
+Optimized for 'optimization' mode: the agent outputs ALL operations' scheduling
+arrangements at once (both READY and WAITING), sorted by scheduled start time
+per AGV. The environment's optimization loop then progressively executes these
+decisions without re-invoking the agent, only re-planning when a disruptive
+event occurs.
 """
 
 from dataclasses import dataclass, field
@@ -51,11 +50,9 @@ class ORToolsBatchAgent(BaseAgent):
     """
     Agent that generates complete batch schedules using OR-Tools CP-SAT solver.
 
-    This agent solves the full FJSP problem and returns:
-    1. immediate_decisions: Operations that are currently READY and should be executed now
-    2. future_decisions: Operations that are waiting but scheduled in the plan
-
-    The agent maintains a rolling execution window, re-planning as jobs progress.
+    In optimization mode, sample() returns ALL operations (READY + WAITING)
+    sorted by scheduled start time per AGV. The environment progressively
+    executes these decisions; re-planning only occurs on disruptive events.
     """
 
     def __init__(self, name=None, agent_id=None, context=None,
@@ -89,10 +86,6 @@ class ORToolsBatchAgent(BaseAgent):
         self.solve_history: List[Dict] = []
         self.run_timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
         self.result_dir = None
-
-        # 当前计划的缓存（避免重复求解）
-        self._cached_schedule: Optional[List[Tuple[Any, Any, Any, float]]] = None
-        self._executed_ops: set = set()  # 已执行的操作
 
         LOGGER.info(f"ORToolsBatchAgent initialized: time_limit={time_limit_seconds}s, "
                    f"fallback={fallback_enabled}")
@@ -324,8 +317,10 @@ class ORToolsBatchAgent(BaseAgent):
         """
         Generate scheduling decisions using batch optimization.
 
-        Returns only the IMMEDIATE decisions (currently ready operations).
-        Future decisions are cached for subsequent calls.
+        In optimization mode, returns ALL operations' scheduling arrangements
+        at once (both READY and WAITING), sorted by scheduled start time per AGV.
+        The environment progressively executes these decisions without re-invoking
+        the agent, only re-planning when a disruptive event occurs.
 
         Args:
             agvs: List of AGV objects
@@ -334,7 +329,8 @@ class ORToolsBatchAgent(BaseAgent):
 
         Returns:
             Tuple of (decisions, step_time)
-            - decisions: List of (Operation, AGV, Machine) tuples for READY operations
+            - decisions: List of (Operation, AGV, Machine) tuples for ALL operations,
+              sorted by scheduled start time within each AGV
             - step_time: Recommended simulation step time
         """
         # Extract graph and current time from context
@@ -363,20 +359,59 @@ class ORToolsBatchAgent(BaseAgent):
             "solve_time": result.solve_time,
             "immediate_count": len(result.immediate_decisions),
             "future_count": len(result.future_decisions),
+            "total_count": len(result.schedule),
         }
         self.solve_history.append(serialized)
         self._save_step(step_idx, serialized)
 
         if result.success:
+            all_decisions = self._build_execution_order(result)
+
             LOGGER.info(f"ORToolsBatchAgent: {len(result.immediate_decisions)} immediate, "
-                       f"{len(result.future_decisions)} future decisions")
-            return result.immediate_decisions, DEFAULT_STEP_TIME
+                       f"{len(result.future_decisions)} future, "
+                       f"{len(all_decisions)} total dispatched")
+            return all_decisions, DEFAULT_STEP_TIME
         elif self.fallback_enabled:
             LOGGER.warning(f"ORToolsBatchAgent: Batch solve failed, falling back to GreedyAgent")
             return self.fallback_agent.sample(agvs, machines, jobs)
         else:
             LOGGER.error(f"ORToolsBatchAgent: Solve failed and fallback disabled")
             return [], DEFAULT_STEP_TIME
+
+    def _build_execution_order(self, result: BatchScheduleResult) -> List[Tuple[Any, Any, Any]]:
+        """
+        Build the execution order from the batch schedule result.
+
+        Sorts operations by scheduled start time within each AGV,
+        ensuring the AGV processes them in the optimal sequence.
+        Skips operations already in progress (MOVING/WORKING/FINISHED).
+
+        Args:
+            result: Batch scheduling result from the solver
+
+        Returns:
+            List of (Operation, AGV, Machine) tuples sorted by execution order
+        """
+        from executor.packet_factory.packet_factory.packet_factory_env.Utils.util import OperationStatus
+
+        # Group by AGV and sort by start time
+        agv_schedules: Dict[Any, List[Tuple[float, Any, Any, Any]]] = {}
+
+        for op, agv, machine, start_time in result.schedule:
+            status = op.get_status()
+            # Skip operations already being processed or completed
+            if status in (OperationStatus.MOVING, OperationStatus.WORKING, OperationStatus.FINISHED):
+                continue
+            agv_schedules.setdefault(agv, []).append((start_time, op, agv, machine))
+
+        # Sort each AGV's operations by start time and flatten
+        all_decisions = []
+        for agv, ops in agv_schedules.items():
+            ops.sort(key=lambda x: x[0])
+            for _, op, agv, machine in ops:
+                all_decisions.append((op, agv, machine))
+
+        return all_decisions
 
     def _save_step(self, step_idx: int, data: Dict):
         """Save a single solve step to JSON file."""
