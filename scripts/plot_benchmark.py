@@ -287,7 +287,19 @@ def plot_benchmark(args):
         return
 
     # 发现参与实验的 agents
-    agents = sorted(set(r["agent"] for r in completed if r["agent"] in AGENT_COLORS))
+    available_agents = sorted(set(r["agent"] for r in completed if r["agent"] in AGENT_COLORS))
+
+    # 根据 --agents 参数筛选
+    if args.agents:
+        agents = [a for a in args.agents if a in available_agents]
+        unknown = set(args.agents) - set(available_agents)
+        if unknown:
+            logger.warning(f"以下 Agent 不在实验结果中: {unknown}")
+        if not agents:
+            logger.error("筛选后无可用 Agent，退出")
+            return
+    else:
+        agents = available_agents
     logger.info(f"参与 Agent: {agents}")
 
     # 对每个指标绘图
@@ -318,6 +330,7 @@ def parse_args():
 示例:
   uv run python scripts/plot_benchmark.py --experiment-id bench_20260519_120000
   uv run python scripts/plot_benchmark.py --experiment-id my_exp --metric makespan avg_decision_time
+  uv run python scripts/plot_benchmark.py --experiment-id my_exp --agents DualDRLAgent ORToolsBatchAgent
         """,
     )
 
@@ -329,6 +342,7 @@ def parse_args():
         choices=["makespan", "avg_decision_time", "total_decision_time", "decision_count"],
         help="要绘制的指标 (默认: makespan)",
     )
+    parser.add_argument("--agents", nargs="+", default=None, choices=list(AGENT_COLORS.keys()), help="要绘制的 Agent 集合 (默认: 全部)")
     parser.add_argument("--output-dir", type=str, default=str(DEFAULT_OUTPUT_ROOT), help="输出目录 (默认: benchmark_plots/)")
     parser.add_argument("--log-level", type=str, default="INFO", choices=["DEBUG", "INFO", "WARNING", "ERROR"], help="日志级别")
 
