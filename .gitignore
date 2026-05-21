@@ -742,3 +742,5 @@ experiment/data/*
 sky_logs/metrics/*
 sky_logs/renders/*
 training_logs/*
+benchmark_plots/*
+benchmark_results/*
