@@ -73,6 +73,12 @@ AGENT_CONFIGS = {
         "task_mode": "inference",
         "time_limit_seconds": 60,
     },
+    "GraphDPAgent": {
+        "agent_name": "packet_factory.GraphDPAgent",
+        "mode": "drl",
+        "task_mode": "inference",
+        "model_path": "./training_logs/models/GraphDPAgent/agent_model.pt",
+    },
 }
 
 ALL_FAMILIES = ["barnes", "behnke", "brandimarte", "dauzere", "fattahi", "hurink", "kacem"]
@@ -425,7 +431,7 @@ def run_benchmark(args):
     # 统计总 trial 数
     total_trials = 0
     for agent_key in args.agents:
-        num_runs = args.runs_drl if agent_key == "DualDRLAgent" else args.runs_opt
+        num_runs = args.runs_drl if agent_key in ("DualDRLAgent", "GraphDPAgent") else args.runs_opt
         for family, instances in family_instances.items():
             for instance_file in instances:
                 instance_name = instance_file.stem.replace("_agv", "")
@@ -456,7 +462,7 @@ def run_benchmark(args):
         if _shutdown_requested:
             break
 
-        num_runs = args.runs_drl if agent_key == "DualDRLAgent" else args.runs_opt
+        num_runs = args.runs_drl if agent_key in ("DualDRLAgent", "GraphDPAgent") else args.runs_opt
         agent_cfg = AGENT_CONFIGS[agent_key]
 
         for family, instances in family_instances.items():
