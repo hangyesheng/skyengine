@@ -45,12 +45,13 @@ class PacketFactoryProxy(BaseFactoryProxy):
         async def api_factory_alive():
             core = RouteRegistry._current_backend_core
             if core is None:
-                return JSONResponse({"is_alive": False, "training_completed": False, "makespan": 0})
+                return JSONResponse({"is_alive": False, "training_completed": False, "makespan": 0, "training_metrics": {}})
             is_alive = core.is_factory_alive()
             return JSONResponse({
                 "is_alive": is_alive,
                 "training_completed": core._training_completed,
-                "makespan": core._last_makespan
+                "makespan": core._last_makespan,
+                "training_metrics": core._live_metrics,
             })
 
         @RouteRegistry.register_route("/factory/start", method="POST")

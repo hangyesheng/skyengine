@@ -530,10 +530,15 @@ class GraphDPAgent(BaseAgent):
         self.allow_agv_reassignment = allow_agv_reassignment
 
         # Device
-        if device is None:
+        if device is None or device == 'auto':
             self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
         else:
             self.device = torch.device(device)
+
+        if self.device.type == 'cuda':
+            LOGGER.info(f"[GraphDPAgent] Using CUDA: {torch.cuda.get_device_name(0)}")
+        else:
+            LOGGER.info(f"[GraphDPAgent] Using CPU")
 
         # Graph builder
         self.graph_builder = FactoryGraphBuilder(device=str(self.device))
@@ -715,6 +720,12 @@ class GraphDPAgent(BaseAgent):
 
     def reward(self, *args, **kwargs) -> float:
         """Compute composite reward: makespan penalty + utilization + balance + waiting."""
+        r = self._compute_reward()
+        self._episode_reward += r
+        return r
+
+    def _compute_reward(self) -> float:
+        """Pure reward computation without side effects."""
         reward = 0.0
 
         if self.context and hasattr(self.context, 'env_timeline'):
@@ -754,7 +765,6 @@ class GraphDPAgent(BaseAgent):
             active = sum(1 for a in agvs if a.get_status() != AGVStatus.READY)
             reward += 1.5 * (active / total_a)
 
-        self._episode_reward += reward
         return reward
 
     # ----------------------------------------------------------
@@ -762,48 +772,8 @@ class GraphDPAgent(BaseAgent):
     # ----------------------------------------------------------
 
     def before_sample(self, *args, **kwargs):
-        """Collect transition from previous step if available."""
-        if self._prev_graph_result is None:
-            return
-        if self.task_mode != TRAINING:
-            return
-
-        # Get current state from args or kwargs
-        agvs = kwargs.get('agvs', args[0] if len(args) > 0 else [])
-        machines = kwargs.get('machines', args[1] if len(args) > 1 else [])
-        jobs = kwargs.get('jobs', args[2] if len(args) > 2 else [])
-
-        if not agvs and not machines and not jobs:
-            return
-
-        factory_graph = self._get_factory_graph(agvs)
-        current_time = self._get_current_time()
-        next_graph_result = self.graph_builder.build(
-            agvs, machines, jobs, factory_graph, current_time,
-        )
-
-        # Compute reward for the transition
-        step_reward = self.reward()
-
-        # Check if done
-        done = all(j.is_finished() for j in jobs) if jobs else False
-
-        # Store transition for each action taken in previous step
-        prev_step = self._episode_buffer[-1] if self._episode_buffer else None
-        if prev_step and prev_step.action_indices:
-            for i, action_idx in enumerate(prev_step.action_indices):
-                trans = Transition(
-                    graph_result_s=self._prev_graph_result,
-                    graph_result_s_next=next_graph_result,
-                    action_info=action_idx,
-                    reward=step_reward / max(len(prev_step.action_indices), 1),
-                    done=done,
-                )
-                self.replay_buffer.append(trans)
-                if len(self.replay_buffer) > self.buffer_capacity:
-                    self.replay_buffer.pop(0)
-
-        self._prev_graph_result = next_graph_result
+        """Pre-sample hook (no-op; transition collection moved to after_sample)."""
+        pass
 
     def train(self, *args, **kwargs):
         """Train transition and value networks from replay buffer, then re-walk."""
@@ -831,73 +801,92 @@ class GraphDPAgent(BaseAgent):
             self.epsilon = max(self.epsilon_min, self.epsilon * self.epsilon_decay)
 
     def _train_from_buffer(self) -> Tuple[float, float]:
-        """Train from replay buffer. Returns (trans_loss, value_loss)."""
-        batch = random.sample(self.replay_buffer, min(self.batch_size, len(self.replay_buffer)))
+        """Train from replay buffer. Returns (trans_loss, value_loss).
+
+        Encodes each graph individually (needed for variable-size graphs),
+        but batches the TransitionNet/ValueNet forward+backward into a single pass.
+        """
+        n_samples = min(self.batch_size, len(self.replay_buffer))
+        batch = random.sample(self.replay_buffer, n_samples)
 
         self.gnn_encoder.train()
         self.transition_net.train()
         self.value_net.train()
 
-        total_trans_loss = 0.0
-        total_value_loss = 0.0
+        all_s_global = []
+        all_s_next_global = []
+        all_node_embs = []
+        all_action_indices = []
+        all_rewards = []
+        all_dones = []
 
         for trans in batch:
-            # Re-encode s and s'
             s_global, s_node_embs = self.gnn_encoder(
                 trans.graph_result_s.data, trans.graph_result_s.node_type_offsets,
             )
             s_next_global, _ = self.gnn_encoder(
                 trans.graph_result_s_next.data, trans.graph_result_s_next.node_type_offsets,
             )
+            all_s_global.append(s_global)
+            all_s_next_global.append(s_next_global)
+            all_node_embs.append(s_node_embs)
+            all_action_indices.append(trans.action_info)
+            all_rewards.append(trans.reward)
+            all_dones.append(trans.done)
 
-            # Action embedding
-            op_idx, agv_idx, m_idx = trans.action_info
-            op_emb = s_node_embs[op_idx]
-            agv_emb = s_node_embs[agv_idx]
-            mach_emb = s_node_embs[m_idx]
-            action_emb = self.action_encoder(op_emb, agv_emb, mach_emb)
+        # Batch action embeddings (lightweight, no GNN)
+        action_embs = []
+        for i, (op_idx, agv_idx, m_idx) in enumerate(all_action_indices):
+            op_emb = all_node_embs[i][op_idx]
+            agv_emb = all_node_embs[i][agv_idx]
+            mach_emb = all_node_embs[i][m_idx]
+            action_embs.append(self.action_encoder(op_emb, agv_emb, mach_emb))
 
-            # Transition loss
-            s_pred = self.transition_net(s_global, action_emb)
-            trans_loss = F.mse_loss(s_pred, s_next_global.detach())
+        # Single batched T/V forward + backward
+        s_batch = torch.stack(all_s_global)
+        s_next_batch = torch.stack(all_s_next_global)
+        action_batch = torch.stack(action_embs)
+        reward_batch = torch.tensor(all_rewards, dtype=torch.float32, device=self.device)
+        done_batch = torch.tensor(all_dones, dtype=torch.float32, device=self.device)
 
-            # Value loss (TD)
-            v_s = self.value_net(s_global)
-            v_s_next = self.value_net(s_next_global.detach())
-            target = trans.reward + self.gamma * v_s_next * (1.0 - float(trans.done))
-            value_loss = F.mse_loss(v_s, target.detach())
+        s_pred = self.transition_net(s_batch, action_batch)
+        trans_loss = F.mse_loss(s_pred, s_next_batch.detach())
 
-            total_trans_loss += trans_loss.item()
-            total_value_loss += value_loss.item()
+        v_s = self.value_net(s_batch).squeeze(-1)
+        with torch.no_grad():
+            v_s_next = self.value_net(s_next_batch).squeeze(-1)
+        target = reward_batch + self.gamma * v_s_next * (1.0 - done_batch)
+        value_loss = F.mse_loss(v_s, target.detach())
 
-            # Backward
-            self.optimizer_gnn.zero_grad()
-            self.optimizer_trans.zero_grad()
-            self.optimizer_value.zero_grad()
+        loss = trans_loss + self.alpha * value_loss
 
-            loss = trans_loss + self.alpha * value_loss
-            loss.backward()
+        self.optimizer_gnn.zero_grad()
+        self.optimizer_trans.zero_grad()
+        self.optimizer_value.zero_grad()
+        loss.backward()
 
-            torch.nn.utils.clip_grad_norm_(self.gnn_encoder.parameters(), 1.0)
-            torch.nn.utils.clip_grad_norm_(self.transition_net.parameters(), 1.0)
-            torch.nn.utils.clip_grad_norm_(self.value_net.parameters(), 1.0)
+        torch.nn.utils.clip_grad_norm_(self.gnn_encoder.parameters(), 1.0)
+        torch.nn.utils.clip_grad_norm_(self.transition_net.parameters(), 1.0)
+        torch.nn.utils.clip_grad_norm_(self.value_net.parameters(), 1.0)
 
-            self.optimizer_gnn.step()
-            self.optimizer_trans.step()
-            self.optimizer_value.step()
+        self.optimizer_gnn.step()
+        self.optimizer_trans.step()
+        self.optimizer_value.step()
 
-        n = len(batch)
-        return total_trans_loss / n, total_value_loss / n
+        return trans_loss.item(), value_loss.item()
 
-    def _rewalk(self):
-        """Re-walk stored episode: re-encode graphs with updated GNN, retrain."""
+    def _rewalk(self, max_steps: int = 50):
+        """Re-walk stored episode: re-encode graphs with updated GNN, retrain.
+
+        Only re-walks the last `max_steps` steps to bound the cost.
+        Uses batched forward+backward per rewalk iteration.
+        """
         self.gnn_encoder.train()
         self.transition_net.train()
         self.value_net.train()
 
         for _ in range(self.rewalk_iters):
-            # Compute Monte Carlo returns from episode
-            steps = self._episode_buffer
+            steps = self._episode_buffer[-max_steps:] if len(self._episode_buffer) > max_steps else self._episode_buffer
             if len(steps) < 2:
                 break
 
@@ -908,11 +897,16 @@ class GraphDPAgent(BaseAgent):
                 G = step.reward + self.gamma * G
                 returns.insert(0, G)
 
+            # Collect all (s, s_next, action, return) for batched update
+            all_s = []
+            all_s_next = []
+            all_action_embs = []
+            all_returns = []
+
             for i, step in enumerate(steps):
                 if not step.action_indices:
                     continue
 
-                # Re-encode current and next state
                 s_global, s_node_embs = self.gnn_encoder(
                     step.graph_result.data, step.graph_result.node_type_offsets,
                 )
@@ -922,44 +916,77 @@ class GraphDPAgent(BaseAgent):
                     s_next_global, _ = self.gnn_encoder(
                         next_step.graph_result.data, next_step.graph_result.node_type_offsets,
                     )
-                    done = False
                 else:
                     s_next_global = torch.zeros_like(s_global)
-                    done = True
 
                 for j, action_idx in enumerate(step.action_indices):
                     op_idx, agv_idx, m_idx = action_idx
                     op_emb = s_node_embs[op_idx]
                     agv_emb = s_node_embs[agv_idx]
                     mach_emb = s_node_embs[m_idx]
-                    action_emb = self.action_encoder(op_emb, agv_emb, mach_emb)
+                    all_s.append(s_global)
+                    all_s_next.append(s_next_global.detach())
+                    all_action_embs.append(self.action_encoder(op_emb, agv_emb, mach_emb))
+                    all_returns.append(returns[i])
 
-                    # Transition loss
-                    s_pred = self.transition_net(s_global, action_emb)
-                    trans_loss = F.mse_loss(s_pred, s_next_global.detach())
+            if not all_s:
+                continue
 
-                    # Value loss (Monte Carlo)
-                    v_s = self.value_net(s_global)
-                    G_t = torch.tensor([returns[i]], dtype=torch.float32, device=self.device)
-                    value_loss = F.mse_loss(v_s, G_t)
+            # Batched forward + single backward
+            s_batch = torch.stack(all_s)
+            s_next_batch = torch.stack(all_s_next)
+            action_batch = torch.stack(all_action_embs)
+            G_batch = torch.tensor(all_returns, dtype=torch.float32, device=self.device)
 
-                    loss = trans_loss + self.alpha * value_loss
+            s_pred = self.transition_net(s_batch, action_batch)
+            trans_loss = F.mse_loss(s_pred, s_next_batch)
 
-                    self.optimizer_gnn.zero_grad()
-                    self.optimizer_trans.zero_grad()
-                    self.optimizer_value.zero_grad()
-                    loss.backward()
+            v_s = self.value_net(s_batch).squeeze(-1)
+            value_loss = F.mse_loss(v_s, G_batch)
 
-                    torch.nn.utils.clip_grad_norm_(self.gnn_encoder.parameters(), 1.0)
-                    torch.nn.utils.clip_grad_norm_(self.transition_net.parameters(), 1.0)
-                    torch.nn.utils.clip_grad_norm_(self.value_net.parameters(), 1.0)
+            loss = trans_loss + self.alpha * value_loss
 
-                    self.optimizer_gnn.step()
-                    self.optimizer_trans.step()
-                    self.optimizer_value.step()
+            self.optimizer_gnn.zero_grad()
+            self.optimizer_trans.zero_grad()
+            self.optimizer_value.zero_grad()
+            loss.backward()
+
+            torch.nn.utils.clip_grad_norm_(self.gnn_encoder.parameters(), 1.0)
+            torch.nn.utils.clip_grad_norm_(self.transition_net.parameters(), 1.0)
+            torch.nn.utils.clip_grad_norm_(self.value_net.parameters(), 1.0)
+
+            self.optimizer_gnn.step()
+            self.optimizer_trans.step()
+            self.optimizer_value.step()
 
     def after_sample(self, *args, **kwargs):
-        """Post-sample hook: store current graph for next transition."""
+        """Post-sample hook: collect transition from previous step, then update _prev_graph_result."""
+        if self.task_mode != TRAINING:
+            if self._episode_buffer:
+                self._prev_graph_result = self._episode_buffer[-1].graph_result
+            return
+
+        # Collect transition: (prev_state, action, reward, current_state)
+        if self._prev_graph_result is not None and self._episode_buffer:
+            current_graph_result = self._episode_buffer[-1].graph_result
+            step_reward = self._compute_reward()
+            done = all(j.is_finished() for j in self.context.jobs) if self.context and hasattr(self.context, 'jobs') else False
+
+            prev_step = self._episode_buffer[-2] if len(self._episode_buffer) >= 2 else None
+            if prev_step and prev_step.action_indices:
+                for action_idx in prev_step.action_indices:
+                    trans = Transition(
+                        graph_result_s=self._prev_graph_result,
+                        graph_result_s_next=current_graph_result,
+                        action_info=action_idx,
+                        reward=step_reward / max(len(prev_step.action_indices), 1),
+                        done=done,
+                    )
+                    self.replay_buffer.append(trans)
+                    if len(self.replay_buffer) > self.buffer_capacity:
+                        self.replay_buffer.pop(0)
+
+        # Store current graph for next step's transition
         if self._episode_buffer:
             self._prev_graph_result = self._episode_buffer[-1].graph_result
 
@@ -1100,6 +1127,21 @@ class GraphDPAgent(BaseAgent):
         except Exception as e:
             LOGGER.error(f"[GraphDPAgent] Load failed: {e}")
             return False
+
+    def get_training_metrics(self) -> Dict[str, Any]:
+        """Return training metrics for convergence detection."""
+        metrics = {
+            'episode_reward': self._episode_reward,
+            'epsilon': self.epsilon,
+            'training_history': self.training_history,
+        }
+        if self.training_history.get('trans_loss'):
+            metrics['trans_loss'] = self.training_history['trans_loss'][-1]
+        if self.training_history.get('value_loss'):
+            metrics['value_loss'] = self.training_history['value_loss'][-1]
+        if self.training_history.get('total_loss'):
+            metrics['total_loss'] = self.training_history['total_loss'][-1]
+        return metrics
 
     def new_episode(self):
         """Reset episode-level state. Call at the start of each episode."""

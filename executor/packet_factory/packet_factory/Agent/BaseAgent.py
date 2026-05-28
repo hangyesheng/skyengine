@@ -131,6 +131,23 @@ class BaseAgent(ABC):
             'average_decision_time': avg_time
         }
 
+    def get_training_metrics(self) -> Dict[str, Any]:
+        """
+        获取训练指标（用于收敛检测）。子类可覆写以提供更具体的指标。
+
+        :return: dict 包含 episode_reward, epsilon, training_history 等
+        """
+        metrics = {}
+        if hasattr(self, '_episode_reward'):
+            metrics['episode_reward'] = self._episode_reward
+        elif hasattr(self, 'current_episode_reward'):
+            metrics['episode_reward'] = self.current_episode_reward
+        if hasattr(self, 'epsilon'):
+            metrics['epsilon'] = self.epsilon
+        if hasattr(self, 'training_history') and isinstance(self.training_history, dict):
+            metrics['training_history'] = self.training_history
+        return metrics
+
     def reset_decision_stats(self):
         """重置决策统计信息"""
         self.total_decision_time = 0.0
