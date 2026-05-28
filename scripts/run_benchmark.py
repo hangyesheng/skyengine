@@ -12,6 +12,8 @@
     uv run python scripts/run_benchmark.py --agents DualDRLAgent ORToolsAgent ORToolsBatchAgent
     uv run python scripts/run_benchmark.py --config-yaml custom.yaml --families brandimarte
     uv run python scripts/run_benchmark.py --log-level DEBUG --backend-log-level INFO
+    uv run python scripts/run_benchmark.py --small-only                           # 只运行小规模数据集
+    uv run python scripts/run_benchmark.py --small-only --small-max-jobs 10       # 自定义小规模阈值
 
 中断后续跑：
     再次运行相同命令即可，已完成的 trial 会自动跳过
@@ -372,8 +374,33 @@ def append_result(results_path: Path, record: dict):
 
 # ==================== 数据集发现 ====================
 
-def discover_instances(families: List[str]) -> Dict[str, List[Path]]:
-    """按族发现 AGV 实例文件（递归搜索子目录）"""
+def is_small_instance(filepath: Path, max_jobs: int = 15, max_machines: int = 10) -> bool:
+    """判断实例是否属于小规模数据集（读取首行即可判断）
+
+    Args:
+        filepath: 实例文件路径
+        max_jobs: 最大作业数阈值
+        max_machines: 最大机器数阈值
+    """
+    try:
+        with open(filepath, "r", encoding="utf-8") as f:
+            first_line = f.readline().strip().split()
+        job_count = int(first_line[0])
+        machine_count = int(first_line[1])
+        return job_count <= max_jobs and machine_count <= max_machines
+    except Exception:
+        return False
+
+
+def discover_instances(families: List[str], small_only: bool = False, max_jobs: int = 15, max_machines: int = 10) -> Dict[str, List[Path]]:
+    """按族发现 AGV 实例文件（递归搜索子目录）
+
+    Args:
+        families: 数据集族列表
+        small_only: 是否只保留小规模实例
+        max_jobs: 小规模实例的最大作业数阈值
+        max_machines: 小规模实例的最大机器数阈值
+    """
     result = {}
     for family in families:
         family_dir = DATA_DIR / family
@@ -382,9 +409,11 @@ def discover_instances(families: List[str]) -> Dict[str, List[Path]]:
             continue
         # 使用 rglob 递归搜索所有子目录中的 _agv.txt 文件
         files = sorted(family_dir.rglob("*_agv.txt"))
+        if small_only:
+            files = [f for f in files if is_small_instance(f, max_jobs, max_machines)]
         if files:
             result[family] = files
-            logger.info(f"  {family}: {len(files)} 个实例")
+            logger.info(f"  {family}: {len(files)} 个实例" + (" (仅小规模)" if small_only else ""))
         else:
             logger.warning(f"  {family}: 未找到实例文件")
     return result
@@ -412,6 +441,9 @@ def run_benchmark(args):
         "timeout": args.timeout,
         "time_limit": args.time_limit,
         "config_yaml": args.config_yaml,
+        "small_only": args.small_only,
+        "small_max_jobs": args.small_max_jobs,
+        "small_max_machines": args.small_max_machines,
         "created_at": time.strftime("%Y-%m-%d %H:%M:%S"),
     }
     with open(exp_dir / "experiment_config.json", "w", encoding="utf-8") as f:
@@ -423,7 +455,12 @@ def run_benchmark(args):
 
     # 发现实例
     logger.info("发现数据集实例...")
-    family_instances = discover_instances(args.families)
+    family_instances = discover_instances(
+        args.families,
+        small_only=args.small_only,
+        max_jobs=args.small_max_jobs,
+        max_machines=args.small_max_machines,
+    )
     if not family_instances:
         logger.error("未找到任何实例文件")
         return
@@ -561,6 +598,12 @@ def parse_args():
 
   # 指定实验 ID（用于续跑）
   uv run python scripts/run_benchmark.py --experiment-id bench_20260519
+
+  # 只运行小规模数据集（默认 jobs<=15, machines<=10），方便与全局最优解对比
+  uv run python scripts/run_benchmark.py --small-only
+
+  # 自定义小规模阈值
+  uv run python scripts/run_benchmark.py --small-only --small-max-jobs 10 --small-max-machines 8
         """,
     )
 
@@ -585,8 +628,14 @@ def parse_args():
     parser.add_argument("--timeout", type=int, default=600, help="单次 episode 超时秒数 (默认: 600)")
     parser.add_argument("--time-limit", type=int, default=30, help="OR-Tools 求解时间限制秒数 (默认: 30)")
     parser.add_argument("--log-level", type=str, default="INFO", choices=["DEBUG", "INFO", "WARNING", "ERROR"], help="前端脚本日志级别")
-    parser.add_argument("--backend-log-level", type=str, default="WARNING", choices=["DEBUG", "INFO", "WARNING", "ERROR"], 
+    parser.add_argument("--backend-log-level", type=str, default="WARNING", choices=["DEBUG", "INFO", "WARNING", "ERROR"],
                         help="后端 logger 日志级别 (默认: WARNING)")
+    parser.add_argument("--small-only", action="store_true",
+                        help="只运行小规模数据集，方便与全局最优解对比")
+    parser.add_argument("--small-max-jobs", type=int, default=15,
+                        help="小规模实例的最大作业数阈值 (默认: 15)")
+    parser.add_argument("--small-max-machines", type=int, default=10,
+                        help="小规模实例的最大机器数阈值 (默认: 10)")
 
     return parser.parse_args()
 
@@ -602,6 +651,8 @@ if __name__ == "__main__":
     logger.info(f"Runs (DRL): {args.runs_drl}, Runs (Opt): {args.runs_opt}")
     logger.info(f"Timeout: {args.timeout}s, Time Limit: {args.time_limit}s")
     logger.info(f"Backend Log Level: {args.backend_log_level.upper()}")
+    if args.small_only:
+        logger.info(f"Small-only mode: max_jobs={args.small_max_jobs}, max_machines={args.small_max_machines}")
     if args.config_yaml:
         logger.info(f"Base YAML: {args.config_yaml}")
     logger.info("=" * 60)
