@@ -75,6 +75,33 @@ class Transition:
     done: bool
 
 
+class RunningMeanStd:
+    """Running mean/std for reward normalization (Welford's online algorithm)."""
+
+    def __init__(self, epsilon=1e-4):
+        self.mean = 0.0
+        self.var = 1.0
+        self.count = epsilon
+
+    def update(self, x: np.ndarray):
+        batch_mean = float(np.mean(x))
+        batch_var = float(np.var(x))
+        batch_count = len(x)
+        delta = batch_mean - self.mean
+        tot_count = self.count + batch_count
+        new_mean = self.mean + delta * batch_count / tot_count
+        m_a = self.var * self.count
+        m_b = batch_var * batch_count
+        m2 = m_a + m_b + delta ** 2 * self.count * batch_count / tot_count
+        new_var = m2 / tot_count
+        self.mean = new_mean
+        self.var = max(new_var, 1e-6)
+        self.count = tot_count
+
+    def normalize(self, x: np.ndarray) -> np.ndarray:
+        return (x - self.mean) / (np.sqrt(self.var) + 1e-8)
+
+
 # ============================================================
 # Factory Graph Builder
 # ============================================================
@@ -504,12 +531,12 @@ class GraphDPAgent(BaseAgent):
                  lr_gnn: float = 1e-4,
                  lr_trans: float = 1e-3,
                  lr_value: float = 1e-3,
-                 alpha: float = 1.0,
+                 alpha: float = 0.01,
                  rewalk_iters: int = 3,
                  buffer_capacity: int = 5000,
                  batch_size: int = 64,
                  epsilon: float = 1.0,
-                 epsilon_decay: float = 0.998,
+                 epsilon_decay: float = 0.995,
                  epsilon_min: float = 0.01,
                  allow_agv_reassignment: bool = False,
                  device: Optional[str] = None,
@@ -568,6 +595,10 @@ class GraphDPAgent(BaseAgent):
         # Training buffers
         self.replay_buffer: List[Transition] = []
         self._episode_buffer: List[EpisodeStep] = []
+
+        # Reward normalization (RunningMeanStd)
+        self.reward_normalizer = RunningMeanStd()
+        self.return_normalizer = RunningMeanStd()
 
         # State tracking for transition collection
         self._prev_graph_result: Optional[GraphBuildResult] = None
@@ -796,10 +827,6 @@ class GraphDPAgent(BaseAgent):
         self.training_history['value_loss'].append(value_loss)
         self.training_history['total_loss'].append(total_loss)
 
-        # Epsilon decay
-        if self.epsilon > self.epsilon_min:
-            self.epsilon = max(self.epsilon_min, self.epsilon * self.epsilon_decay)
-
     def _train_from_buffer(self) -> Tuple[float, float]:
         """Train from replay buffer. Returns (trans_loss, value_loss).
 
@@ -846,7 +873,11 @@ class GraphDPAgent(BaseAgent):
         s_batch = torch.stack(all_s_global)
         s_next_batch = torch.stack(all_s_next_global)
         action_batch = torch.stack(action_embs)
-        reward_batch = torch.tensor(all_rewards, dtype=torch.float32, device=self.device)
+        # Normalize rewards for stable value training
+        reward_array = np.array(all_rewards, dtype=np.float64)
+        self.reward_normalizer.update(reward_array)
+        normalized_rewards = self.reward_normalizer.normalize(reward_array)
+        reward_batch = torch.tensor(normalized_rewards, dtype=torch.float32, device=self.device)
         done_batch = torch.tensor(all_dones, dtype=torch.float32, device=self.device)
 
         s_pred = self.transition_net(s_batch, action_batch)
@@ -936,7 +967,11 @@ class GraphDPAgent(BaseAgent):
             s_batch = torch.stack(all_s)
             s_next_batch = torch.stack(all_s_next)
             action_batch = torch.stack(all_action_embs)
-            G_batch = torch.tensor(all_returns, dtype=torch.float32, device=self.device)
+            # Normalize returns for stable value training
+            return_array = np.array(all_returns, dtype=np.float64)
+            self.return_normalizer.update(return_array)
+            normalized_returns = self.return_normalizer.normalize(return_array)
+            G_batch = torch.tensor(normalized_returns, dtype=torch.float32, device=self.device)
 
             s_pred = self.transition_net(s_batch, action_batch)
             trans_loss = F.mse_loss(s_pred, s_next_batch)
@@ -1087,6 +1122,16 @@ class GraphDPAgent(BaseAgent):
                     'buffer_capacity': self.buffer_capacity,
                     'allow_agv_reassignment': self.allow_agv_reassignment,
                 },
+                'reward_normalizer': {
+                    'mean': self.reward_normalizer.mean,
+                    'var': self.reward_normalizer.var,
+                    'count': self.reward_normalizer.count,
+                },
+                'return_normalizer': {
+                    'mean': self.return_normalizer.mean,
+                    'var': self.return_normalizer.var,
+                    'count': self.return_normalizer.count,
+                },
                 'training_history': self.training_history,
                 'mode': self.mode,
             }
@@ -1118,6 +1163,18 @@ class GraphDPAgent(BaseAgent):
             self.epsilon = hp.get('epsilon', self.epsilon)
             self.gamma = hp.get('gamma', self.gamma)
             self.alpha = hp.get('alpha', self.alpha)
+
+            if 'reward_normalizer' in checkpoint:
+                rn = checkpoint['reward_normalizer']
+                self.reward_normalizer.mean = rn['mean']
+                self.reward_normalizer.var = rn['var']
+                self.reward_normalizer.count = rn['count']
+
+            if 'return_normalizer' in checkpoint:
+                rn = checkpoint['return_normalizer']
+                self.return_normalizer.mean = rn['mean']
+                self.return_normalizer.var = rn['var']
+                self.return_normalizer.count = rn['count']
 
             if 'training_history' in checkpoint:
                 self.training_history = checkpoint['training_history']
@@ -1159,6 +1216,10 @@ class GraphDPAgent(BaseAgent):
             last_ep = 1
         self.training_history['episodes'].append(last_ep)
         self.training_history['epsilon'].append(self.epsilon)
+
+        # Epsilon decay per episode (not per train step)
+        if self.epsilon > self.epsilon_min:
+            self.epsilon = max(self.epsilon_min, self.epsilon * self.epsilon_decay)
 
         makespan = 0.0
         if self.context and hasattr(self.context, 'env_timeline'):

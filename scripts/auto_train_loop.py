@@ -68,6 +68,8 @@ RESULTS_DIR = TRAINING_LOGS / "results"
 REWARD_THRESHOLD = 1000.0  # 累积 reward 阈值
 LOSS_THRESHOLD = None  # Loss 阈值（None 表示不检查）
 CONVERGENCE_PATIENCE = 1  # 收敛满足条件的连续迭代次数
+MIN_ITERS = 30  # 最小迭代次数（防止假收敛）
+MAKESPAN_GAP_THRESHOLD = 0.30  # Makespan Gap 早停阈值（相对下界 30%）
 MAX_ITERATIONS = 1000  # 最大迭代次数（防止无限循环）
 POLL_INTERVAL = 2  # 轮询间隔（秒）
 POLL_TIMEOUT = 7200  # 单次训练超时（秒）= 2小时
@@ -181,6 +183,20 @@ def parse_args():
         type=int,
         default=CONVERGENCE_PATIENCE,
         help=f'收敛耐心度：连续满足所有收敛条件的迭代次数 (默认: {CONVERGENCE_PATIENCE})'
+    )
+
+    parser.add_argument(
+        '--min-iters',
+        type=int,
+        default=MIN_ITERS,
+        help=f'最小迭代次数，低于此数不允许收敛停止 (默认: {MIN_ITERS})'
+    )
+
+    parser.add_argument(
+        '--makespan-gap-threshold',
+        type=float,
+        default=MAKESPAN_GAP_THRESHOLD,
+        help=f'Makespan Gap 早停阈值：相对下界偏差比例 (默认: {MAKESPAN_GAP_THRESHOLD})'
     )
 
     parser.add_argument(
@@ -998,27 +1014,64 @@ def get_latest_training_metrics() -> Dict:
     return {}
 
 
-def check_convergence(iteration_metrics: List[Dict], reward_threshold: float,
-                      loss_threshold: Optional[float], patience: int) -> Tuple[bool, str]:
-    """
-    检查训练是否收敛
+def compute_makespan_lower_bound(parsed_data: dict) -> float:
+    """Compute estimated makespan lower bound from problem data.
 
-    收敛条件：
-    1. episode_reward >= reward_threshold（如果 reward_threshold > 0）
-    2. 所有 loss 指标 < loss_threshold（如果 loss_threshold 不为 None）
-    3. 以上条件连续满足 patience 次迭代
+    Uses two bounds and takes the maximum:
+    1. Job bound: longest job's total minimum processing time
+    2. Machine bound: total minimum work / number of machines
+
+    Returns:
+        float: estimated lower bound (> 0)
+    """
+    job_min_times = []
+    total_min_work = 0.0
+    for job_id, operations in parsed_data['jobs']:
+        if not operations:
+            continue
+        job_time = sum(min(d for _, d in op) for op in operations if op)
+        job_min_times.append(job_time)
+        for op in operations:
+            if op:
+                total_min_work += min(d for _, d in op)
+
+    job_lb = max(job_min_times) if job_min_times else 0.0
+    machine_lb = total_min_work / max(parsed_data['machine_count'], 1)
+
+    lb = max(job_lb, machine_lb)
+    return max(lb, 1.0)
+
+
+def check_convergence(iteration_metrics: List[Dict], reward_threshold: float,
+                      loss_threshold: Optional[float], patience: int,
+                      min_iters: int = 30, current_iteration: int = 0,
+                      makespan_gap_threshold: float = 0.30) -> Tuple[bool, str]:
+    """检查训练是否收敛（含 min_iters 保护 + Makespan Gap 早停）
+
+    收敛条件（所有启用的条件都必须满足）：
+    1. current_iteration >= min_iters（防止假收敛）
+    2. episode_reward >= reward_threshold 连续 patience 次（如果 threshold > 0）
+    3. 所有 loss 指标 < loss_threshold 连续 patience 次（如果启用）
+    4. 平均 Makespan Gap < makespan_gap_threshold 连续 patience 次（如果启用）
 
     Args:
         iteration_metrics: 历次迭代的 metrics 列表
-        reward_threshold: reward 阈值
+        reward_threshold: reward 阈值（0 表示不检查）
         loss_threshold: loss 阈值（None 表示不检查）
         patience: 连续满足条件的迭代次数
+        min_iters: 最小迭代次数
+        current_iteration: 当前迭代编号
+        makespan_gap_threshold: Makespan Gap 阈值（0 表示不检查）
 
     Returns:
         Tuple[bool, str]: (是否收敛, 收敛原因描述)
     """
     if not iteration_metrics:
         return False, ""
+
+    # min_iters 保护
+    if current_iteration < min_iters:
+        return False, f"未达到最小迭代次数 ({current_iteration}/{min_iters})"
 
     # 检查最近 patience 次迭代
     recent = iteration_metrics[-patience:] if len(iteration_metrics) >= patience else iteration_metrics
@@ -1028,8 +1081,11 @@ def check_convergence(iteration_metrics: List[Dict], reward_threshold: float,
     # 所有 recent 迭代都需要满足条件
     all_reward_ok = True
     all_loss_ok = True
+    all_makespan_gap_ok = True
     loss_details = []
 
+    # 计算 Makespan Gap 统计
+    gaps = []
     for m in recent:
         reward = m.get('episode_reward', 0.0)
         if reward_threshold > 0 and reward < reward_threshold:
@@ -1042,25 +1098,47 @@ def check_convergence(iteration_metrics: List[Dict], reward_threshold: float,
                         all_loss_ok = False
                         loss_details.append(f"{key}={value:.6f}")
 
+        # Makespan Gap 检查
+        if makespan_gap_threshold > 0:
+            makespan = m.get('makespan', 0.0)
+            lower_bound = m.get('makespan_lower_bound', 0.0)
+            if lower_bound > 0 and makespan > 0:
+                gap = (makespan - lower_bound) / lower_bound
+                gaps.append(gap)
+
+    # Makespan Gap 使用平均值判断（适应不同实例规模）
+    avg_gap = 0.0
+    if makespan_gap_threshold > 0 and gaps:
+        avg_gap = sum(gaps) / len(gaps)
+        if avg_gap > makespan_gap_threshold:
+            all_makespan_gap_ok = False
+
     reasons = []
     if all_reward_ok and reward_threshold > 0:
         reasons.append(f"reward >= {reward_threshold}")
     if all_loss_ok and loss_threshold is not None:
         reasons.append(f"all losses < {loss_threshold}")
+    if all_makespan_gap_ok and makespan_gap_threshold > 0 and gaps:
+        reasons.append(f"avg makespan gap {avg_gap:.1%} < {makespan_gap_threshold:.1%}")
 
     # 所有启用的条件都满足才收敛
-    if reward_threshold > 0 and loss_threshold is not None:
-        converged = all_reward_ok and all_loss_ok
-    elif reward_threshold > 0:
-        converged = all_reward_ok
-    elif loss_threshold is not None:
-        converged = all_loss_ok
-    else:
-        converged = False
+    conditions = []
+    if reward_threshold > 0:
+        conditions.append(all_reward_ok)
+    if loss_threshold is not None:
+        conditions.append(all_loss_ok)
+    if makespan_gap_threshold > 0:
+        conditions.append(all_makespan_gap_ok)
+
+    converged = all(conditions) if conditions else False
 
     if converged:
         reason = ", ".join(reasons)
         return True, f"连续 {patience} 次满足: {reason}"
+
+    # 提供不收敛的具体原因
+    if not all_makespan_gap_ok:
+        return False, f"makespan gap {avg_gap:.1%} > {makespan_gap_threshold:.1%}"
 
     return False, ""
 
@@ -1210,6 +1288,7 @@ def main():
     # 更新全局配置
     global REWARD_THRESHOLD, MAX_ITERATIONS, POLL_INTERVAL, POLL_TIMEOUT
     global LOSS_THRESHOLD, CONVERGENCE_PATIENCE
+    global MIN_ITERS, MAKESPAN_GAP_THRESHOLD
     BACKEND_PORT = args.port
     BACKEND_URL = f"http://{BACKEND_HOST}:{BACKEND_PORT}"
     REWARD_THRESHOLD = args.reward_threshold
@@ -1218,6 +1297,8 @@ def main():
     POLL_TIMEOUT = args.poll_timeout
     LOSS_THRESHOLD = args.loss_threshold
     CONVERGENCE_PATIENCE = args.patience
+    MIN_ITERS = args.min_iters
+    MAKESPAN_GAP_THRESHOLD = args.makespan_gap_threshold
 
     # 重新计算 API 端点（因为 BACKEND_URL 已更新）
     global API_FACTORY_SWITCH, API_HEALTH, API_YAML_UPLOAD, API_MAP_RENDER, API_JOBS_PROGRESS
@@ -1236,6 +1317,8 @@ def main():
     logger.info(f"Reward 阈值: {REWARD_THRESHOLD:.2f}")
     logger.info(f"Loss 阈值: {LOSS_THRESHOLD if LOSS_THRESHOLD is not None else '不检查'}")
     logger.info(f"收敛耐心度: {CONVERGENCE_PATIENCE}")
+    logger.info(f"最小迭代次数: {MIN_ITERS}")
+    logger.info(f"Makespan Gap 阈值: {MAKESPAN_GAP_THRESHOLD*100:.1f}%")
     logger.info(f"最大迭代次数: {MAX_ITERATIONS}")
     logger.info(f"前端脚本日志级别: {args.log_level.upper()}")
     logger.info(f"后端服务日志级别: {args.backend_log_level.upper()}")
@@ -1255,12 +1338,17 @@ def main():
             # 检查是否达到收敛条件
             if iteration > 0 and iteration_metrics:
                 converged, reason = check_convergence(
-                    iteration_metrics, REWARD_THRESHOLD, LOSS_THRESHOLD, CONVERGENCE_PATIENCE
+                    iteration_metrics, REWARD_THRESHOLD, LOSS_THRESHOLD, CONVERGENCE_PATIENCE,
+                    min_iters=MIN_ITERS, current_iteration=iteration,
+                    makespan_gap_threshold=MAKESPAN_GAP_THRESHOLD,
                 )
                 if converged:
                     logger.info(f"\n=== 训练收敛，停止迭代 ===")
                     logger.info(f"收敛原因: {reason}")
                     break
+                else:
+                    if reason:
+                        logger.info(f"未收敛: {reason}")
 
             # 随机选择数据文件
             data_file = select_random_data_file()
@@ -1293,21 +1381,31 @@ def main():
                 iteration += 1
                 continue
 
+            # 计算当前实例的 makespan 下界（用于 Makespan Gap 早停）
+            try:
+                parsed_lb_data = parse_agv_instance(data_file)
+                lower_bound = compute_makespan_lower_bound(parsed_lb_data)
+            except Exception:
+                lower_bound = 1.0
+
             # 执行训练
             success, makespan = run_training_iteration(iteration, data_file)
 
             # 收集本次迭代的指标
             metrics = get_latest_training_metrics()
             metrics['makespan'] = makespan
+            metrics['makespan_lower_bound'] = lower_bound
+            metrics['makespan_gap'] = (makespan - lower_bound) / lower_bound if lower_bound > 0 else float('inf')
             metrics['iteration_success'] = success
             iteration_metrics.append(metrics)
 
             # 输出本次迭代的关键指标
             episode_reward = metrics.get('episode_reward', 0.0)
             epsilon = metrics.get('epsilon', 'N/A')
+            makespan_gap = metrics.get('makespan_gap', float('inf'))
             loss_keys = {k: v for k, v in metrics.items() if 'loss' in k.lower() and isinstance(v, (int, float))}
             logger.info(f"[迭代 {iteration} 指标] reward={episode_reward:.4f}, "
-                        f"makespan={makespan:.2f}, epsilon={epsilon}"
+                        f"makespan={makespan:.2f}, makespan_gap={makespan_gap:.1%}, epsilon={epsilon}"
                         + (f", losses={{{', '.join(f'{k}={v:.6f}' for k, v in loss_keys.items())}}}"
                            if loss_keys else ""))
 
