@@ -29,5 +29,9 @@ def create_context():
     # 初始化环境本身的文件（例如地图、数据源等）
     env = initialize_env(config, agent)
 
+    # ---------- 绑定上下文 ----------
+    # 让 Agent 可以访问环境状态（用于 reward 计算等）
+    agent.context = env
+
     LOGGER.info(f"[Context] Created.")
     return env, agent

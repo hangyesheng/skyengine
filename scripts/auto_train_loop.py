@@ -7,21 +7,32 @@
 3. POST YAML_UPLOAD 注入配置
 4. POST MAP_RENDER 启动工厂生成
 5. 轮询 JOBS_PROGRESS 检测任务完成，完成后关闭后端
-6. 重复 2-5 直到达到结束条件（累积 reward 达到阈值）
+6. 重复 2-5 直到达到结束条件（reward 阈值、loss 阈值、或最大迭代次数）
+
+收敛检测条件（可组合）：
+- reward 阈值：当 episode reward >= 阈值时判定收敛
+- loss 阈值：当所有 loss 指标 < 阈值时判定收敛
+- 收敛耐心度：连续满足所有条件的迭代次数
 
 用法：
-    uv run python scripts/auto_train_loop.py [--log-level DEBUG|INFO|WARNING|ERROR] [--backend-log-level DEBUG|INFO|WARNING|ERROR] [--reward-threshold VALUE] [--max-iterations VALUE] [--port PORT]
+    uv run python scripts/auto_train_loop.py [选项]
 
 示例：
     # 使用默认端口 8000
     python scripts/auto_train_loop.py
-    
+
     # 指定自定义端口
     python scripts/auto_train_loop.py --port 8001
     python scripts/auto_train_loop.py --port 9000 --log-level INFO
-    
+
     # 组合多个参数
     python scripts/auto_train_loop.py --port 8080 --reward-threshold 500 --max-iterations 100
+
+    # 启用 loss 收敛检测
+    python scripts/auto_train_loop.py --loss-threshold 0.01 --patience 3
+
+    # 同时使用 reward 和 loss 收敛检测（两者都满足时停止）
+    python scripts/auto_train_loop.py --reward-threshold 500 --loss-threshold 0.1 --patience 2
 """
 import subprocess
 import random
@@ -55,6 +66,8 @@ RESULTS_DIR = TRAINING_LOGS / "results"
 
 # 结束条件配置
 REWARD_THRESHOLD = 1000.0  # 累积 reward 阈值
+LOSS_THRESHOLD = None  # Loss 阈值（None 表示不检查）
+CONVERGENCE_PATIENCE = 1  # 收敛满足条件的连续迭代次数
 MAX_ITERATIONS = 1000  # 最大迭代次数（防止无限循环）
 POLL_INTERVAL = 2  # 轮询间隔（秒）
 POLL_TIMEOUT = 7200  # 单次训练超时（秒）= 2小时
@@ -117,7 +130,7 @@ def parse_args():
         argparse.Namespace: 解析后的参数
     """
     parser = argparse.ArgumentParser(
-        description="自动化训练循环脚本",
+        description="自动化训练循环脚本（支持 reward/loss 收敛检测）",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 示例:
@@ -128,6 +141,8 @@ def parse_args():
   python scripts/auto_train_loop.py --max-iterations 100 --poll-interval 5
   python scripts/auto_train_loop.py --port 8001
   python scripts/auto_train_loop.py --port 9000 --log-level INFO
+  python scripts/auto_train_loop.py --loss-threshold 0.01 --patience 3
+  python scripts/auto_train_loop.py --reward-threshold 500 --loss-threshold 0.1 --patience 2
         """
     )
     
@@ -153,7 +168,21 @@ def parse_args():
         default=REWARD_THRESHOLD,
         help=f'累积 reward 阈值 (默认: {REWARD_THRESHOLD})'
     )
-    
+
+    parser.add_argument(
+        '--loss-threshold',
+        type=float,
+        default=None,
+        help='Loss 阈值：当所有 loss 指标低于此值时判定收敛 (默认: 不检查)'
+    )
+
+    parser.add_argument(
+        '--patience',
+        type=int,
+        default=CONVERGENCE_PATIENCE,
+        help=f'收敛耐心度：连续满足所有收敛条件的迭代次数 (默认: {CONVERGENCE_PATIENCE})'
+    )
+
     parser.add_argument(
         '--max-iterations',
         type=int,
@@ -818,7 +847,23 @@ def poll_jobs_completion(timeout: int = POLL_TIMEOUT) -> Tuple[bool, List[dict],
             # 每30秒打印一次状态
             if time.time() - last_status_log > 30:
                 elapsed = time.time() - start_time
-                logger.info(f"训练进行中... ({int(elapsed)}s)")
+                # 从 /factory/alive 响应获取实时训练指标
+                live_metrics = data.get('training_metrics', {}) if resp and resp.status_code == 200 else {}
+                if not live_metrics:
+                    live_metrics = get_latest_training_metrics()
+                metric_str = ""
+                if live_metrics:
+                    ep_reward = live_metrics.get('episode_reward', None)
+                    epsilon = live_metrics.get('epsilon', None)
+                    if ep_reward is not None:
+                        metric_str += f", reward={ep_reward:.4f}"
+                    if epsilon is not None:
+                        metric_str += f", epsilon={epsilon}"
+                    loss_info = {k: f"{v:.6f}" for k, v in live_metrics.items()
+                                if 'loss' in k.lower() and isinstance(v, (int, float))}
+                    if loss_info:
+                        metric_str += f", {loss_info}"
+                logger.info(f"训练进行中... ({int(elapsed)}s{metric_str})")
                 last_status_log = time.time()
 
         time.sleep(POLL_INTERVAL)
@@ -879,48 +924,156 @@ def get_actual_makespan_from_result() -> float:
 
 def get_cumulative_reward() -> float:
     """
-    获取累积 reward
+    获取最新一次训练的 episode reward
+
+    优先从 training_report.json 的 training_metrics.episode_reward 读取，
+    其次尝试从 training_metrics.decision_stats 中读取，
+    最后尝试从 agent 模型文件中读取 training_history。
 
     Returns:
-        float: 累积 reward 值
+        float: episode reward 值
     """
     result = get_latest_training_result()
-    if result and 'decision_stats' in result:
-        # 从 decision_stats 中获取 total_reward
-        stats = result['decision_stats']
-        if 'total_reward' in stats:
-            return stats['total_reward']
-        elif isinstance(stats, dict):
-            # 尝试其他可能的字段
-            for key in ['total_rewards', 'cumulative_reward', 'reward']:
-                if key in stats:
-                    return stats[key]
 
-    # 如果没有找到，尝试从 agent_model.json 获取
-    model_file = TRAINING_LOGS / "models" / "DualDRLAgent" / "agent_model.json"
-    if model_file.exists():
-        try:
-            with open(model_file, 'r', encoding='utf-8') as f:
-                model_data = json.load(f)
-                history = model_data.get('training_history', {})
-                rewards = history.get('total_rewards', [])
-                if rewards:
-                    return sum(rewards)
-        except Exception:
-            pass
+    # 优先从 training_metrics 读取
+    if result and 'training_metrics' in result:
+        metrics = result['training_metrics']
+        if 'episode_reward' in metrics:
+            return float(metrics['episode_reward'])
+
+    # 尝试从 decision_stats 读取（兼容旧格式）
+    if result and 'decision_stats' in result:
+        stats = result['decision_stats']
+        for key in ['total_reward', 'episode_reward', 'total_rewards', 'cumulative_reward', 'reward']:
+            if key in stats:
+                return float(stats[key])
+
+    # 最后尝试从 agent 模型目录中读取 training_history
+    models_dir = TRAINING_LOGS / "models"
+    if models_dir.exists():
+        for agent_dir in sorted(models_dir.iterdir(), key=lambda d: d.stat().st_mtime, reverse=True):
+            if not agent_dir.is_dir():
+                continue
+            # 尝试 JSON 格式
+            json_file = agent_dir / "agent_model.json"
+            if json_file.exists():
+                try:
+                    with open(json_file, 'r', encoding='utf-8') as f:
+                        model_data = json.load(f)
+                    history = model_data.get('training_history', {})
+                    for key in ['total_rewards', 'episode_reward']:
+                        vals = history.get(key, [])
+                        if vals:
+                            return float(vals[-1]) if isinstance(vals[-1], (int, float)) else float(sum(vals))
+                except Exception:
+                    pass
+
+            # 尝试 PyTorch 格式（需读取 JSON backup 或跳过）
+            pt_file = agent_dir / "agent_model.pt"
+            if pt_file.exists():
+                try:
+                    import torch
+                    checkpoint = torch.load(str(pt_file), map_location='cpu', weights_only=False)
+                    history = checkpoint.get('training_history', {})
+                    for key in ['total_rewards', 'episode_reward']:
+                        vals = history.get(key, [])
+                        if vals:
+                            return float(vals[-1]) if isinstance(vals[-1], (int, float)) else float(sum(vals))
+                except Exception:
+                    pass
 
     return 0.0
 
 
+def get_latest_training_metrics() -> Dict:
+    """
+    获取最新训练结果的 training_metrics 字典
+
+    Returns:
+        Dict: training_metrics 字典，如果不存在则返回空字典
+    """
+    result = get_latest_training_result()
+    if result and 'training_metrics' in result:
+        return result['training_metrics']
+    return {}
+
+
+def check_convergence(iteration_metrics: List[Dict], reward_threshold: float,
+                      loss_threshold: Optional[float], patience: int) -> Tuple[bool, str]:
+    """
+    检查训练是否收敛
+
+    收敛条件：
+    1. episode_reward >= reward_threshold（如果 reward_threshold > 0）
+    2. 所有 loss 指标 < loss_threshold（如果 loss_threshold 不为 None）
+    3. 以上条件连续满足 patience 次迭代
+
+    Args:
+        iteration_metrics: 历次迭代的 metrics 列表
+        reward_threshold: reward 阈值
+        loss_threshold: loss 阈值（None 表示不检查）
+        patience: 连续满足条件的迭代次数
+
+    Returns:
+        Tuple[bool, str]: (是否收敛, 收敛原因描述)
+    """
+    if not iteration_metrics:
+        return False, ""
+
+    # 检查最近 patience 次迭代
+    recent = iteration_metrics[-patience:] if len(iteration_metrics) >= patience else iteration_metrics
+    if len(recent) < patience:
+        return False, ""
+
+    # 所有 recent 迭代都需要满足条件
+    all_reward_ok = True
+    all_loss_ok = True
+    loss_details = []
+
+    for m in recent:
+        reward = m.get('episode_reward', 0.0)
+        if reward_threshold > 0 and reward < reward_threshold:
+            all_reward_ok = False
+
+        if loss_threshold is not None:
+            for key, value in m.items():
+                if 'loss' in key.lower() and isinstance(value, (int, float)):
+                    if value >= loss_threshold:
+                        all_loss_ok = False
+                        loss_details.append(f"{key}={value:.6f}")
+
+    reasons = []
+    if all_reward_ok and reward_threshold > 0:
+        reasons.append(f"reward >= {reward_threshold}")
+    if all_loss_ok and loss_threshold is not None:
+        reasons.append(f"all losses < {loss_threshold}")
+
+    # 所有启用的条件都满足才收敛
+    if reward_threshold > 0 and loss_threshold is not None:
+        converged = all_reward_ok and all_loss_ok
+    elif reward_threshold > 0:
+        converged = all_reward_ok
+    elif loss_threshold is not None:
+        converged = all_loss_ok
+    else:
+        converged = False
+
+    if converged:
+        reason = ", ".join(reasons)
+        return True, f"连续 {patience} 次满足: {reason}"
+
+    return False, ""
+
+
 def check_reward_threshold() -> bool:
     """
-    检查累积 reward 是否达到阈值
+    检查累积 reward 是否达到阈值（兼容旧接口）
 
     Returns:
         bool: 是否达到阈值
     """
     cumulative_reward = get_cumulative_reward()
-    logger.info(f"当前累积 reward: {cumulative_reward:.2f}, 阈值: {REWARD_THRESHOLD:.2f}")
+    logger.info(f"当前 episode reward: {cumulative_reward:.2f}, 阈值: {REWARD_THRESHOLD:.2f}")
     return cumulative_reward >= REWARD_THRESHOLD
 
 
@@ -1053,16 +1206,19 @@ def main():
 
     # 解析命令行参数
     args = parse_args()
-    
+
     # 更新全局配置
     global REWARD_THRESHOLD, MAX_ITERATIONS, POLL_INTERVAL, POLL_TIMEOUT
+    global LOSS_THRESHOLD, CONVERGENCE_PATIENCE
     BACKEND_PORT = args.port
     BACKEND_URL = f"http://{BACKEND_HOST}:{BACKEND_PORT}"
     REWARD_THRESHOLD = args.reward_threshold
     MAX_ITERATIONS = args.max_iterations
     POLL_INTERVAL = args.poll_interval
     POLL_TIMEOUT = args.poll_timeout
-    
+    LOSS_THRESHOLD = args.loss_threshold
+    CONVERGENCE_PATIENCE = args.patience
+
     # 重新计算 API 端点（因为 BACKEND_URL 已更新）
     global API_FACTORY_SWITCH, API_HEALTH, API_YAML_UPLOAD, API_MAP_RENDER, API_JOBS_PROGRESS
     API_FACTORY_SWITCH = f"{BACKEND_URL}/factory/control/switch"
@@ -1070,7 +1226,7 @@ def main():
     API_YAML_UPLOAD = f"{BACKEND_URL}/{{config_name}}/yaml/upload"
     API_MAP_RENDER = f"{BACKEND_URL}/map/render"
     API_JOBS_PROGRESS = f"{BACKEND_URL}/jobs/progress"
-    
+
     # 设置前端脚本日志级别
     setup_logging(args.log_level)
 
@@ -1078,6 +1234,8 @@ def main():
     logger.info("自动化训练循环脚本")
     logger.info(f"后端端口: {BACKEND_PORT}")
     logger.info(f"Reward 阈值: {REWARD_THRESHOLD:.2f}")
+    logger.info(f"Loss 阈值: {LOSS_THRESHOLD if LOSS_THRESHOLD is not None else '不检查'}")
+    logger.info(f"收敛耐心度: {CONVERGENCE_PATIENCE}")
     logger.info(f"最大迭代次数: {MAX_ITERATIONS}")
     logger.info(f"前端脚本日志级别: {args.log_level.upper()}")
     logger.info(f"后端服务日志级别: {args.backend_log_level.upper()}")
@@ -1087,14 +1245,22 @@ def main():
     signal.signal(signal.SIGINT, signal_handler)
     signal.signal(signal.SIGTERM, signal_handler)
 
+    # 跨迭代指标追踪
+    iteration_metrics: List[Dict] = []
+
     try:
         # 训练循环
         iteration = 0
         while iteration < MAX_ITERATIONS:
-            # 检查是否达到阈值
-            if iteration > 0 and check_reward_threshold():
-                logger.info("\n=== 达到累积 reward 阈值，停止训练 ===")
-                break
+            # 检查是否达到收敛条件
+            if iteration > 0 and iteration_metrics:
+                converged, reason = check_convergence(
+                    iteration_metrics, REWARD_THRESHOLD, LOSS_THRESHOLD, CONVERGENCE_PATIENCE
+                )
+                if converged:
+                    logger.info(f"\n=== 训练收敛，停止迭代 ===")
+                    logger.info(f"收敛原因: {reason}")
+                    break
 
             # 随机选择数据文件
             data_file = select_random_data_file()
@@ -1106,13 +1272,13 @@ def main():
             logger.info("="*60)
             logger.info(f"[迭代 {iteration}] 启动新的后端实例...")
             logger.info("="*60)
-            
+
             # 如果后端已在运行，先关闭
             if backend_process is not None:
                 logger.info("关闭上一次迭代的后端...")
                 stop_backend()
                 time.sleep(2)  # 等待端口释放
-            
+
             # 启动新的后端（传递后端日志级别）
             if not start_backend(backend_log_level=args.backend_log_level):
                 logger.error("后端启动失败，跳过本次迭代")
@@ -1129,6 +1295,22 @@ def main():
 
             # 执行训练
             success, makespan = run_training_iteration(iteration, data_file)
+
+            # 收集本次迭代的指标
+            metrics = get_latest_training_metrics()
+            metrics['makespan'] = makespan
+            metrics['iteration_success'] = success
+            iteration_metrics.append(metrics)
+
+            # 输出本次迭代的关键指标
+            episode_reward = metrics.get('episode_reward', 0.0)
+            epsilon = metrics.get('epsilon', 'N/A')
+            loss_keys = {k: v for k, v in metrics.items() if 'loss' in k.lower() and isinstance(v, (int, float))}
+            logger.info(f"[迭代 {iteration} 指标] reward={episode_reward:.4f}, "
+                        f"makespan={makespan:.2f}, epsilon={epsilon}"
+                        + (f", losses={{{', '.join(f'{k}={v:.6f}' for k, v in loss_keys.items())}}}"
+                           if loss_keys else ""))
+
             iteration += 1
 
             # 短暂休息，避免太快
@@ -1139,10 +1321,17 @@ def main():
 
         # 打印最终统计
         cumulative_reward = get_cumulative_reward()
+        final_metrics = iteration_metrics[-1] if iteration_metrics else {}
+        final_reward = final_metrics.get('episode_reward', 0.0)
+        final_losses = {k: v for k, v in final_metrics.items() if 'loss' in k.lower() and isinstance(v, (int, float))}
+
         logger.info("\n" + "="*60)
         logger.info("训练完成!")
         logger.info(f"总迭代次数: {iteration}")
-        logger.info(f"累积 reward: {cumulative_reward:.2f}")
+        logger.info(f"最终 episode reward: {final_reward:.4f}")
+        if final_losses:
+            logger.info(f"最终 losses: {{{', '.join(f'{k}={v:.6f}' for k, v in final_losses.items())}}}")
+        logger.info(f"最终 makespan: {final_metrics.get('makespan', 0.0):.2f}")
         logger.info("="*60)
 
     except KeyboardInterrupt:

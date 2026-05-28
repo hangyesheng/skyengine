@@ -316,6 +316,10 @@ class PacketFactoryEnv(ParallelEnv):
         # 重置 Agent 的决策统计
         if hasattr(self.agent, 'reset_decision_stats'):
             self.agent.reset_decision_stats()
+
+        # 重置 Agent 的 episode 状态
+        if hasattr(self.agent, 'new_episode'):
+            self.agent.new_episode()
                 
         # 重新初始化环境
         self.refresh_status()

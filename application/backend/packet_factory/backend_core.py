@@ -20,6 +20,10 @@ from application.backend.packet_factory.service import file_service
 from executor.packet_factory.logger.logger import Logger
 from executor.packet_factory.packet_factory.Agent.BaseAgent import FRONTEND, BACKEND, TRAINING, INFERENCE
 
+# 训练间隔：每隔多少步调用一次 agent.train()
+# 避免每步都训练导致性能瓶颈（尤其是 GraphDPAgent 的 rewalk 开销随 episode 增长）
+TRAIN_INTERVAL = 20
+
 LOGGER = Logger(log_path=config.BACKEND_LOG_DIR, name="backend").logger
 
 
@@ -77,6 +81,8 @@ class BackendCore:
         # 训练完成标记（用于客户端检测快速完成的训练）
         self._training_completed = False
         self._last_makespan = 0
+        # 实时训练指标（训练线程写入，API 读取）
+        self._live_metrics = {}
 
     def bootstrap(self, stop_event: threading.Event, target_factory: str):
         specific_config = self.config_store[target_factory]
@@ -133,22 +139,39 @@ class BackendCore:
         :param stop_event: 停止事件
         """
         LOGGER.info("[Frontend+Training] Starting frontend training mode with visualization...")
-        
+
+        step_count = 0
         # 运行一个 episode（直到结束）
         while not (env.env_is_finished() and not stop_event.is_set()):
+            step_count += 1
             # 输入获得环境状态并决策
             actions = env.action_space(agent)
 
             # agent 在外部决策
             observations, rewards, terminations, truncations, infos = env.step(actions)
 
-            # 训练更新
-            if hasattr(agent, 'update'):
-                agent.update(observations, rewards)
+            # 训练更新（每 TRAIN_INTERVAL 步）
+            if step_count % TRAIN_INTERVAL == 0:
+                if hasattr(agent, 'update'):
+                    agent.update(observations, rewards)
+                elif hasattr(agent, 'train'):
+                    agent.train(observations, rewards, terminations, truncations, infos)
+
+            # 每 50 步打印训练指标
+            if step_count % 50 == 0 and hasattr(agent, 'get_training_metrics'):
+                metrics = agent.get_training_metrics()
+                ep_reward = metrics.get('episode_reward', 0.0)
+                epsilon = metrics.get('epsilon', 'N/A')
+                loss_info = {k: f"{v:.6f}" for k, v in metrics.items()
+                             if 'loss' in k.lower() and isinstance(v, (int, float))}
+                LOGGER.info(f"[Step {step_count}] reward={ep_reward:.4f}, "
+                            f"epsilon={epsilon}, timeline={env.env_timeline}"
+                            + (f", {loss_info}" if loss_info else ""))
+                self._live_metrics = metrics
 
         # 保存训练结果
         self._save_training_results(env, agent)
-        
+
         LOGGER.info(f"[Frontend+Training] Total makespan: {env.env_timeline}s")
 
     def _run_frontend_inference(self, env, agent, stop_event: threading.Event):
@@ -201,9 +224,23 @@ class BackendCore:
             # agent 在外部决策
             observations, rewards, terminations, truncations, infos = env.step(actions)
 
-            # 训练更新
-            if hasattr(agent, 'update'):
-                agent.update(observations, rewards)
+            # 训练更新（每 TRAIN_INTERVAL 步）
+            if step_count % TRAIN_INTERVAL == 0:
+                if hasattr(agent, 'update'):
+                    agent.update(observations, rewards)
+                elif hasattr(agent, 'train'):
+                    agent.train(observations, rewards, terminations, truncations, infos)
+
+            # 每 50 步打印训练指标
+            if step_count % 50 == 0 and hasattr(agent, 'get_training_metrics'):
+                metrics = agent.get_training_metrics()
+                ep_reward = metrics.get('episode_reward', 0.0)
+                epsilon = metrics.get('epsilon', 'N/A')
+                loss_info = {k: f"{v:.6f}" for k, v in metrics.items()
+                             if 'loss' in k.lower() and isinstance(v, (int, float))}
+                LOGGER.info(f"[Backend+Training] Metrics @step {step_count}: "
+                            f"reward={ep_reward:.4f}, epsilon={epsilon}, timeline={env.env_timeline}"
+                            + (f", {loss_info}" if loss_info else ""))
 
         # 保存训练结果
         self._save_training_results(env, agent)
@@ -310,6 +347,7 @@ class BackendCore:
                     'makespan': env.env_timeline,
                     'decision_stats': agent.get_decision_stats() if hasattr(agent, 'get_decision_stats') else {},
                     'q_table_size': len(getattr(agent, 'q_table', {})),
+                    'training_metrics': agent.get_training_metrics() if hasattr(agent, 'get_training_metrics') else {},
                     'metadata': {
                         'agent_name': agent_name,
                         'agent_id': getattr(agent, 'agent_id', None),

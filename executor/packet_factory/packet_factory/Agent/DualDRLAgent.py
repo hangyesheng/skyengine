@@ -814,6 +814,15 @@ class DualDRLAgent(BaseAgent):
         
         return decisions, step_time
     
+    def get_training_metrics(self) -> Dict[str, Any]:
+        """Return training metrics for convergence detection."""
+        metrics = {
+            'episode_reward': self.current_episode_reward,
+            'epsilon': self.epsilon,
+            'training_history': self.training_history,
+        }
+        return metrics
+
     def is_finish(self) -> bool:
         """判断任务是否完成"""
         return not self.alive

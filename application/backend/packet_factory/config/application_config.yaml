@@ -27,6 +27,23 @@ config:
       model_path: ./training_logs/models/GraphDPAgent/agent_model.pt  # 模型文件路径
       time_limit_seconds: 30  # OR-Tools求解时间限制（秒）
       fallback_enabled: true  # 求解失败时是否回退到贪心算法
+
+      # 计算设备配置
+      device: cuda           # cuda | cpu | auto（auto=有GPU用GPU，否则CPU）
+
+      # GraphDPAgent 超参数（其他 Agent 自动忽略不认识的参数）
+      hidden_dim: 64
+      gamma: 0.99
+      lr_gnn: 0.0001
+      lr_trans: 0.001
+      lr_value: 0.001
+      alpha: 1.0
+      rewalk_iters: 0
+      buffer_capacity: 5000
+      batch_size: 64
+      epsilon: 1.0
+      epsilon_decay: 0.998
+      epsilon_min: 0.01
       
       # 模式组合说明：
       # 1. ui_mode=frontend + task_mode=training: 前台训练模式（有界面，进行训练）
