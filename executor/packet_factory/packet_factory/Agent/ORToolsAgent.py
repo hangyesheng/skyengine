@@ -1,9 +1,6 @@
 """
 ORTools Agent for Flexible Job Shop Scheduling.
 Uses OR-Tools CP-SAT solver to find globally optimal or near-optimal schedules.
-
-This agent operates in 'optimization' mode, solving the full scheduling problem
-at each decision point rather than using event-driven DRL.
 """
 
 from typing import List, Tuple, Any, Optional
