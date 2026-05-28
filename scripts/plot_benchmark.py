@@ -40,12 +40,14 @@ AGENT_COLORS = {
     "DualDRLAgent": "#2196F3",
     "ORToolsAgent": "#4CAF50",
     "ORToolsBatchAgent": "#FF9800",
+    "GraphDPAgent": "#9C27B0",
 }
 
 AGENT_LABELS = {
     "DualDRLAgent": "DualDRL",
     "ORToolsAgent": "OR-Tools",
     "ORToolsBatchAgent": "OR-Tools Batch",
+    "GraphDPAgent": "GraphDP",
 }
 
 METRIC_LABELS = {
