@@ -241,6 +241,7 @@ class BackendCore:
                 LOGGER.info(f"[Backend+Training] Metrics @step {step_count}: "
                             f"reward={ep_reward:.4f}, epsilon={epsilon}, timeline={env.env_timeline}"
                             + (f", {loss_info}" if loss_info else ""))
+                self._live_metrics = metrics
 
         # 保存训练结果
         self._save_training_results(env, agent)
