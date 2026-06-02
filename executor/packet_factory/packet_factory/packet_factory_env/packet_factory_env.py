@@ -286,7 +286,8 @@ class PacketFactoryEnv(ParallelEnv):
         
         # === 2. 统计完成状态，计算奖励 ===
         agent_id = self.agent.agent_id if self.agent.agent_id is not None else 'agent'
-        rewards_dict: Dict[str, Any] = {agent_id: self.agent.reward({})}
+        env_info = {'makespan': self.env_timeline, 'machines': self.machines, 'jobs': self.jobs, 'agvs': self.agvs}
+        rewards_dict: Dict[str, Any] = {agent_id: self.agent.reward(env_info)}
         obs = self._get_obs()
     
         # ---------- 更新可视化（支持为空）----------

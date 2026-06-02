@@ -9,10 +9,13 @@
 5. 轮询 JOBS_PROGRESS 检测任务完成，完成后关闭后端
 6. 重复 2-5 直到达到结束条件（reward 阈值、loss 阈值、或最大迭代次数）
 
-收敛检测条件（可组合）：
+收敛检测条件（可组合，所有启用的条件都必须满足）：
 - reward 阈值：当 episode reward >= 阈值时判定收敛
 - loss 阈值：当所有 loss 指标 < 阈值时判定收敛
 - 收敛耐心度：连续满足所有条件的迭代次数
+- reward 稳定性：最近 N 次迭代的 reward 变异系数(CV)低于阈值时判定收敛
+- epsilon 下界：当 epsilon <= 阈值时判定收敛
+- Makespan Gap：当平均 makespan gap < 阈值时判定收敛
 
 用法：
     uv run python scripts/auto_train_loop.py [选项]
@@ -70,6 +73,9 @@ LOSS_THRESHOLD = None  # Loss 阈值（None 表示不检查）
 CONVERGENCE_PATIENCE = 1  # 收敛满足条件的连续迭代次数
 MIN_ITERS = 30  # 最小迭代次数（防止假收敛）
 MAKESPAN_GAP_THRESHOLD = 0.30  # Makespan Gap 早停阈值（相对下界 30%）
+REWARD_STABILITY_WINDOW = None  # Reward 稳定性检测窗口（None 表示不检查）
+REWARD_STABILITY_THRESHOLD = 0.05  # Reward 变异系数阈值（std/mean < 此值视为稳定）
+EPSILON_FLOOR = None  # Epsilon 下界阈值（None 表示不检查）
 MAX_ITERATIONS = 1000  # 最大迭代次数（防止无限循环）
 POLL_INTERVAL = 2  # 轮询间隔（秒）
 POLL_TIMEOUT = 7200  # 单次训练超时（秒）= 2小时
@@ -132,7 +138,7 @@ def parse_args():
         argparse.Namespace: 解析后的参数
     """
     parser = argparse.ArgumentParser(
-        description="自动化训练循环脚本（支持 reward/loss 收敛检测）",
+        description="自动化训练循环脚本（支持 reward/loss/stability 收敛检测）",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 示例:
@@ -145,6 +151,9 @@ def parse_args():
   python scripts/auto_train_loop.py --port 9000 --log-level INFO
   python scripts/auto_train_loop.py --loss-threshold 0.01 --patience 3
   python scripts/auto_train_loop.py --reward-threshold 500 --loss-threshold 0.1 --patience 2
+  python scripts/auto_train_loop.py --reward-stability-window 10 --reward-stability-threshold 0.05
+  python scripts/auto_train_loop.py --epsilon-floor 0.05
+  python scripts/auto_train_loop.py --reward-stability-window 10 --epsilon-floor 0.01 --patience 3
         """
     )
     
@@ -197,6 +206,27 @@ def parse_args():
         type=float,
         default=MAKESPAN_GAP_THRESHOLD,
         help=f'Makespan Gap 早停阈值：相对下界偏差比例 (默认: {MAKESPAN_GAP_THRESHOLD})'
+    )
+
+    parser.add_argument(
+        '--reward-stability-window',
+        type=int,
+        default=None,
+        help=f'Reward 稳定性检测窗口：最近 N 次迭代的 reward 变异系数(CV)低于阈值时判定收敛 (默认: 不检查)'
+    )
+
+    parser.add_argument(
+        '--reward-stability-threshold',
+        type=float,
+        default=REWARD_STABILITY_THRESHOLD,
+        help=f'Reward 稳定性变异系数阈值：std/mean < 此值时视为稳定 (默认: {REWARD_STABILITY_THRESHOLD})'
+    )
+
+    parser.add_argument(
+        '--epsilon-floor',
+        type=float,
+        default=None,
+        help='Epsilon 下界阈值：当 epsilon <= 此值时判定收敛 (默认: 不检查)'
     )
 
     parser.add_argument(
@@ -1045,14 +1075,19 @@ def compute_makespan_lower_bound(parsed_data: dict) -> float:
 def check_convergence(iteration_metrics: List[Dict], reward_threshold: float,
                       loss_threshold: Optional[float], patience: int,
                       min_iters: int = 30, current_iteration: int = 0,
-                      makespan_gap_threshold: float = 0.30) -> Tuple[bool, str]:
-    """检查训练是否收敛（含 min_iters 保护 + Makespan Gap 早停）
+                      makespan_gap_threshold: float = 0.30,
+                      reward_stability_window: Optional[int] = None,
+                      reward_stability_threshold: float = 0.05,
+                      epsilon_floor: Optional[float] = None) -> Tuple[bool, str]:
+    """检查训练是否收敛（含 min_iters 保护 + Makespan Gap 早停 + Reward 稳定性 + Epsilon 下界）
 
     收敛条件（所有启用的条件都必须满足）：
     1. current_iteration >= min_iters（防止假收敛）
     2. episode_reward >= reward_threshold 连续 patience 次（如果 threshold > 0）
     3. 所有 loss 指标 < loss_threshold 连续 patience 次（如果启用）
     4. 平均 Makespan Gap < makespan_gap_threshold 连续 patience 次（如果启用）
+    5. 最近 reward_stability_window 次迭代 reward 变异系数 < reward_stability_threshold（如果启用）
+    6. epsilon <= epsilon_floor（如果启用）
 
     Args:
         iteration_metrics: 历次迭代的 metrics 列表
@@ -1062,6 +1097,9 @@ def check_convergence(iteration_metrics: List[Dict], reward_threshold: float,
         min_iters: 最小迭代次数
         current_iteration: 当前迭代编号
         makespan_gap_threshold: Makespan Gap 阈值（0 表示不检查）
+        reward_stability_window: Reward 稳定性检测窗口大小（None 表示不检查）
+        reward_stability_threshold: Reward 变异系数阈值（std/mean）
+        epsilon_floor: Epsilon 下界阈值（None 表示不检查）
 
     Returns:
         Tuple[bool, str]: (是否收敛, 收敛原因描述)
@@ -1113,6 +1151,29 @@ def check_convergence(iteration_metrics: List[Dict], reward_threshold: float,
         if avg_gap > makespan_gap_threshold:
             all_makespan_gap_ok = False
 
+    # Reward 稳定性检测（最近 window 次迭代的变异系数）
+    reward_stable = True
+    reward_cv = None
+    if reward_stability_window is not None and len(iteration_metrics) >= reward_stability_window:
+        recent_rewards = [m.get('episode_reward', 0.0) for m in iteration_metrics[-reward_stability_window:]]
+        mean_r = sum(recent_rewards) / len(recent_rewards)
+        if abs(mean_r) > 1e-8:
+            std_r = (sum((r - mean_r) ** 2 for r in recent_rewards) / len(recent_rewards)) ** 0.5
+            reward_cv = std_r / abs(mean_r)
+            if reward_cv >= reward_stability_threshold:
+                reward_stable = False
+        elif all(abs(r) < 1e-8 for r in recent_rewards):
+            # 所有 reward 都为 0，不算稳定
+            reward_stable = False
+
+    # Epsilon 下界检测
+    epsilon_at_floor = True
+    latest_epsilon = None
+    if epsilon_floor is not None:
+        latest_epsilon = iteration_metrics[-1].get('epsilon', None)
+        if latest_epsilon is None or latest_epsilon > epsilon_floor:
+            epsilon_at_floor = False
+
     reasons = []
     if all_reward_ok and reward_threshold > 0:
         reasons.append(f"reward >= {reward_threshold}")
@@ -1120,6 +1181,10 @@ def check_convergence(iteration_metrics: List[Dict], reward_threshold: float,
         reasons.append(f"all losses < {loss_threshold}")
     if all_makespan_gap_ok and makespan_gap_threshold > 0 and gaps:
         reasons.append(f"avg makespan gap {avg_gap:.1%} < {makespan_gap_threshold:.1%}")
+    if reward_stable and reward_stability_window is not None and reward_cv is not None:
+        reasons.append(f"reward stable (CV={reward_cv:.4f} < {reward_stability_threshold})")
+    if epsilon_at_floor and epsilon_floor is not None and latest_epsilon is not None:
+        reasons.append(f"epsilon={latest_epsilon:.6f} <= {epsilon_floor}")
 
     # 所有启用的条件都满足才收敛
     conditions = []
@@ -1129,6 +1194,10 @@ def check_convergence(iteration_metrics: List[Dict], reward_threshold: float,
         conditions.append(all_loss_ok)
     if makespan_gap_threshold > 0:
         conditions.append(all_makespan_gap_ok)
+    if reward_stability_window is not None:
+        conditions.append(reward_stable)
+    if epsilon_floor is not None:
+        conditions.append(epsilon_at_floor)
 
     converged = all(conditions) if conditions else False
 
@@ -1139,6 +1208,10 @@ def check_convergence(iteration_metrics: List[Dict], reward_threshold: float,
     # 提供不收敛的具体原因
     if not all_makespan_gap_ok:
         return False, f"makespan gap {avg_gap:.1%} > {makespan_gap_threshold:.1%}"
+    if not reward_stable and reward_cv is not None:
+        return False, f"reward not stable (CV={reward_cv:.4f} >= {reward_stability_threshold})"
+    if not epsilon_at_floor and latest_epsilon is not None:
+        return False, f"epsilon={latest_epsilon:.6f} > {epsilon_floor}"
 
     return False, ""
 
@@ -1289,6 +1362,7 @@ def main():
     global REWARD_THRESHOLD, MAX_ITERATIONS, POLL_INTERVAL, POLL_TIMEOUT
     global LOSS_THRESHOLD, CONVERGENCE_PATIENCE
     global MIN_ITERS, MAKESPAN_GAP_THRESHOLD
+    global REWARD_STABILITY_WINDOW, REWARD_STABILITY_THRESHOLD, EPSILON_FLOOR
     BACKEND_PORT = args.port
     BACKEND_URL = f"http://{BACKEND_HOST}:{BACKEND_PORT}"
     REWARD_THRESHOLD = args.reward_threshold
@@ -1299,6 +1373,9 @@ def main():
     CONVERGENCE_PATIENCE = args.patience
     MIN_ITERS = args.min_iters
     MAKESPAN_GAP_THRESHOLD = args.makespan_gap_threshold
+    REWARD_STABILITY_WINDOW = args.reward_stability_window
+    REWARD_STABILITY_THRESHOLD = args.reward_stability_threshold
+    EPSILON_FLOOR = args.epsilon_floor
 
     # 重新计算 API 端点（因为 BACKEND_URL 已更新）
     global API_FACTORY_SWITCH, API_HEALTH, API_YAML_UPLOAD, API_MAP_RENDER, API_JOBS_PROGRESS
@@ -1319,6 +1396,8 @@ def main():
     logger.info(f"收敛耐心度: {CONVERGENCE_PATIENCE}")
     logger.info(f"最小迭代次数: {MIN_ITERS}")
     logger.info(f"Makespan Gap 阈值: {MAKESPAN_GAP_THRESHOLD*100:.1f}%")
+    logger.info(f"Reward 稳定性: window={REWARD_STABILITY_WINDOW or '不检查'}, CV阈值={REWARD_STABILITY_THRESHOLD}")
+    logger.info(f"Epsilon 下界: {EPSILON_FLOOR if EPSILON_FLOOR is not None else '不检查'}")
     logger.info(f"最大迭代次数: {MAX_ITERATIONS}")
     logger.info(f"前端脚本日志级别: {args.log_level.upper()}")
     logger.info(f"后端服务日志级别: {args.backend_log_level.upper()}")
@@ -1341,6 +1420,9 @@ def main():
                     iteration_metrics, REWARD_THRESHOLD, LOSS_THRESHOLD, CONVERGENCE_PATIENCE,
                     min_iters=MIN_ITERS, current_iteration=iteration,
                     makespan_gap_threshold=MAKESPAN_GAP_THRESHOLD,
+                    reward_stability_window=REWARD_STABILITY_WINDOW,
+                    reward_stability_threshold=REWARD_STABILITY_THRESHOLD,
+                    epsilon_floor=EPSILON_FLOOR,
                 )
                 if converged:
                     logger.info(f"\n=== 训练收敛，停止迭代 ===")
