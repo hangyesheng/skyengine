@@ -61,7 +61,7 @@ AGENT_CONFIGS = {
         "agent_name": "packet_factory.DualDRLAgent",
         "mode": "drl",
         "task_mode": "inference",
-        "model_path": "./training_logs/models/DualDRLAgent/agent_model.json",
+        "model_path": "./training_logs/models/DualDRLAgent/agent_model.pt",
     },
     "ORToolsAgent": {
         "agent_name": "packet_factory.ORToolsAgent",
