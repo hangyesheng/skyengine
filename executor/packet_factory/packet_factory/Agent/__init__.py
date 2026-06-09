@@ -7,4 +7,5 @@ from .DualDRLAgent import *
 from .ORToolsAgent import *
 from .ORToolsBatchAgent import *
 from .GraphDPAgent import *
-__all__ = ['BaseAgent', 'GreedyAgent', 'RandomAgent', 'SimpleRLAgent', 'AdvancedRLAgent', 'DualDRLAgent', 'ORToolsAgent', 'ORToolsBatchAgent', 'GraphDPAgent']
+from .GraphDualAgent import *
+__all__ = ['BaseAgent', 'GreedyAgent', 'RandomAgent', 'SimpleRLAgent', 'AdvancedRLAgent', 'DualDRLAgent', 'ORToolsAgent', 'ORToolsBatchAgent', 'GraphDPAgent', 'GraphDualAgent']
