@@ -44,6 +44,7 @@ class ThreadPool:
             # 创建新的 stop_event
             self.stop_event = threading.Event()
             try:
+                # 将 stop_event 作为第一个参数传入，其余参数透传
                 thread = threading.Thread(target=func, args=(self.stop_event, *args), kwargs=kwargs)
                 thread.daemon = True
                 thread.start()
@@ -84,7 +85,8 @@ class BackendCore:
         # 实时训练指标（训练线程写入，API 读取）
         self._live_metrics = {}
 
-    def bootstrap(self, stop_event: threading.Event, target_factory: str):
+    def bootstrap(self, stop_event: threading.Event, target_factory: str,
+                  agent_name: str = None, ui_mode: str = None, task_mode: str = None):
         specific_config = self.config_store[target_factory]
         LOGGER.info(f"[Bootstrap] 从内存加载配置：{target_factory}")
 
@@ -99,9 +101,22 @@ class BackendCore:
         final_config[env_type]['event_config'] = specific_config['event_config']
         final_config[env_type]['map_config'] = specific_config['map_config']
 
-        # 合并 agent 配置（由 config/agents/ 下的独立文件提供，按需加载）
-        if 'agent' in specific_config:
+        # 覆盖全局 ui_mode / task_mode（由 API 调用方显式指定时生效）
+        if ui_mode is not None:
+            final_config[env_type]['ui_mode'] = ui_mode
+            LOGGER.info(f"[Bootstrap] 覆盖 ui_mode={ui_mode}")
+        if task_mode is not None:
+            final_config[env_type]['task_mode'] = task_mode
+            LOGGER.info(f"[Bootstrap] 覆盖 task_mode={task_mode}")
+
+        # 合并 agent 配置：优先使用指定 agent_name 对应的配置文件，否则回退到 specific_config 中的 agent
+        if agent_name:
+            agent_config = file_service.get_agent_config(agent_name)
+            final_config[env_type]['agent'].update(agent_config)
+            LOGGER.info(f"[Bootstrap] 从 config/agents/{agent_name} 注入 Agent 配置：{agent_config.get('name', 'N/A')}")
+        elif 'agent' in specific_config:
             final_config[env_type]['agent'].update(specific_config['agent'])
+            LOGGER.info(f"[Bootstrap] 从 config_set 配置中合并 Agent 配置")
 
         # 创建环境与智能体
         env, agent = bootstrap(final_config)
@@ -488,7 +503,8 @@ class BackendCore:
     def get_jobs_progress(self):
         """获取任务进度列表（非阻塞，带超时保护）
 
-        使用 getJobTemplates() 而不是 getJobs()，因为后者在训练期间可能被修改
+        使用 getJobs() 获取实时进度（而非 getJobTemplates 的初始快照）。
+        通过子线程+超时保护避免阻塞事件循环。
         """
         if self.env is None:
             return []
@@ -499,10 +515,9 @@ class BackendCore:
 
             def fetch_jobs():
                 try:
-                    # 使用 getJobTemplates() 获取模板作业（稳定数据）
-                    templates: List[Job] = self.env.getJobTemplates()
+                    jobs: List[Job] = self.env.getJobs()
                     result[0] = [{"id": job.id, "status": job.get_status().name, "progress": round(job.get_progress() * 100.0, 2)}
-                                 for job in templates]
+                                 for job in jobs]
                 except Exception as e:
                     exception[0] = e
 
@@ -523,7 +538,7 @@ class BackendCore:
             LOGGER.error(f"[get_jobs_progress] Unexpected error: {e}")
             return []
 
-    def render_map(self, target_factory):
+    def render_map(self, target_factory, agent_name=None, ui_mode=None, task_mode=None):
         """插入配置文件，启动当前渲染地图"""
         # 先关闭之前的线程池（不等待，避免阻塞事件循环）
         LOGGER.info("[render_map] 关闭之前的训练线程...")
@@ -531,9 +546,10 @@ class BackendCore:
         self.env = None
         self._training_completed = False
         self._last_makespan = 0
-        LOGGER.info(f"[render_map] 启动新训练: {target_factory}")
+        LOGGER.info(f"[render_map] 启动新训练: {target_factory}, agent: {agent_name or '未指定'}, "
+                     f"ui_mode: {ui_mode or '默认'}, task_mode: {task_mode or '默认'}")
         # 启动新的训练
-        self.thread_pool.submit(self.bootstrap, target_factory)
+        self.thread_pool.submit(self.bootstrap, target_factory, agent_name, ui_mode, task_mode)
 
     def shutdown(self, wait=True):
         """关闭线程池，重置环境状态"""

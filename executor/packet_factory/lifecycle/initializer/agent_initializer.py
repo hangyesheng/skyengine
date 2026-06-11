@@ -3,24 +3,26 @@ from executor.packet_factory.registry.factory import create_component_by_id
 # 这些 key 已在下方显式提取，不应再作为 **kwargs 传入（避免重复参数）
 _EXPLICIT_KEYS = frozenset([
     'agent_name', 'name', 'id',
-    'ui_mode', 'task_mode', 'model_path',
+    'mode', 'model_path',
     'time_limit_seconds', 'fallback_enabled',
 ])
 
 
 def initialize_agent(config):
     """
-    初始化 Agent，传递 ui_mode、task_mode 和 model_path 参数
+    初始化 Agent，从 simulation 层级读取 ui_mode、task_mode，
+    从 agent 配置读取 mode、model_path 等参数，
     以及 YAML agent 段中的其余参数（device, hidden_dim, gamma 等）
     :param config: 配置字典
     :return: Agent 实例
     """
     env_type = config.get("env_type")
-    agent_config = config.get(env_type).get("agent")
+    env_config = config.get(env_type)
+    agent_config = env_config.get("agent")
 
-    # 获取强化学习相关配置 - 2x2 模式
-    ui_mode = agent_config.get("ui_mode", "backend")      # frontend | backend
-    task_mode = agent_config.get("task_mode", "training")  # training | inference
+    # 从 simulation 层级读取全局控制参数（2x2 模式矩阵）
+    ui_mode = env_config.get("ui_mode", "backend")      # frontend | backend
+    task_mode = env_config.get("task_mode", "training")  # training | inference
     model_path = agent_config.get("model_path")
 
     # 获取 OR-Tools 优化器参数

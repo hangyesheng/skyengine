@@ -84,6 +84,39 @@ def get_log(log_path):
     return log_files[0]
 
 
+def get_agent_dir():
+    """返回 config/agents/ 目录的路径"""
+    return os.path.join(config.dir_path, 'agents')
+
+
+def get_agent_list():
+    """
+    扫描 config/agents/ 目录下的所有 .yaml 文件，返回文件名称列表。
+    返回：
+        List[str]: 所有 .yaml 文件的名称列表。
+    """
+    agent_dir = get_agent_dir()
+    if not os.path.exists(agent_dir):
+        return []
+    return [
+        f for f in os.listdir(agent_dir)
+        if f.endswith('.yaml')
+    ]
+
+
+def get_agent_config(agent_name: str) -> dict:
+    """
+    读取指定 Agent 配置文件并解析为字典。
+    参数：
+        agent_name (str): Agent 配置文件名（含 .yaml 后缀）
+    返回：
+        dict: 解析后的 Agent 配置字典
+    """
+    agent_path = os.path.join(get_agent_dir(), agent_name)
+    with open(agent_path, 'rb') as f:
+        return parse_yaml_content(f.read())
+
+
 def get_config_list():
     """
     扫描 config_set 文件夹内的所有.yaml文件，返回文件名称列表。

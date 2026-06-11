@@ -64,41 +64,26 @@ AGENTS_CONFIG_DIR = (
 logger = logging.getLogger("benchmark")
 
 # === Agent 配置映射 ===
+# mode 由 config/agents/ 下的 YAML 文件提供
+# ui_mode / task_mode 由 application_config.yaml 全局控制
+# 此处仅保留 benchmark 专用的覆盖参数
 AGENT_CONFIGS = {
     "DualDRLAgent": {
-        "agent_name": "packet_factory.DualDRLAgent",
-        "mode": "drl",
-        "task_mode": "inference",
         "model_path": "./training_logs/models/DualDRLAgent/agent_model.pt",
     },
     "ORToolsAgent": {
-        "agent_name": "packet_factory.ORToolsAgent",
-        "mode": "drl",
-        "task_mode": "inference",
         "time_limit_seconds": 30,
     },
     "ORToolsBatchAgent": {
-        "agent_name": "packet_factory.ORToolsBatchAgent",
-        "mode": "optimization",
-        "task_mode": "inference",
         "time_limit_seconds": 60,
     },
     "GraphDPAgent": {
-        "agent_name": "packet_factory.GraphDPAgent",
-        "mode": "drl",
-        "task_mode": "inference",
         "model_path": "./training_logs/models/GraphDPAgent/agent_model.pt",
     },
     "GraphDualAgent": {
-        "agent_name": "packet_factory.GraphDualAgent",
-        "mode": "drl",
-        "task_mode": "inference",
         "model_path": "./training_logs/models/GraphDualAgent/agent_model.pt",
     },
     "GraphPPOAgent": {
-        "agent_name": "packet_factory.GraphPPOAgent",
-        "mode": "drl",
-        "task_mode": "inference",
         "model_path": "./training_logs/models/GraphPPOAgent/agent_model.pt",
     },
 }
@@ -310,17 +295,18 @@ def build_config(agent_key: str, instance_config: dict, base_yaml_path: Optional
 
     config = copy.deepcopy(template["config"])
 
-    # 从 per-agent 配置文件加载完整 agent 参数（超参数 + identity 字段）
+    # 从 per-agent 配置文件加载完整 agent 参数（超参数 + identity 字段，含 mode）
     agent_full_config = load_agent_config(agent_key)
 
     # 填充 agent 段
     config["simulation"]["agent"].update(agent_full_config)
 
-    # 用推理模式 identity 字段覆盖（benchmark 始终用 inference 模式）
-    agent_cfg = AGENT_CONFIGS[agent_key]
-    config["simulation"]["mode"] = agent_cfg["mode"]
-    config["simulation"]["agent"]["task_mode"] = agent_cfg["task_mode"]
+    # Benchmark 覆盖：始终使用 inference + backend 模式
+    config["simulation"]["ui_mode"] = "backend"
+    config["simulation"]["task_mode"] = "inference"
 
+    # 用 AGENT_CONFIGS 覆盖特定参数
+    agent_cfg = AGENT_CONFIGS[agent_key]
     if "time_limit_seconds" in agent_cfg:
         config["simulation"]["agent"]["time_limit_seconds"] = time_limit
     if "model_path" in agent_cfg:

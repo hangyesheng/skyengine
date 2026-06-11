@@ -4,8 +4,7 @@
 agent_name: packet_factory.GraphDualAgent
 name: GraphDualAgent
 id: 1
-ui_mode: backend
-task_mode: training
+mode: drl
 model_path: ./training_logs/models/GraphDualAgent/agent_model.pt
 time_limit_seconds: 30
 fallback_enabled: true

@@ -801,11 +801,15 @@ def render_factory(config_name: str) -> bool:
     import threading
 
     def send_render_request():
-        """后台发送渲染请求"""
+        """后台发送渲染请求，强制 backend + training 模式"""
         resp = retry_request(
             session.post,
             API_MAP_RENDER,
-            json={"target_factory": config_name},
+            json={
+                "target_factory": config_name,
+                "ui_mode": "backend",
+                "task_mode": "training",
+            },
             timeout=REQUEST_LONG_TIMEOUT
         )
         

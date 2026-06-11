@@ -21,6 +21,25 @@
               </el-select>
             </ElCol>
           </ElRow>
+          <ElRow style="margin-top: 8px">
+            <ElCol :span="8">
+              <span>Agent</span>
+            </ElCol>
+            <ElCol :span="16">
+              <el-select v-model="selectedAgent" placeholder="Default (No Agent)" size="small" clearable style="width: 100%">
+                <el-option
+                    label="Default (No Agent)"
+                    value=""
+                />
+                <el-option
+                    v-for="agent in agentList"
+                    :key="agent.id"
+                    :label="agent.id.replace('.yaml', '')"
+                    :value="agent.id"
+                />
+              </el-select>
+            </ElCol>
+          </ElRow>
         </template>
         <el-row :gutter="10" class="mb-2">
           <el-col :span="6">
@@ -299,6 +318,8 @@ const fps = ref(1);
 const factoryList = ref([]);
 const selectedFactory = ref('');
 const speedLevel = ref(parseInt(sessionStorage.getItem('speedLevel')) || 3);
+const selectedAgent = ref('');
+const agentList = ref([]);
 const selectedAgv = ref(null);
 const selectedMachine = ref(null);
 const selectedJob = ref(null);
@@ -402,6 +423,25 @@ const test = () => {
     });
 };
 
+// ===== Agent 列表更新 =====
+const loadAgentList = () => {
+  fetch("/api/agent/list", {
+    method: "GET",
+  })
+    .then((response) => {
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      return response.json();
+    })
+    .then((data) => {
+      agentList.value = data.agent_list;
+    })
+    .catch((error) => {
+      console.error("Failed to load agent list:", error);
+    });
+};
+
 // ===== 工厂列表更新 =====
 const updateCurrentFactoryMapList = () => {
   fetch("/api/factory/list", {
@@ -426,9 +466,13 @@ const updateCurrentFactoryMapList = () => {
 
 // ===== 工厂渲染与控制 =====
 const handleFactoryRender = () => {
+  const requestBody = { target_factory: selectedFactory.value };
+  if (selectedAgent.value) {
+    requestBody.agent_name = selectedAgent.value;
+  }
   fetch("/api/map/render", {
     method: "POST",
-    body: JSON.stringify({target_factory: selectedFactory.value}),
+    body: JSON.stringify(requestBody),
     headers: { "Content-Type": "application/json" },
   })
     .then((response) => {
@@ -811,6 +855,7 @@ onMounted(() => {
 
   // 旧版功能初始化
   updateCurrentFactoryMapList();
+  loadAgentList();
   startCheckingFactory();
   fetchJobProgress();
   

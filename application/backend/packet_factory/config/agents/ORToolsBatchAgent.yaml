@@ -4,8 +4,7 @@
 agent_name: packet_factory.ORToolsBatchAgent
 name: ORToolsBatchAgent
 id: 1
-ui_mode: backend
-task_mode: inference
+mode: optimization
 model_path: ""
 time_limit_seconds: 60
 fallback_enabled: true
