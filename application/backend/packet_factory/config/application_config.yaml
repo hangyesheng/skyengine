@@ -18,23 +18,35 @@ config:
     #   由配置文件生成
 
     agent:
-      agent_name: packet_factory.GraphDualAgent
-      name: GraphDualAgent
+      agent_name: packet_factory.GraphPPOAgent
+      name: GraphPPOAgent
       id: 1
       # agent 模式配置
       ui_mode: backend      # frontend | backend（是否有可视化界面）
       task_mode: training  # training | inference（训练还是推理，优化模式只支持inference）
-      model_path: ./training_logs/models/GraphDualAgent/agent_model.pt  # 模型文件路径
+      model_path: ./training_logs/models/GraphPPOAgent/agent_model.pt  # 模型文件路径
       time_limit_seconds: 30  # OR-Tools求解时间限制（秒）
       fallback_enabled: true  # 求解失败时是否回退到贪心算法
 
       # 计算设备配置
       device: cuda           # cuda | cpu | auto（auto=有GPU用GPU，否则CPU）
 
-      # GraphDualAgent / GraphDPAgent 超参数（其他 Agent 自动忽略不认识的参数）
+      # GraphPPOAgent / GraphDualAgent / GraphDPAgent 超参数（其他 Agent 自动忽略不认识的参数）
       hidden_dim: 64
       gamma: 0.99
       lr_gnn: 0.0001
+      lr_actor: 0.0003
+      lr_critic: 0.001
+      # PPO 专用超参数
+      clip_epsilon: 0.2      # PPO 裁剪参数
+      gae_lambda: 0.95       # GAE lambda
+      ppo_epochs: 4           # 每次 rollout 的更新轮数
+      ppo_batch_size: 64       # PPO 小批量大小
+      entropy_coeff: 0.01     # 熵正则系数
+      value_loss_coeff: 0.5   # 价值损失系数
+      max_grad_norm: 0.5       # 梯度裁剪阈值
+      rollout_steps: 128       # 每次 rollout 收集的步数
+      # 以下为 GraphDualAgent 遗留参数（PPO 不使用，保持兼容）
       lr_seq: 0.001
       lr_route: 0.001
       lr_agv: 0.001
