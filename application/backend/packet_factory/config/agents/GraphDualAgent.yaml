@@ -1,0 +1,47 @@
+# GraphDualAgent 配置
+# 对应 executor/packet_factory/packet_factory/Agent/GraphDualAgent.py
+
+agent_name: packet_factory.GraphDualAgent
+name: GraphDualAgent
+id: 1
+ui_mode: backend
+task_mode: training
+model_path: ./training_logs/models/GraphDualAgent/agent_model.pt
+time_limit_seconds: 30
+fallback_enabled: true
+
+# 计算设备
+device: cuda
+
+# GNN 编码器
+hidden_dim: 64
+
+# DQN 公共参数
+gamma: 0.99
+epsilon: 1.0
+epsilon_decay: 0.998
+epsilon_min: 0.01
+
+# 学习率
+lr_gnn: 0.0001
+lr_seq: 0.001
+lr_route: 0.001
+lr_agv: 0.001
+
+# 训练参数
+buffer_capacity: 5000
+batch_size: 64
+target_update_freq: 100
+
+# 输出维度（动作空间最大尺寸）
+max_seq_output_dim: 100
+max_route_output_dim: 50
+max_agv_output_dim: 20
+
+# 特征维度
+seq_feature_dim: 24
+route_feature_dim: 16
+agv_feature_dim: 12
+
+# 其他
+allow_agv_reassignment: false

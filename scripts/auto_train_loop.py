@@ -66,6 +66,13 @@ BACKEND_URL = None  # 将在 parse_args() 后初始化
 DATA_DIR = Path(__file__).parent.parent / "dataset" / "agv-instances"
 TRAINING_LOGS = Path(__file__).parent.parent / "training_logs"
 RESULTS_DIR = TRAINING_LOGS / "results"
+AGENTS_CONFIG_DIR = Path(__file__).parent.parent / "application" / "backend" / "packet_factory" / "config" / "agents"
+
+# 可选的 Agent 类型
+AVAILABLE_AGENTS = [
+    "GraphPPOAgent", "GraphDualAgent", "GraphDPAgent",
+    "DualDRLAgent", "ORToolsAgent", "ORToolsBatchAgent",
+]
 
 # 结束条件配置
 REWARD_THRESHOLD = 1000.0  # 累积 reward 阈值
@@ -138,12 +145,13 @@ def parse_args():
         argparse.Namespace: 解析后的参数
     """
     parser = argparse.ArgumentParser(
-        description="自动化训练循环脚本（支持 reward/loss/stability 收敛检测）",
+        description="自动化训练循环脚本（支持 reward/loss/stability 收敛检测，支持选择 Agent）",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 示例:
   python scripts/auto_train_loop.py
-  python scripts/auto_train_loop.py --log-level DEBUG
+  python scripts/auto_train_loop.py --agent GraphDualAgent
+  python scripts/auto_train_loop.py --agent GraphDPAgent --log-level DEBUG
   python scripts/auto_train_loop.py --log-level WARNING --backend-log-level ERROR
   python scripts/auto_train_loop.py --log-level WARNING --reward-threshold 500
   python scripts/auto_train_loop.py --max-iterations 100 --poll-interval 5
@@ -155,6 +163,14 @@ def parse_args():
   python scripts/auto_train_loop.py --epsilon-floor 0.05
   python scripts/auto_train_loop.py --reward-stability-window 10 --epsilon-floor 0.01 --patience 3
         """
+    )
+
+    parser.add_argument(
+        '--agent',
+        type=str,
+        default='GraphPPOAgent',
+        choices=AVAILABLE_AGENTS,
+        help=f'训练使用的 Agent 类型 (默认: GraphPPOAgent)，可选: {", ".join(AVAILABLE_AGENTS)}'
     )
     
     parser.add_argument(
@@ -258,6 +274,25 @@ def parse_args():
     )
     
     return parser.parse_args()
+
+
+def load_agent_config(agent_name: str) -> dict:
+    """
+    从 config/agents/ 目录加载指定 Agent 的配置文件
+
+    Args:
+        agent_name: Agent 名称（如 GraphPPOAgent, GraphDualAgent）
+
+    Returns:
+        dict: Agent 配置字典
+    """
+    config_path = AGENTS_CONFIG_DIR / f"{agent_name}.yaml"
+    if not config_path.exists():
+        raise FileNotFoundError(f"Agent 配置文件不存在: {config_path}")
+    with open(config_path, 'r', encoding='utf-8') as f:
+        agent_config = yaml.safe_load(f)
+    logger.info(f"已加载 Agent 配置: {config_path}")
+    return agent_config
 
 
 def retry_request(func, *args, max_retries: int = REQUEST_MAX_RETRIES, **kwargs) -> Optional[requests.Response]:
@@ -491,13 +526,15 @@ def parse_agv_instance(filepath: Path) -> dict:
     }
 
 
-def generate_pipeline_config(parsed_data: dict, config_name: str) -> str:
+def generate_pipeline_config(parsed_data: dict, config_name: str,
+                            agent_config: Optional[dict] = None) -> str:
     """
     从解析的数据生成完整的 pipeline_config.yaml
 
     Args:
         parsed_data: 解析后的数据
         config_name: 配置名称
+        agent_config: 可选的 Agent 配置字典（由 config/agents/ 下的文件加载）
 
     Returns:
         str: YAML 格式的配置文件内容
@@ -604,6 +641,10 @@ def generate_pipeline_config(parsed_data: dict, config_name: str) -> str:
             "agvs": agvs
         }
     }
+
+    # 注入 Agent 配置（由 config/agents/ 下的独立文件提供）
+    if agent_config:
+        pipeline_config["agent"] = agent_config
 
     return yaml.dump(pipeline_config, allow_unicode=True, sort_keys=False)
 
@@ -1272,13 +1313,15 @@ def switch_to_packet_factory() -> bool:
         return False
 
 
-def run_training_iteration(iteration: int, data_file: Path) -> Tuple[bool, float]:
+def run_training_iteration(iteration: int, data_file: Path,
+                          agent_config: Optional[dict] = None) -> Tuple[bool, float]:
     """
     执行一次训练迭代
 
     Args:
         iteration: 当前迭代编号
         data_file: 数据文件路径
+        agent_config: 可选的 Agent 配置字典
 
     Returns:
         Tuple[bool, float]: (是否成功, makespan)
@@ -1299,9 +1342,10 @@ def run_training_iteration(iteration: int, data_file: Path) -> Tuple[bool, float
               f"{parsed_data['machine_count']} machines, "
               f"{parsed_data['agv_count']} AGVs")
 
-        # 2. 生成配置
+        # 2. 生成配置（注入 Agent 配置）
         logger.info("[INFO] 生成 pipeline_config...")
-        yaml_content = generate_pipeline_config(parsed_data, config_name)
+        yaml_content = generate_pipeline_config(parsed_data, config_name,
+                                                agent_config=agent_config)
 
         # 3. 上传配置
         logger.info("[INFO] 上传配置...")
@@ -1388,8 +1432,12 @@ def main():
     # 设置前端脚本日志级别
     setup_logging(args.log_level)
 
+    # 加载 Agent 配置
+    agent_config = load_agent_config(args.agent)
+
     logger.info("="*60)
     logger.info("自动化训练循环脚本")
+    logger.info(f"训练 Agent: {args.agent}")
     logger.info(f"后端端口: {BACKEND_PORT}")
     logger.info(f"Reward 阈值: {REWARD_THRESHOLD:.2f}")
     logger.info(f"Loss 阈值: {LOSS_THRESHOLD if LOSS_THRESHOLD is not None else '不检查'}")
@@ -1471,7 +1519,8 @@ def main():
                 lower_bound = 1.0
 
             # 执行训练
-            success, makespan = run_training_iteration(iteration, data_file)
+            success, makespan = run_training_iteration(iteration, data_file,
+                                                       agent_config=agent_config)
 
             # 收集本次迭代的指标
             metrics = get_latest_training_metrics()

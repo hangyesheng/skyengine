@@ -99,6 +99,10 @@ class BackendCore:
         final_config[env_type]['event_config'] = specific_config['event_config']
         final_config[env_type]['map_config'] = specific_config['map_config']
 
+        # 合并 agent 配置（由 config/agents/ 下的独立文件提供，按需加载）
+        if 'agent' in specific_config:
+            final_config[env_type]['agent'].update(specific_config['agent'])
+
         # 创建环境与智能体
         env, agent = bootstrap(final_config)
 

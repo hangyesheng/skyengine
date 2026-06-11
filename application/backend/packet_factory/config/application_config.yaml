@@ -17,51 +17,10 @@ config:
     # event_config:
     #   由配置文件生成
 
-    agent:
-      agent_name: packet_factory.GraphPPOAgent
-      name: GraphPPOAgent
-      id: 1
-      # agent 模式配置
-      ui_mode: backend      # frontend | backend（是否有可视化界面）
-      task_mode: training  # training | inference（训练还是推理，优化模式只支持inference）
-      model_path: ./training_logs/models/GraphPPOAgent/agent_model.pt  # 模型文件路径
-      time_limit_seconds: 30  # OR-Tools求解时间限制（秒）
-      fallback_enabled: true  # 求解失败时是否回退到贪心算法
-
-      # 计算设备配置
-      device: cuda           # cuda | cpu | auto（auto=有GPU用GPU，否则CPU）
-
-      # GraphPPOAgent / GraphDualAgent / GraphDPAgent 超参数（其他 Agent 自动忽略不认识的参数）
-      hidden_dim: 64
-      gamma: 0.99
-      lr_gnn: 0.0001
-      lr_actor: 0.0003
-      lr_critic: 0.001
-      # PPO 专用超参数
-      clip_epsilon: 0.2      # PPO 裁剪参数
-      gae_lambda: 0.95       # GAE lambda
-      ppo_epochs: 4           # 每次 rollout 的更新轮数
-      ppo_batch_size: 64       # PPO 小批量大小
-      entropy_coeff: 0.01     # 熵正则系数
-      value_loss_coeff: 0.5   # 价值损失系数
-      max_grad_norm: 0.5       # 梯度裁剪阈值
-      rollout_steps: 128       # 每次 rollout 收集的步数
-      # 以下为 GraphDualAgent 遗留参数（PPO 不使用，保持兼容）
-      lr_seq: 0.001
-      lr_route: 0.001
-      lr_agv: 0.001
-      buffer_capacity: 5000
-      batch_size: 64
-      epsilon: 1.0
-      epsilon_decay: 0.998
-      epsilon_min: 0.01
-      target_update_freq: 100
-      
-      # 模式组合说明：
-      # 1. ui_mode=frontend + task_mode=training: 前台训练模式（有界面，进行训练）
-      # 2. ui_mode=frontend + task_mode=inference: 前台推理模式（有界面，使用模型）- 原 inference
-      # 3. ui_mode=backend + task_mode=training: 后台训练模式（无界面，进行训练）- 原 training
-      # 4. ui_mode=backend + task_mode=inference: 后台推理模式（无界面，使用模型）- 原 evaluation
+    # agent 配置由 config/agents/ 下的独立文件提供
+    # 通过 auto_train_loop.py --agent 或 run_benchmark.py --agents 按需加载
+    # 后端启动时通过 specific_config['agent'] 合并到此处
+    agent: {}
 
     callback:
       map_callback:

@@ -1,0 +1,14 @@
+# ORToolsBatchAgent 配置
+# 对应 executor/packet_factory/packet_factory/Agent/ORToolsBatchAgent.py
+
+agent_name: packet_factory.ORToolsBatchAgent
+name: ORToolsBatchAgent
+id: 1
+ui_mode: backend
+task_mode: inference
+model_path: ""
+time_limit_seconds: 60
+fallback_enabled: true
+
+# 计算设备（OR-Tools 使用 CPU）
+device: cpu
