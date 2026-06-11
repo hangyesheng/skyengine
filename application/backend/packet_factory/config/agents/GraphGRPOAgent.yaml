@@ -1,0 +1,47 @@
+# GraphGRPOAgent 配置
+# 对应 executor/packet_factory/packet_factory/Agent/GraphGRPOAgent.py
+
+agent_name: packet_factory.GraphGRPOAgent
+name: GraphGRPOAgent
+id: 1
+mode: drl
+model_path: ./training_logs/models/GraphGRPOAgent/agent_model.pt
+time_limit_seconds: 30
+fallback_enabled: true
+
+# 计算设备
+device: cuda
+
+# GNN 编码器
+hidden_dim: 64
+
+# GRPO 公共参数
+gamma: 0.99
+
+# 学习率
+lr_gnn: 0.0001
+lr_actor: 0.0003
+
+# GRPO 超参数
+clip_epsilon: 0.2
+grpo_epochs: 4
+grpo_batch_size: 64
+grpo_group_size: 8
+min_group_size: 2
+entropy_coeff: 0.01
+kl_coeff: 0.0
+max_grad_norm: 0.5
+rollout_steps: 128
+
+# 输出维度（动作空间最大尺寸）
+max_seq_output_dim: 100
+max_route_output_dim: 50
+max_agv_output_dim: 20
+
+# 特征维度
+seq_feature_dim: 24
+route_feature_dim: 16
+agv_feature_dim: 12
+
+# 其他
+allow_agv_reassignment: false
