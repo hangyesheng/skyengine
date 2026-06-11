@@ -298,13 +298,13 @@ def load_agent_config(agent_name: str) -> dict:
 def retry_request(func, *args, max_retries: int = REQUEST_MAX_RETRIES, **kwargs) -> Optional[requests.Response]:
     """
     带重试机制的请求函数
-    
+
     Args:
         func: requests 请求函数 (session.get, session.post 等)
         *args: 位置参数
         max_retries: 最大重试次数
         **kwargs: 关键字参数
-        
+
     Returns:
         Optional[requests.Response]: 响应对象，失败返回 None
     """
@@ -317,15 +317,17 @@ def retry_request(func, *args, max_retries: int = REQUEST_MAX_RETRIES, **kwargs)
             else:
                 logger.warning(f"请求失败 (尝试 {attempt}/{max_retries}): HTTP {resp.status_code}")
                 if attempt < max_retries:
-                    time.sleep(REQUEST_RETRY_DELAY)
+                    # 递增重试延迟：1s, 3s, 6s, ...，给服务端更多恢复时间
+                    time.sleep(min(REQUEST_RETRY_DELAY * attempt, 10))
                 continue
         except requests.exceptions.RequestException as e:
             last_error = e
             logger.warning(f"请求异常 (尝试 {attempt}/{max_retries}): {e}")
             if attempt < max_retries:
-                time.sleep(REQUEST_RETRY_DELAY)
+                # 递增重试延迟，防止训练高峰期连续超时
+                time.sleep(min(REQUEST_RETRY_DELAY * attempt, 10))
             continue
-    
+
     logger.error(f"请求失败，已重试 {max_retries} 次")
     return None
 
