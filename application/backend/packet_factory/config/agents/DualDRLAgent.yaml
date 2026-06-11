@@ -1,0 +1,16 @@
+# DualDRLAgent 配置
+# 对应 executor/packet_factory/packet_factory/Agent/DualDRLAgent.py
+# 注意：DualDRLAgent 当前将所有超参数硬编码在 __init__ 中，
+# 此配置文件仅包含身份字段，超参数修改需修改 Agent 源码。
+
+agent_name: packet_factory.DualDRLAgent
+name: DualDRLAgent
+id: 1
+ui_mode: backend
+task_mode: training
+model_path: ./training_logs/models/DualDRLAgent/agent_model.pt
+time_limit_seconds: 30
+fallback_enabled: true
+
+# 计算设备
+device: cuda

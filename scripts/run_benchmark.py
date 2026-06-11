@@ -51,6 +51,14 @@ DEFAULT_CONFIG_PATH = (
     / "config"
     / "application_config.yaml"
 )
+AGENTS_CONFIG_DIR = (
+    PROJECT_ROOT
+    / "application"
+    / "backend"
+    / "packet_factory"
+    / "config"
+    / "agents"
+)
 
 # === 日志 ===
 logger = logging.getLogger("benchmark")
@@ -116,6 +124,23 @@ def setup_logging(log_level: str = "INFO", backend_log_level: str = "WARNING"):
     # 设置后端日志级别环境变量，供 executor 层的 Logger 读取
     os.environ['BACKEND_LOG_LEVEL'] = backend_log_level.upper()
     logger.debug(f"后端日志级别已设置为: {backend_log_level.upper()}")
+
+
+def load_agent_config(agent_name: str) -> dict:
+    """从 config/agents/ 目录加载指定 Agent 的配置文件
+
+    Args:
+        agent_name: Agent 名称（如 GraphPPOAgent, GraphDualAgent）
+
+    Returns:
+        dict: Agent 配置字典
+    """
+    config_path = AGENTS_CONFIG_DIR / f"{agent_name}.yaml"
+    if not config_path.exists():
+        raise FileNotFoundError(f"Agent 配置文件不存在: {config_path}")
+    with open(config_path, 'r', encoding='utf-8') as f:
+        agent_config = yaml.safe_load(f)
+    return agent_config
 
 
 # ==================== AGV 实例解析（复用 auto_train_loop） ====================
@@ -270,8 +295,11 @@ def generate_instance_config(parsed_data: dict) -> dict:
 def build_config(agent_key: str, instance_config: dict, base_yaml_path: Optional[str] = None, time_limit: int = 30) -> dict:
     """构建完整的 bootstrap 配置
 
+    从 config/agents/{agent_key}.yaml 加载 Agent 超参数，
+    再用 AGENT_CONFIGS 中的推理模式 identity 字段覆盖。
+
     Args:
-        agent_key: Agent 标识键（DualDRLAgent / ORToolsAgent / ORToolsBatchAgent）
+        agent_key: Agent 标识键（DualDRLAgent / ORToolsAgent / ORToolsBatchAgent 等）
         instance_config: generate_instance_config() 的输出
         base_yaml_path: 可选的自定义基础 YAML 路径
         time_limit: OR-Tools 求解时间限制
@@ -281,21 +309,22 @@ def build_config(agent_key: str, instance_config: dict, base_yaml_path: Optional
         template = yaml.safe_load(f)
 
     config = copy.deepcopy(template["config"])
-    agent_cfg = AGENT_CONFIGS[agent_key]
 
-    # 覆盖 agent 配置
+    # 从 per-agent 配置文件加载完整 agent 参数（超参数 + identity 字段）
+    agent_full_config = load_agent_config(agent_key)
+
+    # 填充 agent 段
+    config["simulation"]["agent"].update(agent_full_config)
+
+    # 用推理模式 identity 字段覆盖（benchmark 始终用 inference 模式）
+    agent_cfg = AGENT_CONFIGS[agent_key]
     config["simulation"]["mode"] = agent_cfg["mode"]
-    config["simulation"]["agent"]["agent_name"] = agent_cfg["agent_name"]
-    config["simulation"]["agent"]["name"] = agent_key
-    config["simulation"]["agent"]["id"] = 1
-    config["simulation"]["agent"]["ui_mode"] = "backend"
     config["simulation"]["agent"]["task_mode"] = agent_cfg["task_mode"]
 
     if "time_limit_seconds" in agent_cfg:
         config["simulation"]["agent"]["time_limit_seconds"] = time_limit
     if "model_path" in agent_cfg:
         config["simulation"]["agent"]["model_path"] = agent_cfg["model_path"]
-    config["simulation"]["agent"]["fallback_enabled"] = True
 
     # 注入实例数据
     config["simulation"]["job_config"] = instance_config["job_config"]
