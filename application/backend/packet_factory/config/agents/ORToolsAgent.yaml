@@ -4,8 +4,7 @@
 agent_name: packet_factory.ORToolsAgent
 name: ORToolsAgent
 id: 1
-ui_mode: backend
-task_mode: inference
+mode: drl
 model_path: ""
 time_limit_seconds: 30
 fallback_enabled: true

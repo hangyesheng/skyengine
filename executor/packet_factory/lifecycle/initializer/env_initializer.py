@@ -16,8 +16,8 @@ def initialize_env(config, agent):
     if not env_type:
         raise ValueError("[Context] 配置中未指定 'env_type'，请检查配置文件")
 
-    # 获取环境运行模式 (drl | optimization)
-    env_mode = config.get(env_type).get("mode", "drl")
+    # 获取环境运行模式 (drl | optimization) — 由 Agent 配置提供
+    env_mode = config.get(env_type).get("agent", {}).get("mode", "drl")
     
     # todo 后续根据 real 还是 sim 更换创建流程
     env_name = config.get(env_type).get("env_name")

@@ -4,9 +4,13 @@ config:
   simulation:
     env_name: packet_factory
     # 环境运行模式配置
-    mode: drl  # drl | optimization
-               # drl: 事件驱动强化学习模式
-               # optimization: 传统优化调度模式
+    # mode 由 config/agents/ 下的 Agent 配置文件提供（drl | optimization）
+    #   drl: 事件驱动强化学习模式
+    #   optimization: 传统优化调度模式
+
+    # ui_mode / task_mode 全局控制（2x2 模式矩阵）
+    ui_mode: frontend     # frontend | backend  — 是否启用可视化
+    task_mode: inference  # training | inference  — 是否进行学习更新
 
     # map_config:
     #   由配置文件生成

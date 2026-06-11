@@ -6,8 +6,7 @@
 agent_name: packet_factory.DualDRLAgent
 name: DualDRLAgent
 id: 1
-ui_mode: backend
-task_mode: training
+mode: drl
 model_path: ./training_logs/models/DualDRLAgent/agent_model.pt
 time_limit_seconds: 30
 fallback_enabled: true

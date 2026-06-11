@@ -201,10 +201,17 @@ class PacketFactoryProxy(BaseFactoryProxy):
         @RouteRegistry.register_route("/map/render", method="POST")
         async def api_map_render(request: Request):
             body = await request.json()
+            target_factory = body.get("target_factory")
+            agent_name = body.get("agent_name")  # 可选字段，前端传入的 Agent 配置文件名
+            ui_mode = body.get("ui_mode")         # 可选字段，覆盖 application_config 的 ui_mode
+            task_mode = body.get("task_mode")     # 可选字段，覆盖 application_config 的 task_mode
             # 使用 run_in_executor 避免阻塞事件循环
             import asyncio
             loop = asyncio.get_event_loop()
-            await loop.run_in_executor(None, RouteRegistry._current_backend_core.render_map, body.get("target_factory"))
+            await loop.run_in_executor(
+                None, RouteRegistry._current_backend_core.render_map,
+                target_factory, agent_name, ui_mode, task_mode
+            )
             return JSONResponse({"success": True})
 
         @RouteRegistry.register_route("/factory/list", method="GET")
@@ -213,6 +220,14 @@ class PacketFactoryProxy(BaseFactoryProxy):
             config_list = RouteRegistry._current_backend_core.get_all_config_names()
             factory_list = [{"id": config_name} for config_name in config_list]
             return JSONResponse({"factory_list": factory_list, "success": True})
+
+        # ========== Agent 列表路由 ==========
+        @RouteRegistry.register_route("/agent/list", method="GET")
+        async def api_agent_list():
+            """返回 config/agents/ 目录下所有可用的 Agent 配置列表"""
+            agent_list = file_service.get_agent_list()
+            agents = [{"id": agent_name} for agent_name in agent_list]
+            return JSONResponse({"agent_list": agents, "success": True})
 
         self._routes_registered = True
         LOGGER.info(f"✅ PacketFactoryProxy 路由已注册，共 {len(RouteRegistry.get_routes())} 条")
@@ -309,9 +324,10 @@ class PacketFactoryProxy(BaseFactoryProxy):
         self._ensure_backend()
         return self._backend_core.get_map_current()
     
-    def render_map(self, target_factory: str):
+    def render_map(self, target_factory: str, agent_name: str = None,
+                   ui_mode: str = None, task_mode: str = None):
         self._ensure_backend()
-        self._backend_core.render_map(target_factory)
+        self._backend_core.render_map(target_factory, agent_name, ui_mode, task_mode)
     
     def is_factory_alive(self) -> bool:
         self._ensure_backend()
