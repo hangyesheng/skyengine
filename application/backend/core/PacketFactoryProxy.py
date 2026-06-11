@@ -1,3 +1,4 @@
+import asyncio
 import os
 from typing import List, Optional
 from fastapi import Query, File, UploadFile, Form, Body, Request
@@ -56,23 +57,28 @@ class PacketFactoryProxy(BaseFactoryProxy):
 
         @RouteRegistry.register_route("/factory/start", method="POST")
         async def api_factory_start():
-            RouteRegistry._current_backend_core.factory_start()
+            loop = asyncio.get_event_loop()
+            await loop.run_in_executor(None, RouteRegistry._current_backend_core.factory_start)
             return JSONResponse({"action": "start"})
 
         @RouteRegistry.register_route("/factory/pause", method="POST")
         async def api_factory_pause():
-            RouteRegistry._current_backend_core.factory_pause()
+            loop = asyncio.get_event_loop()
+            await loop.run_in_executor(None, RouteRegistry._current_backend_core.factory_pause)
             return JSONResponse({"action": "pause"})
 
         @RouteRegistry.register_route("/factory/reset", method="POST")
         async def api_factory_reset():
-            RouteRegistry._current_backend_core.factory_reset()
+            loop = asyncio.get_event_loop()
+            await loop.run_in_executor(None, RouteRegistry._current_backend_core.factory_reset)
             return JSONResponse({"action": "reset"})
 
         @RouteRegistry.register_route("/factory/speed", method="POST")
         async def api_factory_speed(data: dict):
             speedLevel = data.get("speedLevel", 3)
-            RouteRegistry._current_backend_core.change_factory_speed(speedLevel)
+            loop = asyncio.get_event_loop()
+            await loop.run_in_executor(
+                None, RouteRegistry._current_backend_core.change_factory_speed, speedLevel)
             return JSONResponse({
                 'state': 'success',
                 'msg': f'change factory speed={speedLevel} success'
@@ -86,7 +92,8 @@ class PacketFactoryProxy(BaseFactoryProxy):
 
         @RouteRegistry.register_route("/agv/pause/{agvId}", method="POST")
         async def api_agv_pause(agvId: int):
-            RouteRegistry._current_backend_core.pause_agv(int(agvId))
+            loop = asyncio.get_event_loop()
+            await loop.run_in_executor(None, RouteRegistry._current_backend_core.pause_agv, int(agvId))
             return JSONResponse({
                 'state': 'success',
                 'msg': f'pause agv id={agvId} success'
@@ -94,7 +101,8 @@ class PacketFactoryProxy(BaseFactoryProxy):
 
         @RouteRegistry.register_route("/agv/resume/{agvId}", method="POST")
         async def api_agv_resume(agvId: int):
-            RouteRegistry._current_backend_core.resume_agv(int(agvId))
+            loop = asyncio.get_event_loop()
+            await loop.run_in_executor(None, RouteRegistry._current_backend_core.resume_agv, int(agvId))
             return JSONResponse({
                 'state': 'success',
                 'msg': f'resume agv id={agvId} success'
@@ -108,12 +116,14 @@ class PacketFactoryProxy(BaseFactoryProxy):
 
         @RouteRegistry.register_route("/machine/pause/{machineId}", method="POST")
         async def api_machine_pause(machineId: int):
-            RouteRegistry._current_backend_core.pause_machine(int(machineId))
+            loop = asyncio.get_event_loop()
+            await loop.run_in_executor(None, RouteRegistry._current_backend_core.pause_machine, int(machineId))
             return JSONResponse({"machineId": machineId})
 
         @RouteRegistry.register_route("/machine/resume/{machineId}", method="POST")
         async def api_machine_resume(machineId: int):
-            RouteRegistry._current_backend_core.resume_machine(int(machineId))
+            loop = asyncio.get_event_loop()
+            await loop.run_in_executor(None, RouteRegistry._current_backend_core.resume_machine, int(machineId))
             return JSONResponse({"machineId": machineId})
 
         # ========== Job 控制路由 ==========
@@ -124,7 +134,8 @@ class PacketFactoryProxy(BaseFactoryProxy):
 
         @RouteRegistry.register_route("/job/add/{jobId}", method="POST")
         async def api_job_add(jobId: int):
-            RouteRegistry._current_backend_core.add_job(int(jobId))
+            loop = asyncio.get_event_loop()
+            await loop.run_in_executor(None, RouteRegistry._current_backend_core.add_job, int(jobId))
             return JSONResponse({"jobId": jobId})
 
         @RouteRegistry.register_route("/jobs/progress", method="GET")
@@ -269,13 +280,15 @@ class PacketFactoryProxy(BaseFactoryProxy):
     async def start(self):
         """启动工厂"""
         self._ensure_backend()
-        self._backend_core.factory_start()
+        loop = asyncio.get_event_loop()
+        await loop.run_in_executor(None, self._backend_core.factory_start)
         await super().start()
-    
+
     async def pause(self):
         """暂停工厂"""
         self._ensure_backend()
-        self._backend_core.factory_pause()
+        loop = asyncio.get_event_loop()
+        await loop.run_in_executor(None, self._backend_core.factory_pause)
         await super().pause()
     
     async def reset(self):

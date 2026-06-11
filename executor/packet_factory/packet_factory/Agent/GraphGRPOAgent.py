@@ -1608,6 +1608,9 @@ class GraphGRPOAgent(BaseAgent):
                     total_kl += stats['kl_approx']
                     n_updates += 1
 
+            # 主动释放 GIL，防止 CPU 密集的 GRPO 训练阻塞 asyncio 事件循环
+            time.sleep(0)
+
         self._train_step += 1
 
         # Record training stats

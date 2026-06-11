@@ -1332,6 +1332,10 @@ class GraphDualAgent(BaseAgent):
         route_loss = self._train_routing_dqn()
         agv_loss = self._train_agv_dqn()
 
+        # 主动释放 GIL，防止 CPU 密集训练阻塞 asyncio 事件循环
+        import time
+        time.sleep(0)
+
         self._train_step += 1
         if self._train_step % self.target_update_freq == 0:
             self.seq_target.load_state_dict(self.seq_net.state_dict())

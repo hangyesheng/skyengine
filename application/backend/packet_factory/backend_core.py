@@ -176,6 +176,9 @@ class BackendCore:
                 elif hasattr(agent, 'train'):
                     agent.train(observations, rewards, terminations, truncations, infos)
 
+            # 主动释放 GIL，避免 CPU 密集训练阻塞 asyncio 事件循环
+            time.sleep(0)
+
             # 每 50 步打印训练指标
             if step_count % 50 == 0 and hasattr(agent, 'get_training_metrics'):
                 metrics = agent.get_training_metrics()
@@ -249,6 +252,10 @@ class BackendCore:
                     agent.update(observations, rewards)
                 elif hasattr(agent, 'train'):
                     agent.train(observations, rewards, terminations, truncations, infos)
+
+            # 主动释放 GIL，避免 CPU 密集的 PyTorch 训练操作
+            # 长时间占据 GIL 导致 asyncio 事件循环无法响应 HTTP 请求
+            time.sleep(0)
 
             # 每 50 步打印训练指标
             if step_count % 50 == 0 and hasattr(agent, 'get_training_metrics'):
@@ -453,16 +460,20 @@ class BackendCore:
         return not self.env.env_is_finished()
 
     def factory_start(self):
-        self.env.env_visualizer.run()
+        if self.env is not None and self.env.env_visualizer is not None:
+            self.env.env_visualizer.run()
 
     def factory_pause(self):
-        self.env.env_visualizer.pause()
+        if self.env is not None and self.env.env_visualizer is not None:
+            self.env.env_visualizer.pause()
 
     def factory_reset(self):
-        self.env.env_visualizer.restart()
+        if self.env is not None and self.env.env_visualizer is not None:
+            self.env.env_visualizer.restart()
 
     def change_factory_speed(self, speed_level: int):
-        self.env.env_visualizer.change_speed(speed_level)
+        if self.env is not None and self.env.env_visualizer is not None:
+            self.env.env_visualizer.change_speed(speed_level)
 
     def get_agvs(self):
         if self.env is None:
@@ -472,10 +483,12 @@ class BackendCore:
         return agv_list
 
     def pause_agv(self, agv_id):
-        self.env.env_visualizer.pause_agv(agv_id)
+        if self.env is not None and self.env.env_visualizer is not None:
+            self.env.env_visualizer.pause_agv(agv_id)
 
     def resume_agv(self, agv_id):
-        self.env.env_visualizer.resume_agv(agv_id)
+        if self.env is not None and self.env.env_visualizer is not None:
+            self.env.env_visualizer.resume_agv(agv_id)
 
     def get_machines(self):
         if self.env is None:
@@ -485,10 +498,12 @@ class BackendCore:
         return machine_list
 
     def pause_machine(self, machine_id):
-        self.env.env_visualizer.pause_machine(machine_id)
+        if self.env is not None and self.env.env_visualizer is not None:
+            self.env.env_visualizer.pause_machine(machine_id)
 
     def resume_machine(self, machine_id):
-        self.env.env_visualizer.resume_machine(machine_id)
+        if self.env is not None and self.env.env_visualizer is not None:
+            self.env.env_visualizer.resume_machine(machine_id)
 
     def get_job_templates(self):
         if self.env is None:
@@ -498,7 +513,8 @@ class BackendCore:
         return job_list
 
     def add_job(self, job_id: int):
-        self.env.env_visualizer.add_job(job_id)
+        if self.env is not None and self.env.env_visualizer is not None:
+            self.env.env_visualizer.add_job(job_id)
 
     def get_jobs_progress(self):
         """获取任务进度列表（非阻塞，带超时保护）

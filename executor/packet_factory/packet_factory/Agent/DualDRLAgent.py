@@ -668,6 +668,10 @@ class DualDRLAgent(BaseAgent):
         self._train_routing_dqn()
         self._train_sequencing_dqn()
 
+        # 主动释放 GIL，防止 CPU 密集训练阻塞 asyncio 事件循环
+        import time
+        time.sleep(0)
+
         # 更新目标网络
         self.training_step += 1
         if self.training_step % self.target_update_freq == 0:
