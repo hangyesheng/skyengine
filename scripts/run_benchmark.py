@@ -87,6 +87,12 @@ AGENT_CONFIGS = {
         "task_mode": "inference",
         "model_path": "./training_logs/models/GraphDualAgent/agent_model.pt",
     },
+    "GraphPPOAgent": {
+        "agent_name": "packet_factory.GraphPPOAgent",
+        "mode": "drl",
+        "task_mode": "inference",
+        "model_path": "./training_logs/models/GraphPPOAgent/agent_model.pt",
+    },
 }
 
 ALL_FAMILIES = ["barnes", "behnke", "brandimarte", "dauzere", "fattahi", "hurink", "kacem"]
