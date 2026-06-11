@@ -2,12 +2,11 @@
 自动化训练循环脚本
 
 功能：
-1. 启动后端（后台+训练模式）
-2. 随机读取 dataset/agv-instances 下的数据文件，生成 pipeline_config.yaml
-3. POST YAML_UPLOAD 注入配置
-4. POST MAP_RENDER 启动工厂生成
-5. 轮询 JOBS_PROGRESS 检测任务完成，完成后关闭后端
-6. 重复 2-5 直到达到结束条件（reward 阈值、loss 阈值、或最大迭代次数）
+1. 直接调用 executor 层运行训练（不走 HTTP）
+2. 随机读取 dataset/agv-instances 下的数据文件，生成配置
+3. 调用 bootstrap() 创建环境和 Agent，运行训练循环
+4. 直接从 Agent 对象收集训练指标（reward, loss, epsilon 等）
+5. 重复直到达到结束条件（reward 阈值、loss 阈值、或最大迭代次数）
 
 收敛检测条件（可组合，所有启用的条件都必须满足）：
 - reward 阈值：当 episode reward >= 阈值时判定收敛
@@ -21,23 +20,20 @@
     uv run python scripts/auto_train_loop.py [选项]
 
 示例：
-    # 使用默认端口 8000
     python scripts/auto_train_loop.py
-
-    # 指定自定义端口
-    python scripts/auto_train_loop.py --port 8001
-    python scripts/auto_train_loop.py --port 9000 --log-level INFO
-
-    # 组合多个参数
-    python scripts/auto_train_loop.py --port 8080 --reward-threshold 500 --max-iterations 100
-
-    # 启用 loss 收敛检测
+    python scripts/auto_train_loop.py --agent GraphDualAgent
+    python scripts/auto_train_loop.py --agent GraphDPAgent --log-level DEBUG
+    python scripts/auto_train_loop.py --log-level WARNING --reward-threshold 500
+    python scripts/auto_train_loop.py --max-iterations 100 --train-interval 20
     python scripts/auto_train_loop.py --loss-threshold 0.01 --patience 3
-
-    # 同时使用 reward 和 loss 收敛检测（两者都满足时停止）
     python scripts/auto_train_loop.py --reward-threshold 500 --loss-threshold 0.1 --patience 2
+    python scripts/auto_train_loop.py --reward-stability-window 10 --reward-stability-threshold 0.05
+    python scripts/auto_train_loop.py --epsilon-floor 0.05
+
+中断后续跑：
+    再次运行相同命令即可，已完成的迭代会自动跳过（基于结果文件检测）
 """
-import subprocess
+import copy
 import random
 import time
 import yaml
@@ -49,30 +45,43 @@ import argparse
 import logging
 from pathlib import Path
 from typing import Optional, Tuple, List, Dict
-import requests
-from requests import Session
-
-# 禁用代理，直接连接本地后端
-session = Session()
-session.trust_env = False  # 忽略环境变量中的 HTTP_PROXY, HTTPS_PROXY 等
 
 # 添加项目根目录到 Python 路径
-sys.path.insert(0, str(Path(__file__).parent.parent))
+PROJECT_ROOT = Path(__file__).parent.parent
+sys.path.insert(0, str(PROJECT_ROOT))
 
-# === 配置 ===
-BACKEND_HOST = "127.0.0.1"
-BACKEND_PORT = None  # 动态端口，可通过命令行指定
-BACKEND_URL = None  # 将在 parse_args() 后初始化
-DATA_DIR = Path(__file__).parent.parent / "dataset" / "agv-instances"
-TRAINING_LOGS = Path(__file__).parent.parent / "training_logs"
+# === 路径常量 ===
+DATA_DIR = PROJECT_ROOT / "dataset" / "agv-instances"
+TRAINING_LOGS = PROJECT_ROOT / "training_logs"
 RESULTS_DIR = TRAINING_LOGS / "results"
-AGENTS_CONFIG_DIR = Path(__file__).parent.parent / "application" / "backend" / "packet_factory" / "config" / "agents"
+DEFAULT_CONFIG_PATH = (
+    PROJECT_ROOT
+    / "application"
+    / "backend"
+    / "packet_factory"
+    / "config"
+    / "application_config.yaml"
+)
+AGENTS_CONFIG_DIR = (
+    PROJECT_ROOT
+    / "application"
+    / "backend"
+    / "packet_factory"
+    / "config"
+    / "agents"
+)
 
 # 可选的 Agent 类型
 AVAILABLE_AGENTS = [
     "GraphGRPOAgent", "GraphPPOAgent", "GraphDualAgent", "GraphDPAgent",
     "DualDRLAgent", "ORToolsAgent", "ORToolsBatchAgent",
 ]
+
+# DRL agents（需要训练更新）
+DRL_AGENTS = {
+    "DualDRLAgent", "GraphDPAgent", "GraphDualAgent",
+    "GraphPPOAgent", "GraphGRPOAgent",
+}
 
 # 结束条件配置
 REWARD_THRESHOLD = 1000.0  # 累积 reward 阈值
@@ -84,84 +93,67 @@ REWARD_STABILITY_WINDOW = None  # Reward 稳定性检测窗口（None 表示不�
 REWARD_STABILITY_THRESHOLD = 0.05  # Reward 变异系数阈值（std/mean < 此值视为稳定）
 EPSILON_FLOOR = None  # Epsilon 下界阈值（None 表示不检查）
 MAX_ITERATIONS = 1000  # 最大迭代次数（防止无限循环）
-POLL_INTERVAL = 2  # 轮询间隔（秒）
-POLL_TIMEOUT = 7200  # 单次训练超时（秒）= 2小时
+TRAIN_INTERVAL = 20  # 训练间隔：每隔多少步调用一次 agent.train()
+EPISODE_TIMEOUT = 7200  # 单次 episode 超时（秒）= 2小时
 
-# 请求重试配置
-REQUEST_MAX_RETRIES = 3  # 最大重试次数
-REQUEST_RETRY_DELAY = 1  # 重试间隔（秒）
-REQUEST_SHORT_TIMEOUT = 5  # 短请求超时（秒）
-REQUEST_MEDIUM_TIMEOUT = 15  # 中等请求超时（秒）
-REQUEST_LONG_TIMEOUT = 30  # 长请求超时（秒）
+# === 全局中断标记 ===
+_shutdown_requested = False
 
-# === API 端点 ===
-API_FACTORY_SWITCH = f"{BACKEND_URL}/factory/control/switch"
-API_HEALTH = f"{BACKEND_URL}/health"
-API_YAML_UPLOAD = f"{BACKEND_URL}/{{config_name}}/yaml/upload"
-API_MAP_RENDER = f"{BACKEND_URL}/map/render"
-API_JOBS_PROGRESS = f"{BACKEND_URL}/jobs/progress"
-
-# === 全局变量 ===
-backend_process: Optional[subprocess.Popen] = None
-# 标记是否已经初始化过后端（用于判断是否需要重启）
-_backend_initialized: bool = False
 # 日志记录器
 logger = logging.getLogger("auto_train_loop")
 
 
-def setup_logging(log_level: str = "INFO"):
+def setup_logging(log_level: str = "INFO", backend_log_level: str = "WARNING"):
     """
     配置日志系统
-    
+
     Args:
-        log_level: 日志级别 (DEBUG, INFO, WARNING, ERROR)
+        log_level: 前端脚本日志级别 (DEBUG, INFO, WARNING, ERROR)
+        backend_log_level: 后端 logger 日志级别 (DEBUG, INFO, WARNING, ERROR)，默认 WARNING
     """
-    # 映射字符串到 logging 常量
     level_map = {
         "DEBUG": logging.DEBUG,
         "INFO": logging.INFO,
         "WARNING": logging.WARNING,
         "ERROR": logging.ERROR
     }
-    
+
     level = level_map.get(log_level.upper(), logging.INFO)
-    
-    # 配置根日志记录器
     logging.basicConfig(
         level=level,
         format='[%(asctime)s] [%(levelname)s] %(message)s',
         datefmt='%Y-%m-%d %H:%M:%S'
     )
-    
     logger.setLevel(level)
-    logger.info(f"日志级别已设置为: {log_level.upper()}")
+
+    # 设置后端日志级别环境变量，供 executor 层的 Logger 读取
+    os.environ['BACKEND_LOG_LEVEL'] = backend_log_level.upper()
+    logger.debug(f"后端日志级别已设置为: {backend_log_level.upper()}")
 
 
 def parse_args():
     """
     解析命令行参数
-    
+
     Returns:
         argparse.Namespace: 解析后的参数
     """
     parser = argparse.ArgumentParser(
-        description="自动化训练循环脚本（支持 reward/loss/stability 收敛检测，支持选择 Agent）",
+        description="自动化训练循环脚本（直接调用 executor 层，不走 HTTP）",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 示例:
   python scripts/auto_train_loop.py
   python scripts/auto_train_loop.py --agent GraphDualAgent
   python scripts/auto_train_loop.py --agent GraphDPAgent --log-level DEBUG
-  python scripts/auto_train_loop.py --log-level WARNING --backend-log-level ERROR
   python scripts/auto_train_loop.py --log-level WARNING --reward-threshold 500
-  python scripts/auto_train_loop.py --max-iterations 100 --poll-interval 5
-  python scripts/auto_train_loop.py --port 8001
-  python scripts/auto_train_loop.py --port 9000 --log-level INFO
+  python scripts/auto_train_loop.py --max-iterations 100 --train-interval 20
   python scripts/auto_train_loop.py --loss-threshold 0.01 --patience 3
   python scripts/auto_train_loop.py --reward-threshold 500 --loss-threshold 0.1 --patience 2
   python scripts/auto_train_loop.py --reward-stability-window 10 --reward-stability-threshold 0.05
   python scripts/auto_train_loop.py --epsilon-floor 0.05
   python scripts/auto_train_loop.py --reward-stability-window 10 --epsilon-floor 0.01 --patience 3
+  python scripts/auto_train_loop.py --log-level WARNING --backend-log-level ERROR
         """
     )
 
@@ -172,7 +164,7 @@ def parse_args():
         choices=AVAILABLE_AGENTS,
         help=f'训练使用的 Agent 类型 (默认: GraphPPOAgent)，可选: {", ".join(AVAILABLE_AGENTS)}'
     )
-    
+
     parser.add_argument(
         '--log-level',
         type=str,
@@ -180,15 +172,15 @@ def parse_args():
         choices=['DEBUG', 'INFO', 'WARNING', 'ERROR'],
         help='前端脚本日志级别 (默认: INFO)'
     )
-    
+
     parser.add_argument(
         '--backend-log-level',
         type=str,
         default='WARNING',
         choices=['DEBUG', 'INFO', 'WARNING', 'ERROR'],
-        help='后端服务日志级别 (默认: INFO)'
+        help='后端服务日志级别 (默认: WARNING)'
     )
-    
+
     parser.add_argument(
         '--reward-threshold',
         type=float,
@@ -251,28 +243,35 @@ def parse_args():
         default=MAX_ITERATIONS,
         help=f'最大迭代次数 (默认: {MAX_ITERATIONS})'
     )
-    
+
     parser.add_argument(
-        '--poll-interval',
+        '--train-interval',
         type=int,
-        default=POLL_INTERVAL,
-        help=f'轮询间隔（秒）(默认: {POLL_INTERVAL})'
+        default=TRAIN_INTERVAL,
+        help=f'训练间隔：每隔多少步调用一次 agent.train() (默认: {TRAIN_INTERVAL})'
     )
-    
+
     parser.add_argument(
-        '--poll-timeout',
+        '--episode-timeout',
         type=int,
-        default=POLL_TIMEOUT,
-        help=f'单次训练超时（秒）(默认: {POLL_TIMEOUT})'
+        default=EPISODE_TIMEOUT,
+        help=f'单次 episode 超时（秒）(默认: {EPISODE_TIMEOUT})'
     )
-    
+
     parser.add_argument(
-        '--port',
-        type=int,
-        default=8000,
-        help='后端服务端口号 (默认: 8000)'
+        '--config-yaml',
+        type=str,
+        default=None,
+        help='可选的自定义基础 YAML 配置路径'
     )
-    
+
+    parser.add_argument(
+        '--experiment-id',
+        type=str,
+        default=None,
+        help='实验标识（默认自动生成时间戳），结果保存在 training_logs/results/{experiment_id}/'
+    )
+
     return parser.parse_args()
 
 
@@ -295,104 +294,7 @@ def load_agent_config(agent_name: str) -> dict:
     return agent_config
 
 
-def retry_request(func, *args, max_retries: int = REQUEST_MAX_RETRIES, **kwargs) -> Optional[requests.Response]:
-    """
-    带重试机制的请求函数
-
-    Args:
-        func: requests 请求函数 (session.get, session.post 等)
-        *args: 位置参数
-        max_retries: 最大重试次数
-        **kwargs: 关键字参数
-
-    Returns:
-        Optional[requests.Response]: 响应对象，失败返回 None
-    """
-    last_error = None
-    for attempt in range(1, max_retries + 1):
-        try:
-            resp = func(*args, **kwargs)
-            if resp.status_code == 200:
-                return resp
-            else:
-                logger.warning(f"请求失败 (尝试 {attempt}/{max_retries}): HTTP {resp.status_code}")
-                if attempt < max_retries:
-                    # 递增重试延迟：1s, 3s, 6s, ...，给服务端更多恢复时间
-                    time.sleep(min(REQUEST_RETRY_DELAY * attempt, 10))
-                continue
-        except requests.exceptions.RequestException as e:
-            last_error = e
-            logger.warning(f"请求异常 (尝试 {attempt}/{max_retries}): {e}")
-            if attempt < max_retries:
-                # 递增重试延迟，防止训练高峰期连续超时
-                time.sleep(min(REQUEST_RETRY_DELAY * attempt, 10))
-            continue
-
-    logger.error(f"请求失败，已重试 {max_retries} 次")
-    return None
-
-
-def reset_factory_state() -> bool:
-    """
-    重置工厂状态（清理之前的训练状态，准备下一次训练）
-
-    通过调用 /factory/control/reset 端点重置后端核心。
-    如果失败，会重启后端。
-
-    Returns:
-        bool: 重置是否成功
-    """
-    logger.info("重置工厂状态...")
-    resp = retry_request(
-        session.post,
-        f"{BACKEND_URL}/factory/control/reset",
-        timeout=REQUEST_MEDIUM_TIMEOUT
-    )
-    
-    if resp and resp.status_code == 200:
-        logger.info("工厂状态已重置")
-        return True
-    else:
-        logger.warning("重置请求失败")
-
-    # 重置失败，重启后端
-    logger.info("重置失败，尝试重启后端...")
-    return restart_backend()
-
-
-def restart_backend() -> bool:
-    """
-    重启后端服务
-
-    Returns:
-        bool: 重启是否成功
-    """
-    global backend_process
-
-    logger.info("重启后端服务...")
-    stop_backend()
-
-    if not start_backend():
-        return False
-
-    # 重新初始化 packet_factory
-    logger.info("重新初始化 packet_factory...")
-    resp = retry_request(
-        session.post,
-        API_FACTORY_SWITCH,
-        json={"factory_id": "packet_factory"},
-        timeout=REQUEST_LONG_TIMEOUT
-    )
-    
-    if resp and resp.status_code == 200:
-        data = resp.json()
-        if data.get("status") == "ok":
-            logger.info("packet_factory 重新初始化完成")
-            return True
-    
-    logger.error("重新初始化失败")
-    return False
-
+# ==================== AGV 实例解析 ====================
 
 def parse_agv_instance(filepath: Path) -> dict:
     """
@@ -528,98 +430,46 @@ def parse_agv_instance(filepath: Path) -> dict:
     }
 
 
-def generate_pipeline_config(parsed_data: dict, config_name: str,
-                            agent_config: Optional[dict] = None) -> str:
-    """
-    从解析的数据生成完整的 pipeline_config.yaml
+# ==================== 配置构建 ====================
 
-    Args:
-        parsed_data: 解析后的数据
-        config_name: 配置名称
-        agent_config: 可选的 Agent 配置字典（由 config/agents/ 下的文件加载）
-
-    Returns:
-        str: YAML 格式的配置文件内容
-    """
-    # 生成 points
+def generate_instance_config(parsed_data: dict) -> dict:
+    """从解析的数据生成 job_config / map_config / event_config"""
     points = [
-        {
-            "point": {
-                "id": point_id,
-                "coordinate": [x, y]
-            }
-        }
-        for point_id, x, y in parsed_data['points']
+        {"point": {"id": pid, "coordinate": [x, y]}}
+        for pid, x, y in parsed_data['points']
     ]
-
-    # 生成 links
     links = [
-        {
-            "link": {
-                "id": link_id,
-                "begin": point1_id,
-                "end": point2_id
-            }
-        }
-        for link_id, point1_id, point2_id, weight in parsed_data['links']
+        {"link": {"id": lid, "begin": p1, "end": p2}}
+        for lid, p1, p2, _ in parsed_data['links']
     ]
-
-    # 生成 machines
     machines = [
-        {
-            "machine": {
-                "id": machine_id,
-                "type": "packet_factory.Machine",
-                "point_id": point_id
-            }
-        }
-        for machine_id, point_id in parsed_data['machines']
+        {"machine": {"id": mid, "type": "packet_factory.Machine", "point_id": pid}}
+        for mid, pid in parsed_data['machines']
     ]
-
-    # 生成 agvs
     agvs = [
-        {
-            "agv": {
-                "id": agv_id,
-                "type": "packet_factory.Agv",
-                "point_id": point_id,
-                "velocity": velocity,
-                "capacity": 12
-            }
-        }
-        for agv_id, point_id, velocity in parsed_data['agvs']
+        {"agv": {"id": aid, "type": "packet_factory.Agv", "point_id": pid, "velocity": vel, "capacity": 12}}
+        for aid, pid, vel in parsed_data['agvs']
     ]
 
-    # 计算地图尺寸
     all_x = [p[1] for p in parsed_data['points']]
     all_y = [p[2] for p in parsed_data['points']]
     width = int(max(all_x) + 5) if all_x else 20
     height = int(max(all_y) + 5) if all_y else 30
 
-    # 生成 job_config
     jobs_yaml = []
     for job_id, operations in parsed_data["jobs"]:
-        job_entry = {
-            "job": {
-                "id": job_id,
-                "operations": []
-            }
-        }
+        job_entry = {"job": {"id": job_id, "operations": []}}
         for op_idx, machine_options in enumerate(operations):
             op_entry = {
                 "operation": {
                     "id": op_idx,
-                    "machines": [
-                        {"id": m, "time": d}
-                        for m, d in machine_options
-                    ]
+                    "machines": [{"id": m, "time": d} for m, d in machine_options]
                 }
             }
             job_entry["job"]["operations"].append(op_entry)
         jobs_yaml.append(job_entry)
 
-    # 组装完整的 pipeline_config
-    pipeline_config = {
+    return {
         "event_config": {
             "event_type": [
                 "packet_factory.JUST_TEST",
@@ -631,9 +481,7 @@ def generate_pipeline_config(parsed_data: dict, config_name: str,
                 "packet_factory.JOB_ADD"
             ]
         },
-        "job_config": {
-            "jobs": jobs_yaml
-        },
+        "job_config": {"jobs": jobs_yaml},
         "map_config": {
             "width": width,
             "height": height,
@@ -641,465 +489,227 @@ def generate_pipeline_config(parsed_data: dict, config_name: str,
             "machines": machines,
             "links": links,
             "agvs": agvs
-        }
+        },
     }
 
-    # 注入 Agent 配置（由 config/agents/ 下的独立文件提供）
-    if agent_config:
-        pipeline_config["agent"] = agent_config
 
-    return yaml.dump(pipeline_config, allow_unicode=True, sort_keys=False)
+def build_config(agent_key: str, instance_config: dict,
+                 base_yaml_path: Optional[str] = None) -> dict:
+    """构建完整的 bootstrap 配置
 
-
-def start_backend(backend_log_level: str = "INFO") -> bool:
-    """
-    启动后端服务（后台模式）
+    从 config/agents/{agent_key}.yaml 加载 Agent 超参数，
+    设置 ui_mode=backend, task_mode=training。
 
     Args:
-        backend_log_level: 后端日志级别 (DEBUG, INFO, WARNING, ERROR)
+        agent_key: Agent 标识键
+        instance_config: generate_instance_config() 的输出
+        base_yaml_path: 可选的自定义基础 YAML 路径
+    """
+    yaml_path = base_yaml_path or str(DEFAULT_CONFIG_PATH)
+    with open(yaml_path, "r", encoding="utf-8") as f:
+        template = yaml.safe_load(f)
+
+    config = copy.deepcopy(template["config"])
+
+    # 从 per-agent 配置文件加载完整 agent 参数（超参数 + identity 字段，含 mode）
+    agent_full_config = load_agent_config(agent_key)
+
+    # 填充 agent 段
+    config["simulation"]["agent"].update(agent_full_config)
+
+    # 训练模式：始终使用 backend + training
+    config["simulation"]["ui_mode"] = "backend"
+    config["simulation"]["task_mode"] = "training"
+
+    # 注入实例数据
+    config["simulation"]["job_config"] = instance_config["job_config"]
+    config["simulation"]["map_config"] = instance_config["map_config"]
+    config["simulation"]["event_config"] = instance_config["event_config"]
+
+    return config
+
+
+# ==================== Episode 运行 ====================
+
+def run_training_episode(config: dict, train_interval: int = TRAIN_INTERVAL,
+                         timeout: int = EPISODE_TIMEOUT) -> dict:
+    """运行一次完整训练 episode 并返回结果
+
+    直接调用 executor 层，不走 HTTP。
+    训练逻辑与 BackendCore._run_backend_training() 一致。
+
+    Args:
+        config: bootstrap 配置
+        train_interval: 训练间隔步数
+        timeout: 单次 episode 超时秒数
 
     Returns:
-        bool: 启动是否成功
+        dict: 包含 status, makespan, metrics, steps, elapsed 等字段
     """
-    global backend_process
+    from executor.packet_factory.lifecycle.bootstrap import bootstrap
+    from executor.packet_factory.packet_factory.packet_factory_env.Utils.util import EnvStatus
 
-    backend_dir = Path(__file__).parent.parent / "application" / "backend"
-    project_root = backend_dir.parent.parent
+    env, agent = bootstrap(config)
 
-    logger.info("启动后端服务...")
-    logger.debug(f"工作目录: {project_root}")
-    logger.info(f"后端日志级别: {backend_log_level.upper()}")
+    # 重置环境（加载实例数据，初始化 jobs/machines/agvs）
+    env.reset()
+
+    # headless 模式：设置环境状态为 RUNNING，禁用可视化
+    env.status = EnvStatus.RUNNING
+    if env.env_visualizer is not None:
+        env.env_visualizer = None
+
+    start_time = time.time()
+    step_count = 0
 
     try:
-        # 设置环境变量，传递给后端进程
-        env = os.environ.copy()
-        env['BACKEND_LOG_LEVEL'] = backend_log_level.upper()
-        
-        # 确保 PYTHONPATH 包含项目根目录
-        env['PYTHONPATH'] = str(project_root) + os.pathsep + env.get('PYTHONPATH', '')
+        while not env.env_is_finished():
+            if _shutdown_requested:
+                logger.info("收到中断信号，正在停止当前 episode...")
+                metrics = agent.get_training_metrics() if hasattr(agent, 'get_training_metrics') else {}
+                return {
+                    "status": "interrupted",
+                    "makespan": env.env_timeline,
+                    "metrics": metrics,
+                    "decision_stats": agent.get_decision_stats() if hasattr(agent, 'get_decision_stats') else {},
+                    "steps": step_count,
+                    "elapsed": time.time() - start_time,
+                }
 
-        # 启动 uvicorn，从项目根目录运行
-        backend_process = subprocess.Popen(
-            [
-                sys.executable, "-m", "uvicorn",
-                "application.backend.server:app",
-                "--host", BACKEND_HOST,
-                "--port", str(BACKEND_PORT),
-                "--log-level", "info"
-            ],
-            cwd=str(project_root),
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            text=True,
-            env=env
-        )
+            if time.time() - start_time > timeout:
+                logger.warning(f"Episode 超时 ({timeout}s)，已执行 {step_count} 步")
+                metrics = agent.get_training_metrics() if hasattr(agent, 'get_training_metrics') else {}
+                return {
+                    "status": "timeout",
+                    "makespan": env.env_timeline,
+                    "metrics": metrics,
+                    "decision_stats": agent.get_decision_stats() if hasattr(agent, 'get_decision_stats') else {},
+                    "steps": step_count,
+                    "elapsed": time.time() - start_time,
+                }
 
-        # 等待后端就绪，最多等待60秒
-        logger.info("等待后端就绪...")
-        if wait_for_backend(timeout=60):
-            logger.info("后端服务已启动 ✅")
-            return True
-        else:
-            # 读取错误信息
-            logger.error("后端服务启动超时 ❌")
-            # 检查进程状态
-            if backend_process.poll() is not None:
-                _, stderr = backend_process.communicate(timeout=5)
-                logger.error(f"后端进程已退出，stderr: {stderr[:500] if stderr else 'N/A'}")
-            else:
-                logger.error("后端进程仍在运行但未响应")
-            stop_backend()
-            return False
+            step_count += 1
+
+            # 输入获得环境状态并决策
+            actions = env.action_space(agent)
+
+            # 执行动作
+            observations, rewards, terminations, truncations, infos = env.step(actions)
+
+            # 训练更新（每 train_interval 步）
+            if step_count % train_interval == 0:
+                if hasattr(agent, 'update'):
+                    agent.update(observations, rewards)
+                elif hasattr(agent, 'train'):
+                    agent.train(observations, rewards, terminations, truncations, infos)
+
+            # 主动释放 GIL
+            time.sleep(0)
+
+            # 每 50 步打印训练指标
+            if step_count % 50 == 0 and hasattr(agent, 'get_training_metrics'):
+                metrics = agent.get_training_metrics()
+                ep_reward = metrics.get('episode_reward', 0.0)
+                epsilon = metrics.get('epsilon', 'N/A')
+                loss_info = {k: f"{v:.6f}" for k, v in metrics.items()
+                             if 'loss' in k.lower() and isinstance(v, (int, float))}
+                logger.info(f"[Step {step_count}] reward={ep_reward:.4f}, "
+                            f"epsilon={epsilon}, timeline={env.env_timeline}"
+                            + (f", {loss_info}" if loss_info else ""))
+
+        makespan = env.env_timeline
+        metrics = agent.get_training_metrics() if hasattr(agent, 'get_training_metrics') else {}
+        decision_stats = agent.get_decision_stats() if hasattr(agent, 'get_decision_stats') else {}
+        elapsed = time.time() - start_time
+
+        return {
+            "status": "completed",
+            "makespan": makespan,
+            "metrics": metrics,
+            "decision_stats": decision_stats,
+            "steps": step_count,
+            "elapsed": elapsed,
+        }
 
     except Exception as e:
-        logger.error(f"启动后端失败: {e}")
-        return False
+        logger.error(f"Episode 运行异常: {e}")
+        import traceback
+        traceback.print_exc()
+        metrics = agent.get_training_metrics() if hasattr(agent, 'get_training_metrics') else {}
+        return {
+            "status": "error",
+            "makespan": env.env_timeline if hasattr(env, 'env_timeline') else 0.0,
+            "metrics": metrics,
+            "decision_stats": {},
+            "steps": step_count,
+            "elapsed": time.time() - start_time,
+            "error": str(e),
+        }
 
 
-def wait_for_backend(timeout: int = 60) -> bool:
-    """
-    等待后端就绪
+def save_training_result(agent, env, result: dict, experiment_dir: Path):
+    """保存训练结果
 
-    Args:
-        timeout: 超时时间（秒）
-
-    Returns:
-        bool: 是否就绪
-    """
-    import time
-    # 等待2秒让服务器启动
-    time.sleep(2)
-    start_time = time.time()
-    while time.time() - start_time < timeout:
-        resp = retry_request(
-            session.get,
-            API_HEALTH,
-            timeout=REQUEST_SHORT_TIMEOUT,
-            max_retries=1  # 健康检查只重试1次，快速失败
-        )
-        if resp and resp.status_code == 200:
-            return True
-        time.sleep(1)
-    return False
-
-
-def stop_backend():
-    """关闭后端服务"""
-    global backend_process
-
-    if backend_process:
-        logger.info("关闭后端服务...")
-        backend_process.terminate()
-        try:
-            backend_process.wait(timeout=10)
-        except subprocess.TimeoutExpired:
-            backend_process.kill()
-            backend_process.wait()
-        backend_process = None
-        logger.info("后端服务已关闭 ✅")
-
-
-def upload_config(config_name: str, yaml_content: str) -> bool:
-    """
-    上传 YAML 配置到后端
+    复刻 BackendCore._save_training_results() 的逻辑，
+    保存到实验目录下的 training_report.json。
 
     Args:
-        config_name: 配置名称
-        yaml_content: YAML 文件内容
-
-    Returns:
-        bool: 上传是否成功
+        agent: Agent 实例
+        env: 环境实例
+        result: run_training_episode() 的返回值
+        experiment_dir: 实验结果目录
     """
-    files = {'file': (f'{config_name}.yaml', yaml_content, 'text/plain')}
-    # config_name 作为 query 参数传递
-    resp = retry_request(
-        session.post,
-        f"{BACKEND_URL}/yaml/upload?config_name={config_name}",
-        files=files,
-        timeout=REQUEST_MEDIUM_TIMEOUT
-    )
-    
-    if resp and resp.status_code == 200:
-        logger.info(f"配置 {config_name} 上传成功")
-        return True
-    else:
-        logger.error("配置上传失败")
-        return False
-
-
-def render_factory(config_name: str) -> bool:
-    """
-    启动工厂渲染（异步方式）
-
-    后端通过线程池异步处理训练，API 会立即返回。
-    脚本会在 poll_jobs_completion 中轮询训练状态。
-
-    Args:
-        config_name: 配置名称
-
-    Returns:
-        bool: 请求是否发送成功
-    """
-    import threading
-
-    def send_render_request():
-        """后台发送渲染请求，强制 backend + training 模式"""
-        resp = retry_request(
-            session.post,
-            API_MAP_RENDER,
-            json={
-                "target_factory": config_name,
-                "ui_mode": "backend",
-                "task_mode": "training",
-            },
-            timeout=REQUEST_LONG_TIMEOUT
-        )
-        
-        if resp and resp.status_code == 200:
-            logger.info(f"工厂 {config_name} 渲染已启动")
-        else:
-            logger.error("工厂渲染启动失败")
-
     try:
-        # 在后台线程中发送请求，避免阻塞
-        thread = threading.Thread(target=send_render_request, daemon=True)
-        thread.start()
-        return True
+        # 优先调用 Agent 的 save_training_result 方法（如果存在）
+        if hasattr(agent, 'save_training_result'):
+            result_path = agent.save_training_result()
+            if result_path:
+                logger.info(f"Agent 保存训练结果到: {result_path}")
+        else:
+            # 降级方案：保存到实验目录
+            agent_name = getattr(agent, 'name', 'UnknownAgent')
+            timestamp = time.strftime('%Y%m%d_%H%M%S')
+            result_subdir = experiment_dir / f"{agent_name}_{timestamp}"
+            result_subdir.mkdir(parents=True, exist_ok=True)
+
+            results = {
+                'makespan': result.get('makespan', env.env_timeline if hasattr(env, 'env_timeline') else 0),
+                'decision_stats': result.get('decision_stats', {}),
+                'q_table_size': len(getattr(agent, 'q_table', {})),
+                'training_metrics': result.get('metrics', {}),
+                'metadata': {
+                    'agent_name': agent_name,
+                    'agent_id': getattr(agent, 'agent_id', None),
+                    'save_time': time.strftime('%Y-%m-%d %H:%M:%S')
+                }
+            }
+
+            result_file = result_subdir / 'training_report.json'
+            with open(result_file, 'w', encoding='utf-8') as f:
+                json.dump(results, f, indent=2, ensure_ascii=False)
+            logger.info(f"训练结果已保存到: {result_file}")
+
+        # 保存模型（使用 Agent 的默认路径或降级方案）
+        if hasattr(agent, 'save_model'):
+            model_path = agent.save_model()
+            if model_path:
+                logger.info(f"模型已保存到: {model_path}")
+
     except Exception as e:
-        logger.error(f"启动渲染线程失败: {e}")
-        return False
+        logger.error(f"保存训练结果失败: {e}")
 
 
-def wait_for_env_ready(timeout: int = 30) -> bool:
-    """
-    等待环境准备好（之前的训练完全结束）
-
-    Args:
-        timeout: 超时时间（秒）
-
-    Returns:
-        bool: 是否准备好
-    """
-    import time
-    start_time = time.time()
-    while time.time() - start_time < timeout:
-        resp = retry_request(
-            session.get,
-            f"{BACKEND_URL}/factory/alive",
-            timeout=REQUEST_SHORT_TIMEOUT,
-            max_retries=1
-        )
-        
-        if resp and resp.status_code == 200:
-            data = resp.json()
-            # 如果 is_alive 为 False，说明环境已关闭，可以继续
-            if not data.get('is_alive', True):
-                return True
-        
-        time.sleep(0.5)
-    
-    # 超时也算准备好（可能有其他问题）
-    return True
-
-
-def poll_jobs_completion(timeout: int = POLL_TIMEOUT) -> Tuple[bool, List[dict], float]:
-    """
-    轮询任务完成状态
-
-    通过检查 /factory/alive 端点来判断训练是否完成。
-    支持两种完成检测方式：
-    1. is_alive 从 True 变为 False（训练正常完成）
-    2. training_completed=True（训练快速完成，客户端没来得及看到 is_alive=True）
-
-    Args:
-        timeout: 超时时间（秒）
-
-    Returns:
-        Tuple[bool, List[dict], float]: (是否完成, 任务列表, makespan)
-    """
-    start_time = time.time()
-    makespan = 0.0
-    was_alive = False
-
-    # 开始轮询：使用 /factory/alive 判断训练是否完成
-    logger.info("开始监控任务进度...")
-    last_status_log = 0
-    while time.time() - start_time < timeout:
-        resp = retry_request(
-            session.get,
-            f"{BACKEND_URL}/factory/alive",
-            timeout=REQUEST_MEDIUM_TIMEOUT,
-            max_retries=2
-        )
-        
-        if resp and resp.status_code == 200:
-            data = resp.json()
-            is_alive = data.get('is_alive', False)
-            training_completed = data.get('training_completed', False)
-            makespan = float(data.get('makespan', 0))
-
-            # 检测训练完成：training_completed=True
-            if training_completed:
-                logger.info(f"训练完成，检测到 training_completed=True (makespan: {makespan:.2f}s)")
-
-                # 获取最终的任务状态
-                resp_jobs = retry_request(
-                    session.get,
-                    API_JOBS_PROGRESS,
-                    timeout=REQUEST_MEDIUM_TIMEOUT,
-                    max_retries=2
-                )
-                
-                if resp_jobs and resp_jobs.status_code == 200:
-                    jobs_data = resp_jobs.json().get('jobs', [])
-                    return True, jobs_data, makespan
-
-                return True, [], makespan
-
-            # 检测 is_alive 从 True 变为 False
-            if was_alive and not is_alive:
-                elapsed = time.time() - start_time
-                logger.info(f"训练完成，检测到环境已结束 (elapsed: {elapsed:.2f}s)")
-
-                # 获取最终的任务状态
-                resp_jobs = retry_request(
-                    session.get,
-                    API_JOBS_PROGRESS,
-                    timeout=REQUEST_MEDIUM_TIMEOUT,
-                    max_retries=2
-                )
-                
-                if resp_jobs and resp_jobs.status_code == 200:
-                    jobs_data = resp_jobs.json().get('jobs', [])
-                    return True, jobs_data, elapsed
-
-                return True, [], elapsed
-
-            was_alive = is_alive
-
-            # 每30秒打印一次状态
-            if time.time() - last_status_log > 30:
-                elapsed = time.time() - start_time
-                # 从 /factory/alive 响应获取实时训练指标
-                live_metrics = data.get('training_metrics', {}) if resp and resp.status_code == 200 else {}
-                if not live_metrics:
-                    live_metrics = get_latest_training_metrics()
-                metric_str = ""
-                if live_metrics:
-                    ep_reward = live_metrics.get('episode_reward', None)
-                    epsilon = live_metrics.get('epsilon', None)
-                    if ep_reward is not None:
-                        metric_str += f", reward={ep_reward:.4f}"
-                    if epsilon is not None:
-                        metric_str += f", epsilon={epsilon}"
-                    loss_info = {k: f"{v:.6f}" for k, v in live_metrics.items()
-                                if 'loss' in k.lower() and isinstance(v, (int, float))}
-                    if loss_info:
-                        metric_str += f", {loss_info}"
-                logger.info(f"训练进行中... ({int(elapsed)}s{metric_str})")
-                last_status_log = time.time()
-
-        time.sleep(POLL_INTERVAL)
-
-    # 超时，获取最终状态
-    elapsed = time.time() - start_time
-    resp_jobs = retry_request(
-        session.get,
-        API_JOBS_PROGRESS,
-        timeout=REQUEST_MEDIUM_TIMEOUT,
-        max_retries=2
-    )
-    
-    if resp_jobs and resp_jobs.status_code == 200:
-        jobs_data = resp_jobs.json().get('jobs', [])
-        return False, jobs_data, elapsed
-    
-    return False, [], elapsed
-
-
-def get_latest_training_result() -> Optional[dict]:
-    """
-    获取最新的训练结果
-
-    Returns:
-        Optional[dict]: 训练结果字典，如果不存在则返回 None
-    """
-    if not RESULTS_DIR.exists():
-        return None
-
-    # 查找最新的结果目录
-    result_dirs = [d for d in RESULTS_DIR.iterdir() if d.is_dir()]
-    if not result_dirs:
-        return None
-
-    latest_dir = max(result_dirs, key=lambda d: d.stat().st_mtime)
-    report_file = latest_dir / "training_report.json"
-
-    if report_file.exists():
-        with open(report_file, 'r', encoding='utf-8') as f:
-            return json.load(f)
-
-    return None
-
-
-def get_actual_makespan_from_result() -> float:
-    """
-    从最新的训练结果文件获取实际的 makespan
-
-    Returns:
-        float: 实际的 makespan 值，如果不存在则返回 0.0
-    """
-    result = get_latest_training_result()
-    if result and 'makespan' in result:
-        return float(result['makespan'])
-    return 0.0
-
-
-def get_cumulative_reward() -> float:
-    """
-    获取最新一次训练的 episode reward
-
-    优先从 training_report.json 的 training_metrics.episode_reward 读取，
-    其次尝试从 training_metrics.decision_stats 中读取，
-    最后尝试从 agent 模型文件中读取 training_history。
-
-    Returns:
-        float: episode reward 值
-    """
-    result = get_latest_training_result()
-
-    # 优先从 training_metrics 读取
-    if result and 'training_metrics' in result:
-        metrics = result['training_metrics']
-        if 'episode_reward' in metrics:
-            return float(metrics['episode_reward'])
-
-    # 尝试从 decision_stats 读取（兼容旧格式）
-    if result and 'decision_stats' in result:
-        stats = result['decision_stats']
-        for key in ['total_reward', 'episode_reward', 'total_rewards', 'cumulative_reward', 'reward']:
-            if key in stats:
-                return float(stats[key])
-
-    # 最后尝试从 agent 模型目录中读取 training_history
-    models_dir = TRAINING_LOGS / "models"
-    if models_dir.exists():
-        for agent_dir in sorted(models_dir.iterdir(), key=lambda d: d.stat().st_mtime, reverse=True):
-            if not agent_dir.is_dir():
-                continue
-            # 尝试 JSON 格式
-            json_file = agent_dir / "agent_model.json"
-            if json_file.exists():
-                try:
-                    with open(json_file, 'r', encoding='utf-8') as f:
-                        model_data = json.load(f)
-                    history = model_data.get('training_history', {})
-                    for key in ['total_rewards', 'episode_reward']:
-                        vals = history.get(key, [])
-                        if vals:
-                            return float(vals[-1]) if isinstance(vals[-1], (int, float)) else float(sum(vals))
-                except Exception:
-                    pass
-
-            # 尝试 PyTorch 格式（需读取 JSON backup 或跳过）
-            pt_file = agent_dir / "agent_model.pt"
-            if pt_file.exists():
-                try:
-                    import torch
-                    checkpoint = torch.load(str(pt_file), map_location='cpu', weights_only=False)
-                    history = checkpoint.get('training_history', {})
-                    for key in ['total_rewards', 'episode_reward']:
-                        vals = history.get(key, [])
-                        if vals:
-                            return float(vals[-1]) if isinstance(vals[-1], (int, float)) else float(sum(vals))
-                except Exception:
-                    pass
-
-    return 0.0
-
-
-def get_latest_training_metrics() -> Dict:
-    """
-    获取最新训练结果的 training_metrics 字典
-
-    Returns:
-        Dict: training_metrics 字典，如果不存在则返回空字典
-    """
-    result = get_latest_training_result()
-    if result and 'training_metrics' in result:
-        return result['training_metrics']
-    return {}
-
+# ==================== 收敛检测 ====================
 
 def compute_makespan_lower_bound(parsed_data: dict) -> float:
-    """Compute estimated makespan lower bound from problem data.
+    """计算估计的 makespan 下界
 
-    Uses two bounds and takes the maximum:
-    1. Job bound: longest job's total minimum processing time
-    2. Machine bound: total minimum work / number of machines
+    使用两个下界取最大值：
+    1. 作业下界：最长作业的最小总处理时间
+    2. 机器下界：最小总工作量 / 机器数
 
     Returns:
-        float: estimated lower bound (> 0)
+        float: 估计的下界 (> 0)
     """
     job_min_times = []
     total_min_work = 0.0
@@ -1263,17 +873,7 @@ def check_convergence(iteration_metrics: List[Dict], reward_threshold: float,
     return False, ""
 
 
-def check_reward_threshold() -> bool:
-    """
-    检查累积 reward 是否达到阈值（兼容旧接口）
-
-    Returns:
-        bool: 是否达到阈值
-    """
-    cumulative_reward = get_cumulative_reward()
-    logger.info(f"当前 episode reward: {cumulative_reward:.2f}, 阈值: {REWARD_THRESHOLD:.2f}")
-    return cumulative_reward >= REWARD_THRESHOLD
-
+# ==================== 数据集发现 ====================
 
 def select_random_data_file() -> Optional[Path]:
     """
@@ -1292,191 +892,128 @@ def select_random_data_file() -> Optional[Path]:
     return None
 
 
-def switch_to_packet_factory() -> bool:
-    """
-    切换到 packet_factory 工厂（注册后端路由）
+# ==================== 结果管理 ====================
 
-    Returns:
-        bool: 切换是否成功
-    """
-    resp = retry_request(
-        session.post,
-        API_FACTORY_SWITCH,
-        json={"factory_id": "packet_factory"},
-        timeout=REQUEST_MEDIUM_TIMEOUT
-    )
-    
-    if resp and resp.status_code == 200:
-        data = resp.json()
-        if data.get("status") == "ok":
-            logger.info("已切换到 packet_factory")
-            return True
-        else:
-            logger.error(f"切换失败: {data}")
-            return False
-    else:
-        logger.error("切换请求失败")
-        return False
-
-
-def run_training_iteration(iteration: int, data_file: Path,
-                          agent_config: Optional[dict] = None) -> Tuple[bool, float]:
-    """
-    执行一次训练迭代
+def load_completed_iterations(experiment_dir: Path) -> int:
+    """读取已有结果，返回已完成的迭代数
 
     Args:
-        iteration: 当前迭代编号
-        data_file: 数据文件路径
-        agent_config: 可选的 Agent 配置字典
+        experiment_dir: 实验目录
 
     Returns:
-        Tuple[bool, float]: (是否成功, makespan)
+        int: 已完成的迭代数
     """
-    # 显示相对于 DATA_DIR 的路径
-    relative_path = data_file.relative_to(DATA_DIR)
-    config_name = f"auto_train_{iteration}_{data_file.stem}"
+    progress_file = experiment_dir / "progress.jsonl"
+    if not progress_file.exists():
+        return 0
 
-    logger.info("\n" + "="*60)
-    logger.info(f"[迭代 {iteration}] 使用数据文件: {relative_path}")
-    logger.info(f"{'='*60}")
-
-    try:
-        # 1. 解析数据文件
-        logger.info("[INFO] 解析数据文件...")
-        parsed_data = parse_agv_instance(data_file)
-        logger.info(f"[INFO] 解析完成: {parsed_data['job_count']} jobs, "
-              f"{parsed_data['machine_count']} machines, "
-              f"{parsed_data['agv_count']} AGVs")
-
-        # 2. 生成配置（注入 Agent 配置）
-        logger.info("[INFO] 生成 pipeline_config...")
-        yaml_content = generate_pipeline_config(parsed_data, config_name,
-                                                agent_config=agent_config)
-
-        # 3. 上传配置
-        logger.info("[INFO] 上传配置...")
-        if not upload_config(config_name, yaml_content):
-            return False, 0.0
-
-        # 4. 启动渲染
-        logger.info("[INFO] 启动工厂渲染...")
-        if not render_factory(config_name):
-            return False, 0.0
-
-        # 5. 轮询完成
-        logger.info("[INFO] 等待训练完成...")
-        success, jobs, elapsed_time = poll_jobs_completion()
-
-        # 获取实际的 makespan（从训练结果文件）
-        actual_makespan = get_actual_makespan_from_result()
-
-        if success:
-            if actual_makespan > 0:
-                logger.info(f"[INFO] 训练完成! Makespan: {actual_makespan:.2f}s")
-            else:
-                logger.info(f"[INFO] 训练完成! Makespan: {elapsed_time:.2f}s (估计)")
-        else:
-            if actual_makespan > 0:
-                logger.warning(f"[WARN] 训练超时! Makespan: {actual_makespan:.2f}s")
-            else:
-                logger.warning(f"[WARN] 训练超时! Makespan: {elapsed_time:.2f}s (估计)")
-
-        # 训练完成后，等待一段时间让线程完全结束
-        logger.info("[INFO] 等待线程完全结束...")
-        time.sleep(3)
-
-        return success, actual_makespan if actual_makespan > 0 else elapsed_time
-
-    except Exception as e:
-        logger.error(f"[ERROR] 训练迭代失败: {e}")
-        import traceback
-        traceback.print_exc()
-        return False, 0.0
+    count = 0
+    with open(progress_file, "r", encoding="utf-8") as f:
+        for line in f:
+            line = line.strip()
+            if line:
+                count += 1
+    return count
 
 
-def signal_handler(sig, frame):
-    """信号处理器"""
-    logger.info("\n收到信号，准备退出...")
-    stop_backend()
-    sys.exit(0)
+def append_iteration_result(experiment_dir: Path, record: dict):
+    """追加一条迭代结果到 JSONL 文件
 
+    Args:
+        experiment_dir: 实验目录
+        record: 迭代结果字典
+    """
+    progress_file = experiment_dir / "progress.jsonl"
+    with open(progress_file, "a", encoding="utf-8") as f:
+        f.write(json.dumps(record, ensure_ascii=False) + "\n")
+
+
+# ==================== 主训练循环 ====================
 
 def main():
     """主函数"""
-    global backend_process, BACKEND_PORT, BACKEND_URL
-
-    # 解析命令行参数
     args = parse_args()
 
-    # 更新全局配置
-    global REWARD_THRESHOLD, MAX_ITERATIONS, POLL_INTERVAL, POLL_TIMEOUT
-    global LOSS_THRESHOLD, CONVERGENCE_PATIENCE
-    global MIN_ITERS, MAKESPAN_GAP_THRESHOLD
-    global REWARD_STABILITY_WINDOW, REWARD_STABILITY_THRESHOLD, EPSILON_FLOOR
-    BACKEND_PORT = args.port
-    BACKEND_URL = f"http://{BACKEND_HOST}:{BACKEND_PORT}"
-    REWARD_THRESHOLD = args.reward_threshold
-    MAX_ITERATIONS = args.max_iterations
-    POLL_INTERVAL = args.poll_interval
-    POLL_TIMEOUT = args.poll_timeout
-    LOSS_THRESHOLD = args.loss_threshold
-    CONVERGENCE_PATIENCE = args.patience
-    MIN_ITERS = args.min_iters
-    MAKESPAN_GAP_THRESHOLD = args.makespan_gap_threshold
-    REWARD_STABILITY_WINDOW = args.reward_stability_window
-    REWARD_STABILITY_THRESHOLD = args.reward_stability_threshold
-    EPSILON_FLOOR = args.epsilon_floor
+    # 设置日志级别
+    setup_logging(args.log_level, args.backend_log_level)
 
-    # 重新计算 API 端点（因为 BACKEND_URL 已更新）
-    global API_FACTORY_SWITCH, API_HEALTH, API_YAML_UPLOAD, API_MAP_RENDER, API_JOBS_PROGRESS
-    API_FACTORY_SWITCH = f"{BACKEND_URL}/factory/control/switch"
-    API_HEALTH = f"{BACKEND_URL}/health"
-    API_YAML_UPLOAD = f"{BACKEND_URL}/{{config_name}}/yaml/upload"
-    API_MAP_RENDER = f"{BACKEND_URL}/map/render"
-    API_JOBS_PROGRESS = f"{BACKEND_URL}/jobs/progress"
+    # 确定实验 ID 和目录
+    experiment_id = args.experiment_id or time.strftime("train_%Y%m%d_%H%M%S")
+    experiment_dir = RESULTS_DIR / experiment_id
+    experiment_dir.mkdir(parents=True, exist_ok=True)
 
-    # 设置前端脚本日志级别
-    setup_logging(args.log_level)
-
-    # 加载 Agent 配置
+    # 加载 Agent 配置（仅用于验证配置文件存在）
     agent_config = load_agent_config(args.agent)
 
-    logger.info("="*60)
-    logger.info("自动化训练循环脚本")
+    logger.info("=" * 60)
+    logger.info("自动化训练循环脚本（直接调用 executor 层）")
     logger.info(f"训练 Agent: {args.agent}")
-    logger.info(f"后端端口: {BACKEND_PORT}")
-    logger.info(f"Reward 阈值: {REWARD_THRESHOLD:.2f}")
-    logger.info(f"Loss 阈值: {LOSS_THRESHOLD if LOSS_THRESHOLD is not None else '不检查'}")
-    logger.info(f"收敛耐心度: {CONVERGENCE_PATIENCE}")
-    logger.info(f"最小迭代次数: {MIN_ITERS}")
-    logger.info(f"Makespan Gap 阈值: {MAKESPAN_GAP_THRESHOLD*100:.1f}%")
-    logger.info(f"Reward 稳定性: window={REWARD_STABILITY_WINDOW or '不检查'}, CV阈值={REWARD_STABILITY_THRESHOLD}")
-    logger.info(f"Epsilon 下界: {EPSILON_FLOOR if EPSILON_FLOOR is not None else '不检查'}")
-    logger.info(f"最大迭代次数: {MAX_ITERATIONS}")
+    logger.info(f"Reward 阈值: {args.reward_threshold:.2f}")
+    logger.info(f"Loss 阈值: {args.loss_threshold if args.loss_threshold is not None else '不检查'}")
+    logger.info(f"收敛耐心度: {args.patience}")
+    logger.info(f"最小迭代次数: {args.min_iters}")
+    logger.info(f"Makespan Gap 阈值: {args.makespan_gap_threshold * 100:.1f}%")
+    logger.info(f"Reward 稳定性: window={args.reward_stability_window or '不检查'}, "
+                f"CV阈值={args.reward_stability_threshold}")
+    logger.info(f"Epsilon 下界: {args.epsilon_floor if args.epsilon_floor is not None else '不检查'}")
+    logger.info(f"最大迭代次数: {args.max_iterations}")
+    logger.info(f"训练间隔: 每 {args.train_interval} 步")
+    logger.info(f"Episode 超时: {args.episode_timeout}s")
     logger.info(f"前端脚本日志级别: {args.log_level.upper()}")
     logger.info(f"后端服务日志级别: {args.backend_log_level.upper()}")
-    logger.info("="*60)
+    logger.info(f"实验目录: {experiment_dir}")
+    logger.info("=" * 60)
+
+    # 保存实验配置快照
+    config_snapshot = {
+        "experiment_id": experiment_id,
+        "agent": args.agent,
+        "reward_threshold": args.reward_threshold,
+        "loss_threshold": args.loss_threshold,
+        "patience": args.patience,
+        "min_iters": args.min_iters,
+        "makespan_gap_threshold": args.makespan_gap_threshold,
+        "reward_stability_window": args.reward_stability_window,
+        "reward_stability_threshold": args.reward_stability_threshold,
+        "epsilon_floor": args.epsilon_floor,
+        "max_iterations": args.max_iterations,
+        "train_interval": args.train_interval,
+        "episode_timeout": args.episode_timeout,
+        "config_yaml": args.config_yaml,
+        "created_at": time.strftime("%Y-%m-%d %H:%M:%S"),
+    }
+    with open(experiment_dir / "experiment_config.json", "w", encoding="utf-8") as f:
+        json.dump(config_snapshot, f, indent=2, ensure_ascii=False)
 
     # 注册信号处理器
+    def signal_handler(sig, frame):
+        global _shutdown_requested
+        _shutdown_requested = True
+        logger.info("\n收到中断信号，等待当前 episode 完成后退出...")
+
     signal.signal(signal.SIGINT, signal_handler)
     signal.signal(signal.SIGTERM, signal_handler)
 
     # 跨迭代指标追踪
     iteration_metrics: List[Dict] = []
 
+    # 加载已完成的迭代数（支持续跑）
+    completed_iters = load_completed_iterations(experiment_dir)
+    if completed_iters > 0:
+        logger.info(f"检测到已完成的 {completed_iters} 次迭代，将从第 {completed_iters} 次继续")
+
     try:
-        # 训练循环
         iteration = 0
-        while iteration < MAX_ITERATIONS:
+        while iteration < args.max_iterations:
             # 检查是否达到收敛条件
             if iteration > 0 and iteration_metrics:
                 converged, reason = check_convergence(
-                    iteration_metrics, REWARD_THRESHOLD, LOSS_THRESHOLD, CONVERGENCE_PATIENCE,
-                    min_iters=MIN_ITERS, current_iteration=iteration,
-                    makespan_gap_threshold=MAKESPAN_GAP_THRESHOLD,
-                    reward_stability_window=REWARD_STABILITY_WINDOW,
-                    reward_stability_threshold=REWARD_STABILITY_THRESHOLD,
-                    epsilon_floor=EPSILON_FLOOR,
+                    iteration_metrics, args.reward_threshold, args.loss_threshold, args.patience,
+                    min_iters=args.min_iters, current_iteration=iteration,
+                    makespan_gap_threshold=args.makespan_gap_threshold,
+                    reward_stability_window=args.reward_stability_window,
+                    reward_stability_threshold=args.reward_stability_threshold,
+                    epsilon_floor=args.epsilon_floor,
                 )
                 if converged:
                     logger.info(f"\n=== 训练收敛，停止迭代 ===")
@@ -1486,95 +1023,134 @@ def main():
                     if reason:
                         logger.info(f"未收敛: {reason}")
 
+            if _shutdown_requested:
+                break
+
             # 随机选择数据文件
             data_file = select_random_data_file()
             if not data_file:
                 logger.error("未找到数据文件")
                 break
 
-            # 每次迭代开始时重启后端
-            logger.info("="*60)
-            logger.info(f"[迭代 {iteration}] 启动新的后端实例...")
-            logger.info("="*60)
+            # 解析实例
+            relative_path = data_file.relative_to(DATA_DIR)
+            logger.info("\n" + "=" * 60)
+            logger.info(f"[迭代 {iteration}] 使用数据文件: {relative_path}")
+            logger.info(f"{'=' * 60}")
 
-            # 如果后端已在运行，先关闭
-            if backend_process is not None:
-                logger.info("关闭上一次迭代的后端...")
-                stop_backend()
-                time.sleep(2)  # 等待端口释放
-
-            # 启动新的后端（传递后端日志级别）
-            if not start_backend(backend_log_level=args.backend_log_level):
-                logger.error("后端启动失败，跳过本次迭代")
-                iteration += 1
-                continue
-
-            # 切换到 packet_factory
-            logger.info("切换到 packet_factory...")
-            if not switch_to_packet_factory():
-                logger.error("工厂切换失败，跳过本次迭代")
-                stop_backend()
+            try:
+                parsed_data = parse_agv_instance(data_file)
+                logger.info(f"解析完成: {parsed_data['job_count']} jobs, "
+                            f"{parsed_data['machine_count']} machines, "
+                            f"{parsed_data['agv_count']} AGVs")
+            except Exception as e:
+                logger.error(f"解析数据文件失败: {e}")
                 iteration += 1
                 continue
 
             # 计算当前实例的 makespan 下界（用于 Makespan Gap 早停）
             try:
-                parsed_lb_data = parse_agv_instance(data_file)
-                lower_bound = compute_makespan_lower_bound(parsed_lb_data)
+                lower_bound = compute_makespan_lower_bound(parsed_data)
             except Exception:
                 lower_bound = 1.0
 
-            # 执行训练
-            success, makespan = run_training_iteration(iteration, data_file,
-                                                       agent_config=agent_config)
+            # 生成实例配置并构建完整配置
+            instance_config = generate_instance_config(parsed_data)
+            config = build_config(args.agent, instance_config,
+                                  base_yaml_path=args.config_yaml)
 
-            # 收集本次迭代的指标
-            metrics = get_latest_training_metrics()
-            metrics['makespan'] = makespan
+            # 运行训练 episode
+            logger.info("开始训练 episode...")
+            result = run_training_episode(
+                config,
+                train_interval=args.train_interval,
+                timeout=args.episode_timeout,
+            )
+
+            # 提取指标
+            metrics = result.get("metrics", {})
+            metrics['makespan'] = result.get("makespan", 0.0)
             metrics['makespan_lower_bound'] = lower_bound
-            metrics['makespan_gap'] = (makespan - lower_bound) / lower_bound if lower_bound > 0 else float('inf')
-            metrics['iteration_success'] = success
+            metrics['makespan_gap'] = (
+                (metrics['makespan'] - lower_bound) / lower_bound
+                if lower_bound > 0 else float('inf')
+            )
+            metrics['iteration_success'] = result.get("status") == "completed"
+            metrics['steps'] = result.get("steps", 0)
+            metrics['elapsed'] = result.get("elapsed", 0.0)
             iteration_metrics.append(metrics)
+
+            # 记录迭代结果
+            record = {
+                "iteration": iteration,
+                "data_file": str(relative_path),
+                "agent": args.agent,
+                "status": result.get("status", "unknown"),
+                "makespan": result.get("makespan", 0.0),
+                "makespan_lower_bound": lower_bound,
+                "makespan_gap": metrics['makespan_gap'],
+                "steps": result.get("steps", 0),
+                "elapsed": result.get("elapsed", 0.0),
+                "training_metrics": metrics,
+                "timestamp": time.strftime("%Y-%m-%d %H:%M:%S"),
+            }
+            if "error" in result:
+                record["error"] = result["error"]
+
+            append_iteration_result(experiment_dir, record)
 
             # 输出本次迭代的关键指标
             episode_reward = metrics.get('episode_reward', 0.0)
             epsilon = metrics.get('epsilon', 'N/A')
             makespan_gap = metrics.get('makespan_gap', float('inf'))
-            loss_keys = {k: v for k, v in metrics.items() if 'loss' in k.lower() and isinstance(v, (int, float))}
-            logger.info(f"[迭代 {iteration} 指标] reward={episode_reward:.4f}, "
-                        f"makespan={makespan:.2f}, makespan_gap={makespan_gap:.1%}, epsilon={epsilon}"
-                        + (f", losses={{{', '.join(f'{k}={v:.6f}' for k, v in loss_keys.items())}}}"
-                           if loss_keys else ""))
+            loss_keys = {k: v for k, v in metrics.items()
+                         if 'loss' in k.lower() and isinstance(v, (int, float))}
+
+            if result.get("status") == "completed":
+                logger.info(f"[迭代 {iteration}] 训练完成! "
+                            f"makespan={metrics['makespan']:.2f}, "
+                            f"reward={episode_reward:.4f}, "
+                            f"makespan_gap={makespan_gap:.1%}, "
+                            f"epsilon={epsilon}, "
+                            f"steps={result.get('steps', 0)}, "
+                            f"elapsed={result.get('elapsed', 0.0):.2f}s"
+                            + (f", losses={{{', '.join(f'{k}={v:.6f}' for k, v in loss_keys.items())}}}"
+                               if loss_keys else ""))
+            else:
+                logger.warning(f"[迭代 {iteration}] {result.get('status', 'unknown')}! "
+                               f"makespan={metrics['makespan']:.2f}")
 
             iteration += 1
 
             # 短暂休息，避免太快
-            time.sleep(2)
+            time.sleep(1)
 
-        if iteration >= MAX_ITERATIONS:
-            logger.warning(f"\n达到最大迭代次数 {MAX_ITERATIONS}")
+        if iteration >= args.max_iterations:
+            logger.warning(f"\n达到最大迭代次数 {args.max_iterations}")
 
         # 打印最终统计
-        cumulative_reward = get_cumulative_reward()
         final_metrics = iteration_metrics[-1] if iteration_metrics else {}
         final_reward = final_metrics.get('episode_reward', 0.0)
-        final_losses = {k: v for k, v in final_metrics.items() if 'loss' in k.lower() and isinstance(v, (int, float))}
+        final_losses = {k: v for k, v in final_metrics.items()
+                        if 'loss' in k.lower() and isinstance(v, (int, float))}
+        final_makespan = final_metrics.get('makespan', 0.0)
+        final_makespan_gap = final_metrics.get('makespan_gap', float('inf'))
 
-        logger.info("\n" + "="*60)
+        logger.info("\n" + "=" * 60)
         logger.info("训练完成!")
         logger.info(f"总迭代次数: {iteration}")
         logger.info(f"最终 episode reward: {final_reward:.4f}")
+        logger.info(f"最终 makespan: {final_makespan:.2f}")
+        logger.info(f"最终 makespan gap: {final_makespan_gap:.1%}")
         if final_losses:
             logger.info(f"最终 losses: {{{', '.join(f'{k}={v:.6f}' for k, v in final_losses.items())}}}")
-        logger.info(f"最终 makespan: {final_metrics.get('makespan', 0.0):.2f}")
-        logger.info("="*60)
+        logger.info(f"结果保存在: {experiment_dir}")
+        logger.info("=" * 60)
 
     except KeyboardInterrupt:
         logger.info("\n收到键盘中断信号")
     finally:
-        # 确保后端被关闭
-        stop_backend()
-        logger.info("="*60)
+        logger.info("训练循环已退出")
 
 
 if __name__ == "__main__":
