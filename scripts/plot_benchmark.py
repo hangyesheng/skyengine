@@ -43,6 +43,7 @@ AGENT_COLORS = {
     "GraphDPAgent": "#9C27B0",
     "GraphDualAgent": "#E91E63",
     "GraphPPOAgent": "#00BCD4",
+    "GraphGRPOAgent": "#3F51B5",
 }
 
 AGENT_LABELS = {
@@ -52,6 +53,7 @@ AGENT_LABELS = {
     "GraphDPAgent": "GraphDP",
     "GraphDualAgent": "GraphDual",
     "GraphPPOAgent": "GraphPPO",
+    "GraphGRPOAgent": "GraphGRPO",
 }
 
 METRIC_LABELS = {

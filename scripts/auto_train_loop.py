@@ -70,7 +70,7 @@ AGENTS_CONFIG_DIR = Path(__file__).parent.parent / "application" / "backend" / "
 
 # 可选的 Agent 类型
 AVAILABLE_AGENTS = [
-    "GraphPPOAgent", "GraphDualAgent", "GraphDPAgent",
+    "GraphGRPOAgent", "GraphPPOAgent", "GraphDualAgent", "GraphDPAgent",
     "DualDRLAgent", "ORToolsAgent", "ORToolsBatchAgent",
 ]
 
