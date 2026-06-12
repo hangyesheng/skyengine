@@ -36,7 +36,6 @@ import time
 import yaml
 import json
 import sys
-import signal
 import os
 import argparse
 import logging
@@ -101,8 +100,9 @@ REWARD_STABILITY_WINDOW = None
 REWARD_STABILITY_THRESHOLD = 0.05
 EPSILON_FLOOR = None
 
-# === 全局中断标记 ===
-_shutdown_requested = False
+# === 配置缓存（避免每 episode 重复读取 YAML 文件）===
+_cached_base_template = None       # application_config.yaml 解析后的模板
+_cached_agent_config = {}          # {agent_key: dict} 缓存 Agent YAML 配置
 
 # 日志记录器
 logger = logging.getLogger("auto_train_loop")
@@ -341,7 +341,7 @@ def parse_args():
 
 def load_agent_config(agent_name: str) -> dict:
     """
-    从 config/agents/ 目录加载指定 Agent 的配置文件
+    从 config/agents/ 目录加载指定 Agent 的配置文件（带缓存）
 
     Args:
         agent_name: Agent 名称（如 GraphPPOAgent, GraphDualAgent）
@@ -349,12 +349,17 @@ def load_agent_config(agent_name: str) -> dict:
     Returns:
         dict: Agent 配置字典
     """
+    global _cached_agent_config
+    if agent_name in _cached_agent_config:
+        return _cached_agent_config[agent_name]
+
     config_path = AGENTS_CONFIG_DIR / f"{agent_name}.yaml"
     if not config_path.exists():
         raise FileNotFoundError(f"Agent 配置文件不存在: {config_path}")
     with open(config_path, 'r', encoding='utf-8') as f:
         agent_config = yaml.safe_load(f)
     logger.info(f"已加载 Agent 配置: {config_path}")
+    _cached_agent_config[agent_name] = agent_config
     return agent_config
 
 
@@ -559,23 +564,29 @@ def generate_instance_config(parsed_data: dict) -> dict:
 
 def build_config(agent_key: str, instance_config: dict,
                  base_yaml_path: Optional[str] = None) -> dict:
-    """构建完整的 bootstrap 配置
+    """构建完整的 bootstrap 配置（带缓存）
 
     从 config/agents/{agent_key}.yaml 加载 Agent 超参数，
     设置 ui_mode=backend, task_mode=training。
+    基础 YAML 模板和 Agent 配置仅首次从磁盘读取，后续使用缓存。
 
     Args:
         agent_key: Agent 标识键
         instance_config: generate_instance_config() 的输出
         base_yaml_path: 可选的自定义基础 YAML 路径
     """
-    yaml_path = base_yaml_path or str(DEFAULT_CONFIG_PATH)
-    with open(yaml_path, "r", encoding="utf-8") as f:
-        template = yaml.safe_load(f)
+    global _cached_base_template
 
-    config = copy.deepcopy(template["config"])
+    # 缓存基础 YAML 模板（仅首次读取）
+    if _cached_base_template is None or base_yaml_path is not None:
+        yaml_path = base_yaml_path or str(DEFAULT_CONFIG_PATH)
+        with open(yaml_path, "r", encoding="utf-8") as f:
+            raw = yaml.safe_load(f)
+        _cached_base_template = raw["config"]
 
-    # 从 per-agent 配置文件加载完整 agent 参数（超参数 + identity 字段，含 mode）
+    config = copy.deepcopy(_cached_base_template)
+
+    # 从 per-agent 配置文件加载完整 agent 参数（超参数 + identity 字段，含 mode，带缓存）
     agent_full_config = load_agent_config(agent_key)
 
     # 填充 agent 段
@@ -767,18 +778,6 @@ def run_episode_with_env(agent: object, env: object,
 
     try:
         while not env.env_is_finished():
-            if _shutdown_requested:
-                logger.info("收到中断信号，正在停止当前 episode...")
-                metrics = agent.get_training_metrics() if hasattr(agent, 'get_training_metrics') else {}
-                return {
-                    "status": "interrupted",
-                    "makespan": env.env_timeline,
-                    "metrics": metrics,
-                    "decision_stats": agent.get_decision_stats() if hasattr(agent, 'get_decision_stats') else {},
-                    "steps": step_count,
-                    "elapsed": time.time() - start_time,
-                }
-
             if time.time() - start_time > timeout:
                 logger.warning(f"Episode 超时 ({timeout}s)，已执行 {step_count} 步")
                 metrics = agent.get_training_metrics() if hasattr(agent, 'get_training_metrics') else {}
@@ -806,9 +805,6 @@ def run_episode_with_env(agent: object, env: object,
                 elif hasattr(agent, 'train'):
                     agent.train(observations, rewards, terminations, truncations, infos)
 
-            # 主动释放 GIL
-            time.sleep(0)
-
             # 每 50 步打印训练指标（仅训练模式）
             if is_training and step_count % 50 == 0 and hasattr(agent, 'get_training_metrics'):
                 metrics = agent.get_training_metrics()
@@ -834,6 +830,10 @@ def run_episode_with_env(agent: object, env: object,
             "elapsed": elapsed,
         }
 
+    except KeyboardInterrupt:
+        # Ctrl+C：立即停止当前 episode，向上抛出
+        logger.info("Episode 被键盘中断")
+        raise
     except Exception as e:
         logger.error(f"Episode 运行异常: {e}")
         import traceback
@@ -1377,14 +1377,9 @@ def main():
     with open(experiment_dir / "experiment_config.json", "w", encoding="utf-8") as f:
         json.dump(config_snapshot, f, indent=2, ensure_ascii=False)
 
-    # 注册信号处理器
-    def signal_handler(sig, frame):
-        global _shutdown_requested
-        _shutdown_requested = True
-        logger.info("\n收到中断信号，等待当前 epoch 完成后退出...")
-
-    signal.signal(signal.SIGINT, signal_handler)
-    signal.signal(signal.SIGTERM, signal_handler)
+    # 不注册自定义 SIGINT 处理器 —— 让 KeyboardInterrupt 自然抛出
+    # 这样 Ctrl+C 可以立即中断当前操作（包括 PyTorch 训练步）
+    # 在 epoch 级别用 try/except KeyboardInterrupt 捕获并优雅保存
 
     # === 一次性 Agent 初始化 ===
     agent = initialize_training(args.agent, base_yaml_path=args.config_yaml)
@@ -1406,9 +1401,6 @@ def main():
     try:
         for epoch in range(start_epoch, args.max_epochs):
             epoch_start_time = time.time()
-
-            if _shutdown_requested:
-                break
 
             # ========== 训练阶段（Mini-Batch）==========
             epoch_train_files = random.sample(
@@ -1458,12 +1450,16 @@ def main():
                     continue
 
                 # 运行训练 episode
-                result = run_episode_with_env(
-                    agent, env,
-                    train_interval=args.train_interval,
-                    timeout=args.episode_timeout,
-                    is_training=True,
-                )
+                try:
+                    result = run_episode_with_env(
+                        agent, env,
+                        train_interval=args.train_interval,
+                        timeout=args.episode_timeout,
+                        is_training=True,
+                    )
+                except KeyboardInterrupt:
+                    logger.info("\n训练 episode 被中断，保存当前 epoch 结果...")
+                    raise
                 result['makespan_gap'] = (
                     (result.get('makespan', 0.0) - lower_bound) / lower_bound
                     if lower_bound > 0 else float('inf')
@@ -1521,11 +1517,15 @@ def main():
                         continue
 
                     # 验证模式：推理（不训练）
-                    result = run_episode_with_env(
-                        agent, env,
-                        timeout=args.episode_timeout,
-                        is_training=False,
-                    )
+                    try:
+                        result = run_episode_with_env(
+                            agent, env,
+                            timeout=args.episode_timeout,
+                            is_training=False,
+                        )
+                    except KeyboardInterrupt:
+                        logger.info("\n验证 episode 被中断，保存当前 epoch 结果...")
+                        raise
                     result['makespan_gap'] = (
                         (result.get('makespan', 0.0) - lower_bound) / lower_bound
                         if lower_bound > 0 else float('inf')
@@ -1631,28 +1631,29 @@ def main():
                         f"耗时={epoch_elapsed:.1f}s")
 
         # ========== 最终统计 ==========
-        if not _shutdown_requested:
-            if epoch_metrics_list:
-                final = epoch_metrics_list[-1]
-                best = early_stopping_state
+        if epoch_metrics_list:
+            final = epoch_metrics_list[-1]
+            best = early_stopping_state
 
-                logger.info("\n" + "=" * 60)
-                logger.info("训练完成!")
-                logger.info(f"总 Epoch 数: {len(epoch_metrics_list)}")
-                logger.info(f"最终训练 reward: {final.get('train_mean_reward', 0.0):.4f}")
-                logger.info(f"最终训练 makespan gap: {final.get('train_mean_makespan_gap', float('inf')):.1%}")
-                logger.info(f"最终验证 makespan gap: {final.get('val_makespan_gap', float('inf')):.1%}")
-                logger.info(f"最佳验证 makespan gap: {best['best_val_gap']:.4f} "
-                            f"(epoch {best['best_epoch']})")
-                logger.info(f"结果保存在: {experiment_dir}")
-                logger.info("=" * 60)
-            else:
-                logger.info("未完成任何 epoch")
+            logger.info("\n" + "=" * 60)
+            logger.info("训练完成!")
+            logger.info(f"总 Epoch 数: {len(epoch_metrics_list)}")
+            logger.info(f"最终训练 reward: {final.get('train_mean_reward', 0.0):.4f}")
+            logger.info(f"最终训练 makespan gap: {final.get('train_mean_makespan_gap', float('inf')):.1%}")
+            logger.info(f"最终验证 makespan gap: {final.get('val_makespan_gap', float('inf')):.1%}")
+            logger.info(f"最佳验证 makespan gap: {best['best_val_gap']:.4f} "
+                        f"(epoch {best['best_epoch']})")
+            logger.info(f"结果保存在: {experiment_dir}")
+            logger.info("=" * 60)
         else:
-            logger.info("\n训练因中断信号而停止")
+            logger.info("未完成任何 epoch")
 
     except KeyboardInterrupt:
-        logger.info("\n收到键盘中断信号")
+        logger.info("\n收到键盘中断信号，正在保存当前进度...")
+        # 保存当前 epoch 的部分结果（如果有）
+        if epoch_metrics_list:
+            save_epoch_result(experiment_dir, epoch_metrics_list[-1])
+        logger.info("进度已保存")
     finally:
         logger.info("训练循环已退出")
 
