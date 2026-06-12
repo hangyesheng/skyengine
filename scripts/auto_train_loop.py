@@ -1,20 +1,19 @@
 """
-自动化训练循环脚本
+自动化训练循环脚本（Epoch 级别，Mini-Batch 训练）
 
 功能：
 1. 直接调用 executor 层运行训练（不走 HTTP）
-2. 随机读取 dataset/agv-instances 下的数据文件，生成配置
-3. 调用 bootstrap() 创建环境和 Agent，运行训练循环
-4. 直接从 Agent 对象收集训练指标（reward, loss, epsilon 等）
-5. 重复直到达到结束条件（reward 阈值、loss 阈值、或最大迭代次数）
+2. 划分训练集和验证集，按文件夹分层采样
+3. 每轮 epoch 运行 mini-batch 训练 episode，agent 权重跨 episode 持久化
+4. 定期在验证集上推理评估，计算平均 makespan gap
+5. 基于 epoch 级相对容差的早停机制：
+   当验证指标相对改善 < tolerance 连续 patience 个 epoch 时停止
+6. 支持旧版绝对收敛条件（--legacy-convergence）
 
-收敛检测条件（可组合，所有启用的条件都必须满足）：
-- reward 阈值：当 episode reward >= 阈值时判定收敛
-- loss 阈值：当所有 loss 指标 < 阈值时判定收敛
-- 收敛耐心度：连续满足所有条件的迭代次数
-- reward 稳定性：最近 N 次迭代的 reward 变异系数(CV)低于阈值时判定收敛
-- epsilon 下界：当 epsilon <= 阈值时判定收敛
-- Makespan Gap：当平均 makespan gap < 阈值时判定收敛
+架构：
+- Agent 只创建一次，跨 episode 复用（神经网络权重持久化）
+- 每个 episode 创建新的 env（不同实例有不同的工厂布局）
+- 收敛检测基于 epoch 级验证集指标，不再是逐 episode 的绝对阈值
 
 用法：
     uv run python scripts/auto_train_loop.py [选项]
@@ -22,16 +21,14 @@
 示例：
     python scripts/auto_train_loop.py
     python scripts/auto_train_loop.py --agent GraphDualAgent
-    python scripts/auto_train_loop.py --agent GraphDPAgent --log-level DEBUG
-    python scripts/auto_train_loop.py --log-level WARNING --reward-threshold 500
-    python scripts/auto_train_loop.py --max-iterations 100 --train-interval 20
-    python scripts/auto_train_loop.py --loss-threshold 0.01 --patience 3
-    python scripts/auto_train_loop.py --reward-threshold 500 --loss-threshold 0.1 --patience 2
-    python scripts/auto_train_loop.py --reward-stability-window 10 --reward-stability-threshold 0.05
-    python scripts/auto_train_loop.py --epsilon-floor 0.05
+    python scripts/auto_train_loop.py --agent GraphPPOAgent --epoch-size 5 --max-epochs 50
+    python scripts/auto_train_loop.py --val-ratio 0.3 --relative-tolerance 0.005
+    python scripts/auto_train_loop.py --early-stop-patience 3 --min-epochs 5
+    python scripts/auto_train_loop.py --resume-from training_logs/results/train_xxx
+    python scripts/auto_train_loop.py --legacy-convergence --reward-threshold 500
 
 中断后续跑：
-    再次运行相同命令即可，已完成的迭代会自动跳过（基于结果文件检测）
+    再次运行相同命令即可，已完成的 epoch 会自动跳过
 """
 import copy
 import random
@@ -83,18 +80,26 @@ DRL_AGENTS = {
     "GraphPPOAgent", "GraphGRPOAgent",
 }
 
-# 结束条件配置
-REWARD_THRESHOLD = 1000.0  # 累积 reward 阈值
-LOSS_THRESHOLD = None  # Loss 阈值（None 表示不检查）
-CONVERGENCE_PATIENCE = 1  # 收敛满足条件的连续迭代次数
-MIN_ITERS = 30  # 最小迭代次数（防止假收敛）
-MAKESPAN_GAP_THRESHOLD = 0.30  # Makespan Gap 早停阈值（相对下界 30%）
-REWARD_STABILITY_WINDOW = None  # Reward 稳定性检测窗口（None 表示不检查）
-REWARD_STABILITY_THRESHOLD = 0.05  # Reward 变异系数阈值（std/mean < 此值视为稳定）
-EPSILON_FLOOR = None  # Epsilon 下界阈值（None 表示不检查）
-MAX_ITERATIONS = 1000  # 最大迭代次数（防止无限循环）
-TRAIN_INTERVAL = 20  # 训练间隔：每隔多少步调用一次 agent.train()
-EPISODE_TIMEOUT = 7200  # 单次 episode 超时（秒）= 2小时
+# === Epoch 级训练默认参数 ===
+EPOCH_SIZE = 10           # 每个 epoch 的训练 episode 数（mini-batch 大小）
+VAL_RATIO = 0.2           # 验证集比例
+SPLIT_SEED = 42           # 数据集划分种子
+VAL_INTERVAL = 1          # 每 N 个 epoch 验证一次
+EARLY_STOP_PATIENCE = 5   # 早停耐心度
+RELATIVE_TOLERANCE = 0.01 # 相对容差阈值（1%）
+MIN_EPOCHS = 10           # 最小 epoch 数（防止假收敛）
+MAX_EPOCHS = 100          # 最大 epoch 数
+TRAIN_INTERVAL = 20       # 训练间隔：每隔多少步调用一次 agent.train()
+EPISODE_TIMEOUT = 7200    # 单次 episode 超时（秒）= 2小时
+
+# === 旧版收敛条件默认值（仅 --legacy-convergence 时使用）===
+REWARD_THRESHOLD = 1000.0
+LOSS_THRESHOLD = None
+CONVERGENCE_PATIENCE = 1
+MAKESPAN_GAP_THRESHOLD = 0.30
+REWARD_STABILITY_WINDOW = None
+REWARD_STABILITY_THRESHOLD = 0.05
+EPSILON_FLOOR = None
 
 # === 全局中断标记 ===
 _shutdown_requested = False
@@ -139,24 +144,21 @@ def parse_args():
         argparse.Namespace: 解析后的参数
     """
     parser = argparse.ArgumentParser(
-        description="自动化训练循环脚本（直接调用 executor 层，不走 HTTP）",
+        description="自动化训练循环脚本（Epoch 级别，Mini-Batch 训练）",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 示例:
   python scripts/auto_train_loop.py
   python scripts/auto_train_loop.py --agent GraphDualAgent
-  python scripts/auto_train_loop.py --agent GraphDPAgent --log-level DEBUG
-  python scripts/auto_train_loop.py --log-level WARNING --reward-threshold 500
-  python scripts/auto_train_loop.py --max-iterations 100 --train-interval 20
-  python scripts/auto_train_loop.py --loss-threshold 0.01 --patience 3
-  python scripts/auto_train_loop.py --reward-threshold 500 --loss-threshold 0.1 --patience 2
-  python scripts/auto_train_loop.py --reward-stability-window 10 --reward-stability-threshold 0.05
-  python scripts/auto_train_loop.py --epsilon-floor 0.05
-  python scripts/auto_train_loop.py --reward-stability-window 10 --epsilon-floor 0.01 --patience 3
-  python scripts/auto_train_loop.py --log-level WARNING --backend-log-level ERROR
+  python scripts/auto_train_loop.py --agent GraphPPOAgent --epoch-size 5 --max-epochs 50
+  python scripts/auto_train_loop.py --val-ratio 0.3 --relative-tolerance 0.005
+  python scripts/auto_train_loop.py --early-stop-patience 3 --min-epochs 5
+  python scripts/auto_train_loop.py --resume-from training_logs/results/train_xxx
+  python scripts/auto_train_loop.py --legacy-convergence --reward-threshold 500
         """
     )
 
+    # === Agent 选择 ===
     parser.add_argument(
         '--agent',
         type=str,
@@ -165,6 +167,7 @@ def parse_args():
         help=f'训练使用的 Agent 类型 (默认: GraphPPOAgent)，可选: {", ".join(AVAILABLE_AGENTS)}'
     )
 
+    # === 日志级别 ===
     parser.add_argument(
         '--log-level',
         type=str,
@@ -181,67 +184,19 @@ def parse_args():
         help='后端服务日志级别 (默认: WARNING)'
     )
 
+    # === Epoch 级训练参数 ===
     parser.add_argument(
-        '--reward-threshold',
-        type=float,
-        default=REWARD_THRESHOLD,
-        help=f'累积 reward 阈值 (默认: {REWARD_THRESHOLD})'
-    )
-
-    parser.add_argument(
-        '--loss-threshold',
-        type=float,
-        default=None,
-        help='Loss 阈值：当所有 loss 指标低于此值时判定收敛 (默认: 不检查)'
-    )
-
-    parser.add_argument(
-        '--patience',
+        '--epoch-size',
         type=int,
-        default=CONVERGENCE_PATIENCE,
-        help=f'收敛耐心度：连续满足所有收敛条件的迭代次数 (默认: {CONVERGENCE_PATIENCE})'
+        default=EPOCH_SIZE,
+        help=f'每个 epoch 的训练 episode 数（mini-batch 大小）(默认: {EPOCH_SIZE})'
     )
 
     parser.add_argument(
-        '--min-iters',
+        '--max-epochs',
         type=int,
-        default=MIN_ITERS,
-        help=f'最小迭代次数，低于此数不允许收敛停止 (默认: {MIN_ITERS})'
-    )
-
-    parser.add_argument(
-        '--makespan-gap-threshold',
-        type=float,
-        default=MAKESPAN_GAP_THRESHOLD,
-        help=f'Makespan Gap 早停阈值：相对下界偏差比例 (默认: {MAKESPAN_GAP_THRESHOLD})'
-    )
-
-    parser.add_argument(
-        '--reward-stability-window',
-        type=int,
-        default=None,
-        help=f'Reward 稳定性检测窗口：最近 N 次迭代的 reward 变异系数(CV)低于阈值时判定收敛 (默认: 不检查)'
-    )
-
-    parser.add_argument(
-        '--reward-stability-threshold',
-        type=float,
-        default=REWARD_STABILITY_THRESHOLD,
-        help=f'Reward 稳定性变异系数阈值：std/mean < 此值时视为稳定 (默认: {REWARD_STABILITY_THRESHOLD})'
-    )
-
-    parser.add_argument(
-        '--epsilon-floor',
-        type=float,
-        default=None,
-        help='Epsilon 下界阈值：当 epsilon <= 此值时判定收敛 (默认: 不检查)'
-    )
-
-    parser.add_argument(
-        '--max-iterations',
-        type=int,
-        default=MAX_ITERATIONS,
-        help=f'最大迭代次数 (默认: {MAX_ITERATIONS})'
+        default=MAX_EPOCHS,
+        help=f'最大 epoch 数 (默认: {MAX_EPOCHS})'
     )
 
     parser.add_argument(
@@ -258,6 +213,51 @@ def parse_args():
         help=f'单次 episode 超时（秒）(默认: {EPISODE_TIMEOUT})'
     )
 
+    # === 验证集划分 ===
+    parser.add_argument(
+        '--val-ratio',
+        type=float,
+        default=VAL_RATIO,
+        help=f'验证集比例 (默认: {VAL_RATIO})'
+    )
+
+    parser.add_argument(
+        '--split-seed',
+        type=int,
+        default=SPLIT_SEED,
+        help=f'数据集划分随机种子 (默认: {SPLIT_SEED})'
+    )
+
+    parser.add_argument(
+        '--val-interval',
+        type=int,
+        default=VAL_INTERVAL,
+        help=f'每 N 个 epoch 进行一次验证 (默认: {VAL_INTERVAL})'
+    )
+
+    # === 早停参数 ===
+    parser.add_argument(
+        '--relative-tolerance',
+        type=float,
+        default=RELATIVE_TOLERANCE,
+        help=f'早停相对容差：验证指标相对改善低于此值视为无显著改善 (默认: {RELATIVE_TOLERANCE})'
+    )
+
+    parser.add_argument(
+        '--early-stop-patience',
+        type=int,
+        default=EARLY_STOP_PATIENCE,
+        help=f'早停耐心度：连续无显著改善的 epoch 数 (默认: {EARLY_STOP_PATIENCE})'
+    )
+
+    parser.add_argument(
+        '--min-epochs',
+        type=int,
+        default=MIN_EPOCHS,
+        help=f'最小 epoch 数，低于此数不允许早停 (默认: {MIN_EPOCHS})'
+    )
+
+    # === 续跑与配置 ===
     parser.add_argument(
         '--config-yaml',
         type=str,
@@ -270,6 +270,70 @@ def parse_args():
         type=str,
         default=None,
         help='实验标识（默认自动生成时间戳），结果保存在 training_logs/results/{experiment_id}/'
+    )
+
+    parser.add_argument(
+        '--resume-from',
+        type=str,
+        default=None,
+        help='从指定实验目录续跑（自动加载已完成的 epoch 和早停状态）'
+    )
+
+    # === 旧版收敛条件（仅 --legacy-convergence 时启用）===
+    parser.add_argument(
+        '--legacy-convergence',
+        action='store_true',
+        default=False,
+        help='同时启用旧版绝对收敛条件（reward 阈值、loss 阈值等）'
+    )
+
+    parser.add_argument(
+        '--reward-threshold',
+        type=float,
+        default=REWARD_THRESHOLD,
+        help=f'[旧版] 累积 reward 阈值 (默认: {REWARD_THRESHOLD})'
+    )
+
+    parser.add_argument(
+        '--loss-threshold',
+        type=float,
+        default=None,
+        help='[旧版] Loss 阈值：当所有 loss 指标低于此值时判定收敛 (默认: 不检查)'
+    )
+
+    parser.add_argument(
+        '--convergence-patience',
+        type=int,
+        default=CONVERGENCE_PATIENCE,
+        help=f'[旧版] 收敛耐心度：连续满足所有收敛条件的迭代次数 (默认: {CONVERGENCE_PATIENCE})'
+    )
+
+    parser.add_argument(
+        '--makespan-gap-threshold',
+        type=float,
+        default=MAKESPAN_GAP_THRESHOLD,
+        help=f'[旧版] Makespan Gap 早停阈值 (默认: {MAKESPAN_GAP_THRESHOLD})'
+    )
+
+    parser.add_argument(
+        '--reward-stability-window',
+        type=int,
+        default=None,
+        help='[旧版] Reward 稳定性检测窗口 (默认: 不检查)'
+    )
+
+    parser.add_argument(
+        '--reward-stability-threshold',
+        type=float,
+        default=REWARD_STABILITY_THRESHOLD,
+        help=f'[旧版] Reward 变异系数阈值 (默认: {REWARD_STABILITY_THRESHOLD})'
+    )
+
+    parser.add_argument(
+        '--epsilon-floor',
+        type=float,
+        default=None,
+        help='[旧版] Epsilon 下界阈值 (默认: 不检查)'
     )
 
     return parser.parse_args()
@@ -529,35 +593,174 @@ def build_config(agent_key: str, instance_config: dict,
     return config
 
 
-# ==================== Episode 运行 ====================
+# ==================== 数据集划分 ====================
 
-def run_training_episode(config: dict, train_interval: int = TRAIN_INTERVAL,
-                         timeout: int = EPISODE_TIMEOUT) -> dict:
-    """运行一次完整训练 episode 并返回结果
-
-    直接调用 executor 层，不走 HTTP。
-    训练逻辑与 BackendCore._run_backend_training() 一致。
+def split_dataset(data_dir: Path, val_ratio: float = 0.2,
+                  seed: int = 42) -> Tuple[List[Path], List[Path]]:
+    """将数据文件划分为训练集和验证集（按子目录分层采样）
 
     Args:
-        config: bootstrap 配置
+        data_dir: 数据文件根目录
+        val_ratio: 验证集比例
+        seed: 随机种子（确保可复现）
+
+    Returns:
+        (train_files, val_files): 训练集和验证集文件路径列表
+    """
+    all_files = sorted(data_dir.glob('**/*_agv.txt'))
+    if not all_files:
+        raise FileNotFoundError(f"未找到数据文件: {data_dir}/**/*_agv.txt")
+
+    # 按子目录分组（分层采样，确保各子目录在训练集和验证集中都有代表）
+    groups: Dict[str, List[Path]] = {}
+    for f in all_files:
+        group_key = str(f.parent.relative_to(data_dir))
+        groups.setdefault(group_key, []).append(f)
+
+    train_files = []
+    val_files = []
+
+    rng = random.Random(seed)
+
+    for group_key, files in sorted(groups.items()):
+        shuffled = files.copy()
+        rng.shuffle(shuffled)
+        n_val = max(1, int(len(shuffled) * val_ratio))
+        # 如果组内文件数 <= 2，至少保留 1 个给训练集
+        if len(shuffled) <= 2:
+            n_val = 1
+        val_files.extend(shuffled[:n_val])
+        train_files.extend(shuffled[n_val:])
+
+    logger.info(f"数据集划分完成（seed={seed}）: "
+                f"{len(train_files)} 训练, {len(val_files)} 验证, "
+                f"共 {len(all_files)} 个文件, {len(groups)} 个子目录")
+
+    return train_files, val_files
+
+
+# ==================== Agent 一次性初始化 ====================
+
+def initialize_training(agent_key: str,
+                        base_yaml_path: Optional[str] = None) -> object:
+    """一次性初始化：加载配置、扫描组件、创建 Agent
+
+    与 bootstrap() 不同，此函数只创建 Agent 而不创建 env。
+    Agent 将跨 episode 复用，env 在每个 episode 独立创建。
+
+    Args:
+        agent_key: Agent 类名
+        base_yaml_path: 可选的自定义基础 YAML 路径
+
+    Returns:
+        Agent 实例（持久化）
+    """
+    from executor.packet_factory.registry import load_config, scan_and_register_components
+    from executor.packet_factory.lifecycle.initializer.agent_initializer import initialize_agent
+
+    # 加载 Agent 配置
+    agent_config = load_agent_config(agent_key)
+
+    # 构建初始配置（使用第一个可用的数据文件，仅用于满足 load_config 的要求）
+    data_files = list(DATA_DIR.glob('**/*_agv.txt'))
+    if not data_files:
+        raise FileNotFoundError(f"未找到数据文件: {DATA_DIR}")
+
+    dummy_file = data_files[0]
+    parsed_data = parse_agv_instance(dummy_file)
+    instance_config = generate_instance_config(parsed_data)
+    config = build_config(agent_key, instance_config, base_yaml_path=base_yaml_path)
+
+    # 存储配置到全局注册表
+    load_config(config)
+
+    # 一次性扫描注册组件
+    scan_and_register_components()
+
+    # 创建 Agent（env 将在后续每个 episode 单独创建）
+    agent = initialize_agent(config)
+
+    logger.info(f"Agent 初始化完成: {agent_key} (task_mode={agent.task_mode})")
+    return agent
+
+
+# ==================== Per-episode 环境创建 ====================
+
+def create_env_for_instance(agent: object, instance_config: dict,
+                            agent_key: str,
+                            base_yaml_path: Optional[str] = None) -> object:
+    """为特定实例创建新的 env，复用已有的 Agent
+
+    每次调用会创建一个全新的 env（不同实例有不同的工厂布局），
+    但 Agent 是同一个实例（权重持久化）。
+
+    Args:
+        agent: 已有的 Agent 实例
+        instance_config: generate_instance_config() 的输出
+        agent_key: Agent 类名
+        base_yaml_path: 可选的自定义基础 YAML 路径
+
+    Returns:
+        新创建的环境实例
+    """
+    from executor.packet_factory.registry import load_config
+    from executor.packet_factory.lifecycle.initializer.env_initializer import initialize_env
+    from executor.packet_factory.packet_factory.packet_factory_env.Utils.util import EnvStatus
+
+    # 构建新实例的配置
+    config = build_config(agent_key, instance_config, base_yaml_path=base_yaml_path)
+
+    # 更新全局注册表中的配置
+    load_config(config)
+
+    # 创建新环境（复用已有 Agent）
+    env = initialize_env(config, agent)
+
+    # 设置 Agent 对环境的引用
+    agent.context = env
+
+    # Headless 模式
+    env.status = EnvStatus.RUNNING
+    if env.env_visualizer is not None:
+        env.env_visualizer = None
+
+    # 重置环境（加载实例数据，调用 agent.new_episode()，重置 agent.alive=True）
+    env.reset()
+
+    return env
+
+
+# ==================== Episode 运行 ====================
+
+def run_episode_with_env(agent: object, env: object,
+                         train_interval: int = TRAIN_INTERVAL,
+                         timeout: int = EPISODE_TIMEOUT,
+                         is_training: bool = True) -> dict:
+    """使用已有的 agent+env 运行一次完整 episode
+
+    与旧版 run_training_episode() 不同，此函数不调用 bootstrap()，
+    Agent 和环境已经存在。
+
+    Args:
+        agent: Agent 实例（持久化）
+        env: 环境实例（为当前数据文件创建）
         train_interval: 训练间隔步数
         timeout: 单次 episode 超时秒数
+        is_training: 是否为训练模式（False 时切换到推理模式）
 
     Returns:
         dict: 包含 status, makespan, metrics, steps, elapsed 等字段
     """
-    from executor.packet_factory.lifecycle.bootstrap import bootstrap
-    from executor.packet_factory.packet_factory.packet_factory_env.Utils.util import EnvStatus
+    from executor.packet_factory.packet_factory.Agent.BaseAgent import INFERENCE
 
-    env, agent = bootstrap(config)
-
-    # 重置环境（加载实例数据，初始化 jobs/machines/agvs）
-    env.reset()
-
-    # headless 模式：设置环境状态为 RUNNING，禁用可视化
-    env.status = EnvStatus.RUNNING
-    if env.env_visualizer is not None:
-        env.env_visualizer = None
+    # 验证模式：临时切换 task_mode
+    original_task_mode = None
+    original_mode = None
+    if not is_training:
+        original_task_mode = agent.task_mode
+        original_mode = agent.mode
+        agent.task_mode = INFERENCE
+        agent.mode = f"{agent.ui_mode}_{INFERENCE}"
 
     start_time = time.time()
     step_count = 0
@@ -596,8 +799,8 @@ def run_training_episode(config: dict, train_interval: int = TRAIN_INTERVAL,
             # 执行动作
             observations, rewards, terminations, truncations, infos = env.step(actions)
 
-            # 训练更新（每 train_interval 步）
-            if step_count % train_interval == 0:
+            # 训练更新（仅训练模式，每 train_interval 步）
+            if is_training and step_count % train_interval == 0:
                 if hasattr(agent, 'update'):
                     agent.update(observations, rewards)
                 elif hasattr(agent, 'train'):
@@ -606,8 +809,8 @@ def run_training_episode(config: dict, train_interval: int = TRAIN_INTERVAL,
             # 主动释放 GIL
             time.sleep(0)
 
-            # 每 50 步打印训练指标
-            if step_count % 50 == 0 and hasattr(agent, 'get_training_metrics'):
+            # 每 50 步打印训练指标（仅训练模式）
+            if is_training and step_count % 50 == 0 and hasattr(agent, 'get_training_metrics'):
                 metrics = agent.get_training_metrics()
                 ep_reward = metrics.get('episode_reward', 0.0)
                 epsilon = metrics.get('epsilon', 'N/A')
@@ -645,61 +848,14 @@ def run_training_episode(config: dict, train_interval: int = TRAIN_INTERVAL,
             "elapsed": time.time() - start_time,
             "error": str(e),
         }
+    finally:
+        # 恢复原始 task_mode
+        if not is_training and original_task_mode is not None:
+            agent.task_mode = original_task_mode
+            agent.mode = original_mode
 
 
-def save_training_result(agent, env, result: dict, experiment_dir: Path):
-    """保存训练结果
-
-    复刻 BackendCore._save_training_results() 的逻辑，
-    保存到实验目录下的 training_report.json。
-
-    Args:
-        agent: Agent 实例
-        env: 环境实例
-        result: run_training_episode() 的返回值
-        experiment_dir: 实验结果目录
-    """
-    try:
-        # 优先调用 Agent 的 save_training_result 方法（如果存在）
-        if hasattr(agent, 'save_training_result'):
-            result_path = agent.save_training_result()
-            if result_path:
-                logger.info(f"Agent 保存训练结果到: {result_path}")
-        else:
-            # 降级方案：保存到实验目录
-            agent_name = getattr(agent, 'name', 'UnknownAgent')
-            timestamp = time.strftime('%Y%m%d_%H%M%S')
-            result_subdir = experiment_dir / f"{agent_name}_{timestamp}"
-            result_subdir.mkdir(parents=True, exist_ok=True)
-
-            results = {
-                'makespan': result.get('makespan', env.env_timeline if hasattr(env, 'env_timeline') else 0),
-                'decision_stats': result.get('decision_stats', {}),
-                'q_table_size': len(getattr(agent, 'q_table', {})),
-                'training_metrics': result.get('metrics', {}),
-                'metadata': {
-                    'agent_name': agent_name,
-                    'agent_id': getattr(agent, 'agent_id', None),
-                    'save_time': time.strftime('%Y-%m-%d %H:%M:%S')
-                }
-            }
-
-            result_file = result_subdir / 'training_report.json'
-            with open(result_file, 'w', encoding='utf-8') as f:
-                json.dump(results, f, indent=2, ensure_ascii=False)
-            logger.info(f"训练结果已保存到: {result_file}")
-
-        # 保存模型（使用 Agent 的默认路径或降级方案）
-        if hasattr(agent, 'save_model'):
-            model_path = agent.save_model()
-            if model_path:
-                logger.info(f"模型已保存到: {model_path}")
-
-    except Exception as e:
-        logger.error(f"保存训练结果失败: {e}")
-
-
-# ==================== 收敛检测 ====================
+# ==================== Makespan 下界计算 ====================
 
 def compute_makespan_lower_bound(parsed_data: dict) -> float:
     """计算估计的 makespan 下界
@@ -729,6 +885,55 @@ def compute_makespan_lower_bound(parsed_data: dict) -> float:
     return max(lb, 1.0)
 
 
+# ==================== Epoch 级早停检测 ====================
+
+def should_early_stop(early_stopping_state: dict, current_val_gap: float,
+                       tolerance: float, patience: int, min_epochs: int,
+                       current_epoch: int) -> Tuple[bool, str]:
+    """基于增量跟踪的早停判断
+
+    此函数更新 early_stopping_state 并判断是否应早停。
+    早停状态在调用间持久化，支持正确的增量判断。
+
+    Args:
+        early_stopping_state: 早停状态字典（含 best_val_gap, best_epoch, patience_counter）
+        current_val_gap: 当前 epoch 的验证 makespan gap
+        tolerance: 相对容差阈值
+        patience: 早停耐心度
+        min_epochs: 最小 epoch 数
+        current_epoch: 当前 epoch 编号
+
+    Returns:
+        Tuple[bool, str]: (是否应早停, 原因描述)
+    """
+    best_val_gap = early_stopping_state['best_val_gap']
+
+    if current_val_gap < best_val_gap:
+        relative_improvement = (best_val_gap - current_val_gap) / max(abs(best_val_gap), 1e-8)
+        if relative_improvement > tolerance:
+            # 显著改善 → 重置耐心度
+            early_stopping_state['patience_counter'] = 0
+        else:
+            # 边际改善 → 更新最佳，但增加耐心度
+            early_stopping_state['patience_counter'] += 1
+        early_stopping_state['best_val_gap'] = current_val_gap
+        early_stopping_state['best_epoch'] = current_epoch
+    else:
+        # 无改善 → 增加耐心度
+        early_stopping_state['patience_counter'] += 1
+
+    # 判断早停
+    if (early_stopping_state['patience_counter'] >= patience
+            and current_epoch >= min_epochs):
+        return True, (f"验证集 makespan gap 连续 {patience} 个 epoch "
+                      f"无显著改善 (相对容差 {tolerance:.1%}), "
+                      f"当前={current_val_gap:.4f}, "
+                      f"最佳={early_stopping_state['best_val_gap']:.4f} "
+                      f"(epoch {early_stopping_state['best_epoch']})")
+
+    return False, ""
+
+
 def check_convergence(iteration_metrics: List[Dict], reward_threshold: float,
                       loss_threshold: Optional[float], patience: int,
                       min_iters: int = 30, current_iteration: int = 0,
@@ -736,7 +941,7 @@ def check_convergence(iteration_metrics: List[Dict], reward_threshold: float,
                       reward_stability_window: Optional[int] = None,
                       reward_stability_threshold: float = 0.05,
                       epsilon_floor: Optional[float] = None) -> Tuple[bool, str]:
-    """检查训练是否收敛（含 min_iters 保护 + Makespan Gap 早停 + Reward 稳定性 + Epsilon 下界）
+    """检查训练是否收敛（旧版，含 min_iters 保护 + Makespan Gap 早停 + Reward 稳定性 + Epsilon 下界）
 
     收敛条件（所有启用的条件都必须满足）：
     1. current_iteration >= min_iters（防止假收敛）
@@ -820,7 +1025,6 @@ def check_convergence(iteration_metrics: List[Dict], reward_threshold: float,
             if reward_cv >= reward_stability_threshold:
                 reward_stable = False
         elif all(abs(r) < 1e-8 for r in recent_rewards):
-            # 所有 reward 都为 0，不算稳定
             reward_stable = False
 
     # Epsilon 下界检测
@@ -873,62 +1077,229 @@ def check_convergence(iteration_metrics: List[Dict], reward_threshold: float,
     return False, ""
 
 
-# ==================== 数据集发现 ====================
+# ==================== Epoch 指标计算 ====================
 
-def select_random_data_file() -> Optional[Path]:
-    """
-    随机选择一个数据文件（递归搜索所有子文件夹）
+def compute_epoch_metrics(train_results: List[dict], val_results: List[dict],
+                          epoch: int, agent: object = None) -> dict:
+    """计算单个 epoch 的聚合指标
+
+    Args:
+        train_results: 训练 episode 结果列表
+        val_results: 验证 episode 结果列表
+        epoch: 当前 epoch 编号
+        agent: Agent 实例（用于获取 epsilon 等指标）
 
     Returns:
-        Optional[Path]: 数据文件路径，如果没有找到则返回 None
+        dict: 包含训练和验证的聚合指标
     """
-    data_files = list(DATA_DIR.glob('**/*_agv.txt'))
-    if data_files:
-        selected_file = random.choice(data_files)
-        # 显示相对于 DATA_DIR 的路径，方便用户识别
-        relative_path = selected_file.relative_to(DATA_DIR)
-        logger.info(f"从 {len(data_files)} 个文件中随机选择: {relative_path}")
-        return selected_file
-    return None
+    # 训练指标
+    train_rewards = [r.get('metrics', {}).get('episode_reward', 0.0)
+                     for r in train_results if r.get('status') == 'completed']
+    train_gaps = [r.get('makespan_gap', float('inf'))
+                  for r in train_results if r.get('status') == 'completed']
+    train_steps = [r.get('steps', 0) for r in train_results]
+    train_elapsed = [r.get('elapsed', 0.0) for r in train_results]
+
+    # 验证指标
+    val_gaps = [r.get('makespan_gap', float('inf'))
+                for r in val_results if r.get('status') == 'completed']
+    val_makespans = [r.get('makespan', 0.0)
+                     for r in val_results if r.get('status') == 'completed']
+
+    # 如果没有验证结果，使用 inf 表示缺失
+    if not val_gaps:
+        val_mean_gap = float('inf')
+        val_mean_makespan = 0.0
+    else:
+        val_mean_gap = sum(val_gaps) / len(val_gaps)
+        val_mean_makespan = sum(val_makespans) / max(len(val_makespans), 1)
+
+    # Agent 指标
+    epsilon = None
+    if agent is not None and hasattr(agent, 'epsilon'):
+        epsilon = agent.epsilon
+
+    loss_metrics = {}
+    if agent is not None and hasattr(agent, 'get_training_metrics'):
+        agent_metrics = agent.get_training_metrics()
+        loss_metrics = {k: v for k, v in agent_metrics.items()
+                        if 'loss' in k.lower() and isinstance(v, (int, float))}
+
+    n_train_completed = len(train_rewards)
+    n_val_completed = len(val_gaps)
+    n_train_total = len(train_results)
+    n_val_total = len(val_results)
+
+    result = {
+        'epoch': epoch,
+        # 训练指标
+        'train_mean_reward': sum(train_rewards) / max(len(train_rewards), 1),
+        'train_mean_makespan_gap': sum(train_gaps) / max(len(train_gaps), 1),
+        'train_mean_steps': sum(train_steps) / max(len(train_steps), 1),
+        'train_total_elapsed': sum(train_elapsed),
+        'train_completed': n_train_completed,
+        'train_total': n_train_total,
+        # 验证指标
+        'val_makespan_gap': val_mean_gap,
+        'val_mean_makespan': val_mean_makespan,
+        'val_completed': n_val_completed,
+        'val_total': n_val_total,
+        # Agent 指标
+        'epsilon': epsilon,
+        'loss_metrics': loss_metrics,
+    }
+
+    return result
 
 
 # ==================== 结果管理 ====================
 
-def load_completed_iterations(experiment_dir: Path) -> int:
-    """读取已有结果，返回已完成的迭代数
+def save_epoch_result(experiment_dir: Path, record: dict):
+    """追加一条 epoch 结果到 JSONL 文件
+
+    Args:
+        experiment_dir: 实验目录
+        record: epoch 结果字典
+    """
+    results_file = experiment_dir / "epoch_results.jsonl"
+    with open(results_file, "a", encoding="utf-8") as f:
+        f.write(json.dumps(record, ensure_ascii=False) + "\n")
+
+
+def load_completed_epochs(experiment_dir: Path) -> Tuple[int, dict]:
+    """读取已完成的 epoch 数和早停状态
 
     Args:
         experiment_dir: 实验目录
 
     Returns:
-        int: 已完成的迭代数
+        (completed_epochs, early_stopping_state): 已完成的 epoch 数和早停状态字典
     """
-    progress_file = experiment_dir / "progress.jsonl"
-    if not progress_file.exists():
-        return 0
+    results_file = experiment_dir / "epoch_results.jsonl"
+    if not results_file.exists():
+        return 0, {'best_val_gap': float('inf'), 'best_epoch': -1, 'patience_counter': 0}
 
     count = 0
-    with open(progress_file, "r", encoding="utf-8") as f:
+    best_val_gap = float('inf')
+    best_epoch = -1
+    patience_counter = 0
+
+    with open(results_file, "r", encoding="utf-8") as f:
         for line in f:
             line = line.strip()
-            if line:
+            if not line:
+                continue
+            try:
+                record = json.loads(line)
                 count += 1
-    return count
+                val_gap = record.get('val_makespan_gap')
+                if val_gap is not None and val_gap < best_val_gap:
+                    best_val_gap = val_gap
+                    best_epoch = record.get('epoch', count - 1)
+                # 重建 patience_counter
+                patience_counter = record.get('patience_counter', 0)
+            except json.JSONDecodeError:
+                continue
+
+    return count, {
+        'best_val_gap': best_val_gap,
+        'best_epoch': best_epoch,
+        'patience_counter': patience_counter,
+    }
 
 
-def append_iteration_result(experiment_dir: Path, record: dict):
-    """追加一条迭代结果到 JSONL 文件
+def save_best_checkpoint(agent: object, experiment_dir: Path,
+                         epoch: int, epoch_metrics: dict):
+    """保存最佳模型检查点
 
     Args:
+        agent: Agent 实例
         experiment_dir: 实验目录
-        record: 迭代结果字典
+        epoch: 当前 epoch 编号
+        epoch_metrics: 当前 epoch 指标
     """
-    progress_file = experiment_dir / "progress.jsonl"
-    with open(progress_file, "a", encoding="utf-8") as f:
-        f.write(json.dumps(record, ensure_ascii=False) + "\n")
+    checkpoint_dir = experiment_dir / "checkpoints"
+    checkpoint_dir.mkdir(parents=True, exist_ok=True)
+
+    # 保存模型
+    if hasattr(agent, 'save_model'):
+        try:
+            model_path = agent.save_model()
+            if model_path:
+                logger.info(f"最佳模型已保存到: {model_path}")
+        except Exception as e:
+            logger.warning(f"保存模型失败: {e}")
+
+    # 保存检查点元数据
+    meta = {
+        'epoch': epoch,
+        'val_makespan_gap': epoch_metrics.get('val_makespan_gap'),
+        'train_mean_reward': epoch_metrics.get('train_mean_reward'),
+        'train_mean_makespan_gap': epoch_metrics.get('train_mean_makespan_gap'),
+        'epsilon': epoch_metrics.get('epsilon'),
+        'timestamp': time.strftime("%Y-%m-%d %H:%M:%S"),
+    }
+    meta_path = checkpoint_dir / "best_checkpoint_meta.json"
+    with open(meta_path, 'w', encoding='utf-8') as f:
+        json.dump(meta, f, indent=2, ensure_ascii=False)
+
+    logger.info(f"检查点元数据已保存: {meta_path} (epoch={epoch}, "
+                f"val_gap={epoch_metrics.get('val_makespan_gap', 'N/A'):.4f})")
 
 
-# ==================== 主训练循环 ====================
+def save_training_result(agent, env, result: dict, experiment_dir: Path):
+    """保存训练结果
+
+    复刻 BackendCore._save_training_results() 的逻辑，
+    保存到实验目录下的 training_report.json。
+
+    Args:
+        agent: Agent 实例
+        env: 环境实例
+        result: run_episode_with_env() 的返回值
+        experiment_dir: 实验结果目录
+    """
+    try:
+        # 优先调用 Agent 的 save_training_result 方法（如果存在）
+        if hasattr(agent, 'save_training_result'):
+            result_path = agent.save_training_result()
+            if result_path:
+                logger.info(f"Agent 保存训练结果到: {result_path}")
+        else:
+            # 降级方案：保存到实验目录
+            agent_name = getattr(agent, 'name', 'UnknownAgent')
+            timestamp = time.strftime('%Y%m%d_%H%M%S')
+            result_subdir = experiment_dir / f"{agent_name}_{timestamp}"
+            result_subdir.mkdir(parents=True, exist_ok=True)
+
+            results = {
+                'makespan': result.get('makespan', env.env_timeline if hasattr(env, 'env_timeline') else 0),
+                'decision_stats': result.get('decision_stats', {}),
+                'q_table_size': len(getattr(agent, 'q_table', {})),
+                'training_metrics': result.get('metrics', {}),
+                'metadata': {
+                    'agent_name': agent_name,
+                    'agent_id': getattr(agent, 'agent_id', None),
+                    'save_time': time.strftime('%Y-%m-%d %H:%M:%S')
+                }
+            }
+
+            result_file = result_subdir / 'training_report.json'
+            with open(result_file, 'w', encoding='utf-8') as f:
+                json.dump(results, f, indent=2, ensure_ascii=False)
+            logger.info(f"训练结果已保存到: {result_file}")
+
+        # 保存模型（使用 Agent 的默认路径或降级方案）
+        if hasattr(agent, 'save_model'):
+            model_path = agent.save_model()
+            if model_path:
+                logger.info(f"模型已保存到: {model_path}")
+
+    except Exception as e:
+        logger.error(f"保存训练结果失败: {e}")
+
+
+# ==================== 主训练循环（Epoch 级别）====================
 
 def main():
     """主函数"""
@@ -938,29 +1309,45 @@ def main():
     setup_logging(args.log_level, args.backend_log_level)
 
     # 确定实验 ID 和目录
-    experiment_id = args.experiment_id or time.strftime("train_%Y%m%d_%H%M%S")
-    experiment_dir = RESULTS_DIR / experiment_id
-    experiment_dir.mkdir(parents=True, exist_ok=True)
+    if args.resume_from:
+        # 续跑模式：使用已有实验目录
+        experiment_dir = Path(args.resume_from)
+        if not experiment_dir.exists():
+            logger.error(f"续跑目录不存在: {experiment_dir}")
+            return
+        # 尝试读取已有实验 ID
+        config_file = experiment_dir / "experiment_config.json"
+        if config_file.exists():
+            with open(config_file, 'r', encoding='utf-8') as f:
+                existing_config = json.load(f)
+            experiment_id = existing_config.get('experiment_id', experiment_dir.name)
+        else:
+            experiment_id = experiment_dir.name
+    else:
+        experiment_id = args.experiment_id or time.strftime("train_%Y%m%d_%H%M%S")
+        experiment_dir = RESULTS_DIR / experiment_id
+        experiment_dir.mkdir(parents=True, exist_ok=True)
 
-    # 加载 Agent 配置（仅用于验证配置文件存在）
-    agent_config = load_agent_config(args.agent)
+    # 划分数据集
+    train_files, val_files = split_dataset(DATA_DIR, args.val_ratio, args.split_seed)
 
     logger.info("=" * 60)
-    logger.info("自动化训练循环脚本（直接调用 executor 层）")
+    logger.info("自动化训练循环脚本（Epoch 级别，Mini-Batch 训练）")
     logger.info(f"训练 Agent: {args.agent}")
-    logger.info(f"Reward 阈值: {args.reward_threshold:.2f}")
-    logger.info(f"Loss 阈值: {args.loss_threshold if args.loss_threshold is not None else '不检查'}")
-    logger.info(f"收敛耐心度: {args.patience}")
-    logger.info(f"最小迭代次数: {args.min_iters}")
-    logger.info(f"Makespan Gap 阈值: {args.makespan_gap_threshold * 100:.1f}%")
-    logger.info(f"Reward 稳定性: window={args.reward_stability_window or '不检查'}, "
-                f"CV阈值={args.reward_stability_threshold}")
-    logger.info(f"Epsilon 下界: {args.epsilon_floor if args.epsilon_floor is not None else '不检查'}")
-    logger.info(f"最大迭代次数: {args.max_iterations}")
+    logger.info(f"Epoch 大小: {args.epoch_size} 个训练 episode/epoch")
+    logger.info(f"最大 Epoch 数: {args.max_epochs}")
+    logger.info(f"最小 Epoch 数: {args.min_epochs}")
+    logger.info(f"验证集比例: {args.val_ratio:.0%}")
+    logger.info(f"验证间隔: 每 {args.val_interval} 个 epoch")
+    logger.info(f"早停相对容差: {args.relative_tolerance:.1%}")
+    logger.info(f"早停耐心度: {args.early_stop_patience}")
     logger.info(f"训练间隔: 每 {args.train_interval} 步")
     logger.info(f"Episode 超时: {args.episode_timeout}s")
-    logger.info(f"前端脚本日志级别: {args.log_level.upper()}")
-    logger.info(f"后端服务日志级别: {args.backend_log_level.upper()}")
+    logger.info(f"数据集: {len(train_files)} 训练, {len(val_files)} 验证")
+    if args.legacy_convergence:
+        logger.info(f"旧版收敛: reward阈值={args.reward_threshold}, "
+                    f"loss阈值={args.loss_threshold}, "
+                    f"patience={args.convergence_patience}")
     logger.info(f"实验目录: {experiment_dir}")
     logger.info("=" * 60)
 
@@ -968,18 +1355,23 @@ def main():
     config_snapshot = {
         "experiment_id": experiment_id,
         "agent": args.agent,
-        "reward_threshold": args.reward_threshold,
-        "loss_threshold": args.loss_threshold,
-        "patience": args.patience,
-        "min_iters": args.min_iters,
-        "makespan_gap_threshold": args.makespan_gap_threshold,
-        "reward_stability_window": args.reward_stability_window,
-        "reward_stability_threshold": args.reward_stability_threshold,
-        "epsilon_floor": args.epsilon_floor,
-        "max_iterations": args.max_iterations,
+        "epoch_size": args.epoch_size,
+        "max_epochs": args.max_epochs,
+        "min_epochs": args.min_epochs,
+        "val_ratio": args.val_ratio,
+        "split_seed": args.split_seed,
+        "val_interval": args.val_interval,
+        "relative_tolerance": args.relative_tolerance,
+        "early_stop_patience": args.early_stop_patience,
         "train_interval": args.train_interval,
         "episode_timeout": args.episode_timeout,
         "config_yaml": args.config_yaml,
+        "legacy_convergence": args.legacy_convergence,
+        "reward_threshold": args.reward_threshold if args.legacy_convergence else None,
+        "loss_threshold": args.loss_threshold if args.legacy_convergence else None,
+        "convergence_patience": args.convergence_patience if args.legacy_convergence else None,
+        "train_files": [str(f.relative_to(DATA_DIR)) for f in train_files],
+        "val_files": [str(f.relative_to(DATA_DIR)) for f in val_files],
         "created_at": time.strftime("%Y-%m-%d %H:%M:%S"),
     }
     with open(experiment_dir / "experiment_config.json", "w", encoding="utf-8") as f:
@@ -989,163 +1381,275 @@ def main():
     def signal_handler(sig, frame):
         global _shutdown_requested
         _shutdown_requested = True
-        logger.info("\n收到中断信号，等待当前 episode 完成后退出...")
+        logger.info("\n收到中断信号，等待当前 epoch 完成后退出...")
 
     signal.signal(signal.SIGINT, signal_handler)
     signal.signal(signal.SIGTERM, signal_handler)
 
-    # 跨迭代指标追踪
+    # === 一次性 Agent 初始化 ===
+    agent = initialize_training(args.agent, base_yaml_path=args.config_yaml)
+
+    # === 加载已完成的 epoch（续跑支持）===
+    start_epoch, early_stopping_state = load_completed_epochs(experiment_dir)
+    if start_epoch > 0:
+        logger.info(f"检测到已完成的 {start_epoch} 个 epoch，将从第 {start_epoch} 个 epoch 继续")
+        logger.info(f"早停状态: best_val_gap={early_stopping_state['best_val_gap']:.4f}, "
+                    f"best_epoch={early_stopping_state['best_epoch']}, "
+                    f"patience_counter={early_stopping_state['patience_counter']}")
+
+    # 跨 epoch 指标追踪
+    epoch_metrics_list: List[Dict] = []
+
+    # 旧版收敛指标（仅 legacy 模式）
     iteration_metrics: List[Dict] = []
 
-    # 加载已完成的迭代数（支持续跑）
-    completed_iters = load_completed_iterations(experiment_dir)
-    if completed_iters > 0:
-        logger.info(f"检测到已完成的 {completed_iters} 次迭代，将从第 {completed_iters} 次继续")
-
     try:
-        iteration = 0
-        while iteration < args.max_iterations:
-            # 检查是否达到收敛条件
-            if iteration > 0 and iteration_metrics:
-                converged, reason = check_convergence(
-                    iteration_metrics, args.reward_threshold, args.loss_threshold, args.patience,
-                    min_iters=args.min_iters, current_iteration=iteration,
-                    makespan_gap_threshold=args.makespan_gap_threshold,
-                    reward_stability_window=args.reward_stability_window,
-                    reward_stability_threshold=args.reward_stability_threshold,
-                    epsilon_floor=args.epsilon_floor,
-                )
-                if converged:
-                    logger.info(f"\n=== 训练收敛，停止迭代 ===")
-                    logger.info(f"收敛原因: {reason}")
-                    break
-                else:
-                    if reason:
-                        logger.info(f"未收敛: {reason}")
+        for epoch in range(start_epoch, args.max_epochs):
+            epoch_start_time = time.time()
 
             if _shutdown_requested:
                 break
 
-            # 随机选择数据文件
-            data_file = select_random_data_file()
-            if not data_file:
-                logger.error("未找到数据文件")
-                break
+            # ========== 训练阶段（Mini-Batch）==========
+            epoch_train_files = random.sample(
+                train_files,
+                min(args.epoch_size, len(train_files))
+            )
+            train_results = []
 
-            # 解析实例
-            relative_path = data_file.relative_to(DATA_DIR)
-            logger.info("\n" + "=" * 60)
-            logger.info(f"[迭代 {iteration}] 使用数据文件: {relative_path}")
+            logger.info(f"\n{'=' * 60}")
+            logger.info(f"[Epoch {epoch}] 训练阶段 ({len(epoch_train_files)} episodes)")
             logger.info(f"{'=' * 60}")
 
-            try:
-                parsed_data = parse_agv_instance(data_file)
-                logger.info(f"解析完成: {parsed_data['job_count']} jobs, "
-                            f"{parsed_data['machine_count']} machines, "
-                            f"{parsed_data['agv_count']} AGVs")
-            except Exception as e:
-                logger.error(f"解析数据文件失败: {e}")
-                iteration += 1
-                continue
+            for ep_idx, data_file in enumerate(epoch_train_files):
+                relative_path = data_file.relative_to(DATA_DIR)
 
-            # 计算当前实例的 makespan 下界（用于 Makespan Gap 早停）
-            try:
-                lower_bound = compute_makespan_lower_bound(parsed_data)
-            except Exception:
-                lower_bound = 1.0
+                try:
+                    parsed_data = parse_agv_instance(data_file)
+                    lower_bound = compute_makespan_lower_bound(parsed_data)
+                except Exception as e:
+                    logger.error(f"解析数据文件失败 {relative_path}: {e}")
+                    train_results.append({
+                        'status': 'error', 'makespan': 0.0,
+                        'metrics': {}, 'steps': 0, 'elapsed': 0.0,
+                        'makespan_gap': float('inf'),
+                        'data_file': str(relative_path),
+                    })
+                    continue
 
-            # 生成实例配置并构建完整配置
-            instance_config = generate_instance_config(parsed_data)
-            config = build_config(args.agent, instance_config,
-                                  base_yaml_path=args.config_yaml)
+                instance_config = generate_instance_config(parsed_data)
 
-            # 运行训练 episode
-            logger.info("开始训练 episode...")
-            result = run_training_episode(
-                config,
-                train_interval=args.train_interval,
-                timeout=args.episode_timeout,
+                # 创建环境（复用 Agent）
+                try:
+                    env = create_env_for_instance(
+                        agent, instance_config, args.agent,
+                        base_yaml_path=args.config_yaml
+                    )
+                except Exception as e:
+                    logger.error(f"创建环境失败 {relative_path}: {e}")
+                    import traceback
+                    traceback.print_exc()
+                    train_results.append({
+                        'status': 'error', 'makespan': 0.0,
+                        'metrics': {}, 'steps': 0, 'elapsed': 0.0,
+                        'makespan_gap': float('inf'),
+                        'data_file': str(relative_path),
+                    })
+                    continue
+
+                # 运行训练 episode
+                result = run_episode_with_env(
+                    agent, env,
+                    train_interval=args.train_interval,
+                    timeout=args.episode_timeout,
+                    is_training=True,
+                )
+                result['makespan_gap'] = (
+                    (result.get('makespan', 0.0) - lower_bound) / lower_bound
+                    if lower_bound > 0 else float('inf')
+                )
+                result['makespan_lower_bound'] = lower_bound
+                result['data_file'] = str(relative_path)
+                train_results.append(result)
+
+                # 打印本次 episode 的关键指标
+                ep_reward = result.get('metrics', {}).get('episode_reward', 0.0)
+                makespan = result.get('makespan', 0.0)
+                gap = result.get('makespan_gap', float('inf'))
+                status = result.get('status', 'unknown')
+
+                if status == 'completed':
+                    logger.info(f"  [Epoch {epoch} / Episode {ep_idx}] "
+                                f"文件={relative_path}, "
+                                f"makespan={makespan:.2f}, "
+                                f"gap={gap:.1%}, "
+                                f"reward={ep_reward:.4f}, "
+                                f"steps={result.get('steps', 0)}, "
+                                f"elapsed={result.get('elapsed', 0.0):.2f}s")
+                else:
+                    logger.warning(f"  [Epoch {epoch} / Episode {ep_idx}] "
+                                   f"文件={relative_path}, "
+                                   f"状态={status}, makespan={makespan:.2f}")
+
+
+            # ========== 验证阶段 ==========
+            val_results = []
+            do_validation = (epoch % args.val_interval == 0)
+
+            if do_validation and val_files:
+                logger.info(f"\n[Epoch {epoch}] 验证阶段 ({len(val_files)} episodes)")
+
+                for data_file in val_files:
+                    relative_path = data_file.relative_to(DATA_DIR)
+
+                    try:
+                        parsed_data = parse_agv_instance(data_file)
+                        lower_bound = compute_makespan_lower_bound(parsed_data)
+                    except Exception as e:
+                        logger.error(f"解析验证文件失败 {relative_path}: {e}")
+                        continue
+
+                    instance_config = generate_instance_config(parsed_data)
+
+                    try:
+                        env = create_env_for_instance(
+                            agent, instance_config, args.agent,
+                            base_yaml_path=args.config_yaml
+                        )
+                    except Exception as e:
+                        logger.error(f"创建验证环境失败 {relative_path}: {e}")
+                        continue
+
+                    # 验证模式：推理（不训练）
+                    result = run_episode_with_env(
+                        agent, env,
+                        timeout=args.episode_timeout,
+                        is_training=False,
+                    )
+                    result['makespan_gap'] = (
+                        (result.get('makespan', 0.0) - lower_bound) / lower_bound
+                        if lower_bound > 0 else float('inf')
+                    )
+                    result['makespan_lower_bound'] = lower_bound
+                    result['data_file'] = str(relative_path)
+                    val_results.append(result)
+
+            # ========== 计算 Epoch 指标 ==========
+            epoch_metrics = compute_epoch_metrics(
+                train_results, val_results, epoch, agent=agent
             )
 
-            # 提取指标
-            metrics = result.get("metrics", {})
-            metrics['makespan'] = result.get("makespan", 0.0)
-            metrics['makespan_lower_bound'] = lower_bound
-            metrics['makespan_gap'] = (
-                (metrics['makespan'] - lower_bound) / lower_bound
-                if lower_bound > 0 else float('inf')
+            # ========== 早停检测 ==========
+            current_val_gap = epoch_metrics.get('val_makespan_gap', float('inf'))
+            best_val_gap = early_stopping_state['best_val_gap']
+
+            stop, reason = should_early_stop(
+                early_stopping_state, current_val_gap,
+                tolerance=args.relative_tolerance,
+                patience=args.early_stop_patience,
+                min_epochs=args.min_epochs,
+                current_epoch=epoch,
             )
-            metrics['iteration_success'] = result.get("status") == "completed"
-            metrics['steps'] = result.get("steps", 0)
-            metrics['elapsed'] = result.get("elapsed", 0.0)
-            iteration_metrics.append(metrics)
 
-            # 记录迭代结果
-            record = {
-                "iteration": iteration,
-                "data_file": str(relative_path),
-                "agent": args.agent,
-                "status": result.get("status", "unknown"),
-                "makespan": result.get("makespan", 0.0),
-                "makespan_lower_bound": lower_bound,
-                "makespan_gap": metrics['makespan_gap'],
-                "steps": result.get("steps", 0),
-                "elapsed": result.get("elapsed", 0.0),
-                "training_metrics": metrics,
-                "timestamp": time.strftime("%Y-%m-%d %H:%M:%S"),
-            }
-            if "error" in result:
-                record["error"] = result["error"]
-
-            append_iteration_result(experiment_dir, record)
-
-            # 输出本次迭代的关键指标
-            episode_reward = metrics.get('episode_reward', 0.0)
-            epsilon = metrics.get('epsilon', 'N/A')
-            makespan_gap = metrics.get('makespan_gap', float('inf'))
-            loss_keys = {k: v for k, v in metrics.items()
-                         if 'loss' in k.lower() and isinstance(v, (int, float))}
-
-            if result.get("status") == "completed":
-                logger.info(f"[迭代 {iteration}] 训练完成! "
-                            f"makespan={metrics['makespan']:.2f}, "
-                            f"reward={episode_reward:.4f}, "
-                            f"makespan_gap={makespan_gap:.1%}, "
-                            f"epsilon={epsilon}, "
-                            f"steps={result.get('steps', 0)}, "
-                            f"elapsed={result.get('elapsed', 0.0):.2f}s"
-                            + (f", losses={{{', '.join(f'{k}={v:.6f}' for k, v in loss_keys.items())}}}"
-                               if loss_keys else ""))
+            # 日志输出
+            if current_val_gap < best_val_gap:
+                relative_improvement = (best_val_gap - current_val_gap) / max(abs(best_val_gap), 1e-8)
+                if relative_improvement > args.relative_tolerance:
+                    logger.info(f"  验证指标显著改善: {best_val_gap:.4f} → {current_val_gap:.4f} "
+                                f"(改善 {relative_improvement:.1%})")
+                else:
+                    logger.info(f"  验证指标边际改善: {best_val_gap:.4f} → {current_val_gap:.4f} "
+                                f"(改善 {relative_improvement:.1%} < 容差 {args.relative_tolerance:.1%})")
+                # 保存最佳模型检查点
+                save_best_checkpoint(agent, experiment_dir, epoch, epoch_metrics)
             else:
-                logger.warning(f"[迭代 {iteration}] {result.get('status', 'unknown')}! "
-                               f"makespan={metrics['makespan']:.2f}")
+                logger.info(f"  验证指标无改善: {current_val_gap:.4f} >= 最佳 {best_val_gap:.4f} "
+                            f"(耐心度 {early_stopping_state['patience_counter']}"
+                            f"/{args.early_stop_patience})")
 
-            iteration += 1
+            epoch_metrics['best_val_gap'] = early_stopping_state['best_val_gap']
+            epoch_metrics['best_epoch'] = early_stopping_state['best_epoch']
+            epoch_metrics['patience_counter'] = early_stopping_state['patience_counter']
+            epoch_metrics_list.append(epoch_metrics)
 
-            # 短暂休息，避免太快
-            time.sleep(1)
+            # 早停判断
+            if stop:
+                logger.info(f"\n=== 早停触发 ===")
+                logger.info(f"原因: {reason}")
+                logger.info(f"最佳验证 makespan gap: {early_stopping_state['best_val_gap']:.4f} "
+                            f"(epoch {early_stopping_state['best_epoch']})")
+                # 保存当前 epoch 结果后退出
+                epoch_elapsed = time.time() - epoch_start_time
+                epoch_metrics['epoch_elapsed'] = epoch_elapsed
+                save_epoch_result(experiment_dir, epoch_metrics)
+                break
 
-        if iteration >= args.max_iterations:
-            logger.warning(f"\n达到最大迭代次数 {args.max_iterations}")
+            # ========== 旧版收敛检测（可选）==========
+            if args.legacy_convergence:
+                # 将本次 epoch 的训练指标加入旧版检测列表
+                epoch_train_metrics = epoch_metrics.copy()
+                epoch_train_metrics['episode_reward'] = epoch_metrics.get('train_mean_reward', 0.0)
+                iteration_metrics.append(epoch_train_metrics)
 
-        # 打印最终统计
-        final_metrics = iteration_metrics[-1] if iteration_metrics else {}
-        final_reward = final_metrics.get('episode_reward', 0.0)
-        final_losses = {k: v for k, v in final_metrics.items()
-                        if 'loss' in k.lower() and isinstance(v, (int, float))}
-        final_makespan = final_metrics.get('makespan', 0.0)
-        final_makespan_gap = final_metrics.get('makespan_gap', float('inf'))
+                if epoch > 0 and iteration_metrics:
+                    converged, reason = check_convergence(
+                        iteration_metrics, args.reward_threshold, args.loss_threshold,
+                        args.convergence_patience,
+                        min_iters=args.min_epochs, current_iteration=epoch,
+                        makespan_gap_threshold=args.makespan_gap_threshold,
+                        reward_stability_window=args.reward_stability_window,
+                        reward_stability_threshold=args.reward_stability_threshold,
+                        epsilon_floor=args.epsilon_floor,
+                    )
+                    if converged:
+                        logger.info(f"\n=== 旧版收敛条件触发 ===")
+                        logger.info(f"收敛原因: {reason}")
+                        epoch_elapsed = time.time() - epoch_start_time
+                        epoch_metrics['epoch_elapsed'] = epoch_elapsed
+                        save_epoch_result(experiment_dir, epoch_metrics)
+                        break
+                    elif reason:
+                        logger.info(f"旧版收敛未满足: {reason}")
 
-        logger.info("\n" + "=" * 60)
-        logger.info("训练完成!")
-        logger.info(f"总迭代次数: {iteration}")
-        logger.info(f"最终 episode reward: {final_reward:.4f}")
-        logger.info(f"最终 makespan: {final_makespan:.2f}")
-        logger.info(f"最终 makespan gap: {final_makespan_gap:.1%}")
-        if final_losses:
-            logger.info(f"最终 losses: {{{', '.join(f'{k}={v:.6f}' for k, v in final_losses.items())}}}")
-        logger.info(f"结果保存在: {experiment_dir}")
-        logger.info("=" * 60)
+            # ========== 保存 Epoch 结果 ==========
+            epoch_elapsed = time.time() - epoch_start_time
+            epoch_metrics['epoch_elapsed'] = epoch_elapsed
+            save_epoch_result(experiment_dir, epoch_metrics)
+
+            # ========== 打印 Epoch 总结 ==========
+            train_mean_reward = epoch_metrics.get('train_mean_reward', 0.0)
+            train_mean_gap = epoch_metrics.get('train_mean_makespan_gap', float('inf'))
+            val_mean_gap = epoch_metrics.get('val_makespan_gap', float('inf'))
+            epsilon = epoch_metrics.get('epsilon', 'N/A')
+
+            logger.info(f"\n[Epoch {epoch}] 完成! "
+                        f"训练 reward={train_mean_reward:.4f}, "
+                        f"训练 gap={train_mean_gap:.1%}, "
+                        f"验证 gap={val_mean_gap:.1%}, "
+                        f"最佳验证 gap={early_stopping_state['best_val_gap']:.4f}, "
+                        f"epsilon={epsilon}, "
+                        f"耗时={epoch_elapsed:.1f}s")
+
+        # ========== 最终统计 ==========
+        if not _shutdown_requested:
+            if epoch_metrics_list:
+                final = epoch_metrics_list[-1]
+                best = early_stopping_state
+
+                logger.info("\n" + "=" * 60)
+                logger.info("训练完成!")
+                logger.info(f"总 Epoch 数: {len(epoch_metrics_list)}")
+                logger.info(f"最终训练 reward: {final.get('train_mean_reward', 0.0):.4f}")
+                logger.info(f"最终训练 makespan gap: {final.get('train_mean_makespan_gap', float('inf')):.1%}")
+                logger.info(f"最终验证 makespan gap: {final.get('val_makespan_gap', float('inf')):.1%}")
+                logger.info(f"最佳验证 makespan gap: {best['best_val_gap']:.4f} "
+                            f"(epoch {best['best_epoch']})")
+                logger.info(f"结果保存在: {experiment_dir}")
+                logger.info("=" * 60)
+            else:
+                logger.info("未完成任何 epoch")
+        else:
+            logger.info("\n训练因中断信号而停止")
 
     except KeyboardInterrupt:
         logger.info("\n收到键盘中断信号")

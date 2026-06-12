@@ -313,7 +313,11 @@ class PacketFactoryEnv(ParallelEnv):
         """
         # ---------- 清理重建阶段 ----------
         self.set_env_timeline(0)
-        
+
+        # 重置 Agent 的存活状态（check_job_finished 会将其设为 False）
+        if hasattr(self.agent, 'alive'):
+            self.agent.alive = True
+
         # 重置 Agent 的决策统计
         if hasattr(self.agent, 'reset_decision_stats'):
             self.agent.reset_decision_stats()
