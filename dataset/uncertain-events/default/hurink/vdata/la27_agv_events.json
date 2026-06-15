@@ -1,0 +1,319 @@
+{
+  "source_instance": "hurink\\vdata\\la27_agv.txt",
+  "instance_info": {
+    "job_count": 20,
+    "machine_count": 10,
+    "agv_count": 5,
+    "estimated_makespan": 1083.2
+  },
+  "generation_config": {
+    "seed": 3554,
+    "machine_fail_prob": 0.15,
+    "agv_fail_prob": 0.1,
+    "job_add_prob": 0.05,
+    "machine_fail_duration_range": [
+      3,
+      10
+    ],
+    "agv_fail_duration_range": [
+      2,
+      8
+    ],
+    "timeline_span_ratio": 0.8,
+    "min_events": 2
+  },
+  "event_counts": {
+    "machine_fail_trigger": 0,
+    "machine_fail_recover": 0,
+    "agv_fail_trigger": 1,
+    "agv_fail_recover": 1,
+    "job_add": 1,
+    "total": 3
+  },
+  "event_timeline": [
+    {
+      "timestamp": 245.32,
+      "type": "packet_factory.JOB_ADD",
+      "args": [
+        "trigger",
+        {
+          "job": {
+            "id": 20,
+            "operations": [
+              {
+                "id": 0,
+                "machines": [
+                  {
+                    "id": 0,
+                    "time": 69
+                  },
+                  {
+                    "id": 2,
+                    "time": 69
+                  },
+                  {
+                    "id": 6,
+                    "time": 93
+                  },
+                  {
+                    "id": 7,
+                    "time": 85
+                  },
+                  {
+                    "id": 9,
+                    "time": 70
+                  }
+                ]
+              },
+              {
+                "id": 1,
+                "machines": [
+                  {
+                    "id": 1,
+                    "time": 44
+                  },
+                  {
+                    "id": 3,
+                    "time": 46
+                  },
+                  {
+                    "id": 5,
+                    "time": 44
+                  },
+                  {
+                    "id": 6,
+                    "time": 40
+                  },
+                  {
+                    "id": 7,
+                    "time": 39
+                  },
+                  {
+                    "id": 8,
+                    "time": 33
+                  }
+                ]
+              },
+              {
+                "id": 2,
+                "machines": [
+                  {
+                    "id": 2,
+                    "time": 24
+                  },
+                  {
+                    "id": 4,
+                    "time": 24
+                  },
+                  {
+                    "id": 5,
+                    "time": 23
+                  },
+                  {
+                    "id": 9,
+                    "time": 23
+                  }
+                ]
+              },
+              {
+                "id": 3,
+                "machines": [
+                  {
+                    "id": 0,
+                    "time": 77
+                  },
+                  {
+                    "id": 3,
+                    "time": 56
+                  },
+                  {
+                    "id": 5,
+                    "time": 75
+                  },
+                  {
+                    "id": 6,
+                    "time": 64
+                  }
+                ]
+              },
+              {
+                "id": 4,
+                "machines": [
+                  {
+                    "id": 1,
+                    "time": 94
+                  },
+                  {
+                    "id": 2,
+                    "time": 84
+                  },
+                  {
+                    "id": 3,
+                    "time": 82
+                  },
+                  {
+                    "id": 7,
+                    "time": 93
+                  },
+                  {
+                    "id": 9,
+                    "time": 76
+                  }
+                ]
+              },
+              {
+                "id": 5,
+                "machines": [
+                  {
+                    "id": 2,
+                    "time": 91
+                  },
+                  {
+                    "id": 3,
+                    "time": 90
+                  },
+                  {
+                    "id": 7,
+                    "time": 78
+                  },
+                  {
+                    "id": 9,
+                    "time": 80
+                  }
+                ]
+              },
+              {
+                "id": 6,
+                "machines": [
+                  {
+                    "id": 2,
+                    "time": 7
+                  },
+                  {
+                    "id": 4,
+                    "time": 7
+                  },
+                  {
+                    "id": 7,
+                    "time": 7
+                  },
+                  {
+                    "id": 8,
+                    "time": 7
+                  }
+                ]
+              },
+              {
+                "id": 7,
+                "machines": [
+                  {
+                    "id": 2,
+                    "time": 55
+                  },
+                  {
+                    "id": 4,
+                    "time": 55
+                  },
+                  {
+                    "id": 6,
+                    "time": 51
+                  },
+                  {
+                    "id": 7,
+                    "time": 56
+                  },
+                  {
+                    "id": 8,
+                    "time": 40
+                  },
+                  {
+                    "id": 9,
+                    "time": 42
+                  }
+                ]
+              },
+              {
+                "id": 8,
+                "machines": [
+                  {
+                    "id": 0,
+                    "time": 55
+                  },
+                  {
+                    "id": 1,
+                    "time": 50
+                  },
+                  {
+                    "id": 3,
+                    "time": 52
+                  },
+                  {
+                    "id": 4,
+                    "time": 51
+                  },
+                  {
+                    "id": 6,
+                    "time": 39
+                  },
+                  {
+                    "id": 7,
+                    "time": 42
+                  },
+                  {
+                    "id": 8,
+                    "time": 46
+                  },
+                  {
+                    "id": 9,
+                    "time": 51
+                  }
+                ]
+              },
+              {
+                "id": 9,
+                "machines": [
+                  {
+                    "id": 0,
+                    "time": 52
+                  },
+                  {
+                    "id": 1,
+                    "time": 65
+                  },
+                  {
+                    "id": 5,
+                    "time": 61
+                  },
+                  {
+                    "id": 9,
+                    "time": 48
+                  }
+                ]
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "timestamp": 629.15,
+      "type": "packet_factory.AGV_FAIL",
+      "args": [
+        "trigger",
+        {
+          "id": 3
+        }
+      ]
+    },
+    {
+      "timestamp": 633.33,
+      "type": "packet_factory.AGV_FAIL",
+      "args": [
+        "recover",
+        {
+          "id": 3
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,95 @@
+{
+  "source_instance": "hurink\\rdata\\la34_agv.txt",
+  "instance_info": {
+    "job_count": 30,
+    "machine_count": 10,
+    "agv_count": 5,
+    "estimated_makespan": 1534.1
+  },
+  "generation_config": {
+    "seed": 1917,
+    "machine_fail_prob": 0.15,
+    "agv_fail_prob": 0.1,
+    "job_add_prob": 0.05,
+    "machine_fail_duration_range": [
+      3,
+      10
+    ],
+    "agv_fail_duration_range": [
+      2,
+      8
+    ],
+    "timeline_span_ratio": 0.8,
+    "min_events": 2
+  },
+  "event_counts": {
+    "machine_fail_trigger": 1,
+    "machine_fail_recover": 1,
+    "agv_fail_trigger": 2,
+    "agv_fail_recover": 2,
+    "job_add": 0,
+    "total": 6
+  },
+  "event_timeline": [
+    {
+      "timestamp": 275.42,
+      "type": "packet_factory.MACHINE_FAIL",
+      "args": [
+        "trigger",
+        {
+          "id": 6
+        }
+      ]
+    },
+    {
+      "timestamp": 283.17,
+      "type": "packet_factory.MACHINE_FAIL",
+      "args": [
+        "recover",
+        {
+          "id": 6
+        }
+      ]
+    },
+    {
+      "timestamp": 736.66,
+      "type": "packet_factory.AGV_FAIL",
+      "args": [
+        "trigger",
+        {
+          "id": 3
+        }
+      ]
+    },
+    {
+      "timestamp": 738.97,
+      "type": "packet_factory.AGV_FAIL",
+      "args": [
+        "recover",
+        {
+          "id": 3
+        }
+      ]
+    },
+    {
+      "timestamp": 783.99,
+      "type": "packet_factory.AGV_FAIL",
+      "args": [
+        "trigger",
+        {
+          "id": 3
+        }
+      ]
+    },
+    {
+      "timestamp": 787.57,
+      "type": "packet_factory.AGV_FAIL",
+      "args": [
+        "recover",
+        {
+          "id": 3
+        }
+      ]
+    }
+  ]
+}

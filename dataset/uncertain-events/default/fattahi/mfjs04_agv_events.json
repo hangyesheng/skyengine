@@ -1,0 +1,116 @@
+{
+  "source_instance": "fattahi\\mfjs04_agv.txt",
+  "instance_info": {
+    "job_count": 7,
+    "machine_count": 7,
+    "agv_count": 3,
+    "estimated_makespan": 496
+  },
+  "generation_config": {
+    "seed": 5855,
+    "machine_fail_prob": 0.15,
+    "agv_fail_prob": 0.1,
+    "job_add_prob": 0.05,
+    "machine_fail_duration_range": [
+      3,
+      10
+    ],
+    "agv_fail_duration_range": [
+      2,
+      8
+    ],
+    "timeline_span_ratio": 0.8,
+    "min_events": 2
+  },
+  "event_counts": {
+    "machine_fail_trigger": 1,
+    "machine_fail_recover": 1,
+    "agv_fail_trigger": 0,
+    "agv_fail_recover": 0,
+    "job_add": 1,
+    "total": 3
+  },
+  "event_timeline": [
+    {
+      "timestamp": 107.13,
+      "type": "packet_factory.JOB_ADD",
+      "args": [
+        "trigger",
+        {
+          "job": {
+            "id": 7,
+            "operations": [
+              {
+                "id": 0,
+                "machines": [
+                  {
+                    "id": 0,
+                    "time": 100
+                  },
+                  {
+                    "id": 1,
+                    "time": 60
+                  }
+                ]
+              },
+              {
+                "id": 1,
+                "machines": [
+                  {
+                    "id": 6,
+                    "time": 164
+                  },
+                  {
+                    "id": 2,
+                    "time": 151
+                  },
+                  {
+                    "id": 3,
+                    "time": 86
+                  }
+                ]
+              },
+              {
+                "id": 2,
+                "machines": [
+                  {
+                    "id": 3,
+                    "time": 206
+                  },
+                  {
+                    "id": 4,
+                    "time": 115
+                  },
+                  {
+                    "id": 5,
+                    "time": 175
+                  }
+                ]
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "timestamp": 251.2,
+      "type": "packet_factory.MACHINE_FAIL",
+      "args": [
+        "trigger",
+        {
+          "id": 5
+        }
+      ]
+    },
+    {
+      "timestamp": 260.54,
+      "type": "packet_factory.MACHINE_FAIL",
+      "args": [
+        "recover",
+        {
+          "id": 5
+        }
+      ]
+    }
+  ]
+}

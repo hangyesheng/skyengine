@@ -1,0 +1,1646 @@
+{
+  "source_instance": "behnke\\med04_4_agv.txt",
+  "instance_info": {
+    "job_count": 100,
+    "machine_count": 40,
+    "agv_count": 20,
+    "estimated_makespan": 152.9
+  },
+  "generation_config": {
+    "seed": 1735,
+    "machine_fail_prob": 0.15,
+    "agv_fail_prob": 0.1,
+    "job_add_prob": 0.05,
+    "machine_fail_duration_range": [
+      3,
+      10
+    ],
+    "agv_fail_duration_range": [
+      2,
+      8
+    ],
+    "timeline_span_ratio": 0.8,
+    "min_events": 2
+  },
+  "event_counts": {
+    "machine_fail_trigger": 8,
+    "machine_fail_recover": 8,
+    "agv_fail_trigger": 2,
+    "agv_fail_recover": 2,
+    "job_add": 5,
+    "total": 25
+  },
+  "event_timeline": [
+    {
+      "timestamp": 23.47,
+      "type": "packet_factory.MACHINE_FAIL",
+      "args": [
+        "trigger",
+        {
+          "id": 7
+        }
+      ]
+    },
+    {
+      "timestamp": 27.67,
+      "type": "packet_factory.MACHINE_FAIL",
+      "args": [
+        "trigger",
+        {
+          "id": 7
+        }
+      ]
+    },
+    {
+      "timestamp": 28.4,
+      "type": "packet_factory.MACHINE_FAIL",
+      "args": [
+        "recover",
+        {
+          "id": 7
+        }
+      ]
+    },
+    {
+      "timestamp": 34.72,
+      "type": "packet_factory.MACHINE_FAIL",
+      "args": [
+        "recover",
+        {
+          "id": 7
+        }
+      ]
+    },
+    {
+      "timestamp": 35.76,
+      "type": "packet_factory.MACHINE_FAIL",
+      "args": [
+        "trigger",
+        {
+          "id": 26
+        }
+      ]
+    },
+    {
+      "timestamp": 39.55,
+      "type": "packet_factory.MACHINE_FAIL",
+      "args": [
+        "recover",
+        {
+          "id": 26
+        }
+      ]
+    },
+    {
+      "timestamp": 40.28,
+      "type": "packet_factory.MACHINE_FAIL",
+      "args": [
+        "trigger",
+        {
+          "id": 9
+        }
+      ]
+    },
+    {
+      "timestamp": 44.06,
+      "type": "packet_factory.MACHINE_FAIL",
+      "args": [
+        "recover",
+        {
+          "id": 9
+        }
+      ]
+    },
+    {
+      "timestamp": 46.68,
+      "type": "packet_factory.MACHINE_FAIL",
+      "args": [
+        "trigger",
+        {
+          "id": 12
+        }
+      ]
+    },
+    {
+      "timestamp": 48.85,
+      "type": "packet_factory.AGV_FAIL",
+      "args": [
+        "trigger",
+        {
+          "id": 5
+        }
+      ]
+    },
+    {
+      "timestamp": 49.74,
+      "type": "packet_factory.MACHINE_FAIL",
+      "args": [
+        "trigger",
+        {
+          "id": 32
+        }
+      ]
+    },
+    {
+      "timestamp": 51.23,
+      "type": "packet_factory.JOB_ADD",
+      "args": [
+        "trigger",
+        {
+          "job": {
+            "id": 100,
+            "operations": [
+              {
+                "id": 0,
+                "machines": [
+                  {
+                    "id": 0,
+                    "time": 32
+                  },
+                  {
+                    "id": 1,
+                    "time": 15
+                  },
+                  {
+                    "id": 2,
+                    "time": 28
+                  },
+                  {
+                    "id": 3,
+                    "time": 22
+                  }
+                ]
+              },
+              {
+                "id": 1,
+                "machines": [
+                  {
+                    "id": 4,
+                    "time": 16
+                  },
+                  {
+                    "id": 5,
+                    "time": 31
+                  },
+                  {
+                    "id": 6,
+                    "time": 16
+                  },
+                  {
+                    "id": 7,
+                    "time": 35
+                  },
+                  {
+                    "id": 16,
+                    "time": 27
+                  },
+                  {
+                    "id": 17,
+                    "time": 23
+                  },
+                  {
+                    "id": 18,
+                    "time": 22
+                  },
+                  {
+                    "id": 19,
+                    "time": 25
+                  },
+                  {
+                    "id": 24,
+                    "time": 14
+                  },
+                  {
+                    "id": 25,
+                    "time": 12
+                  },
+                  {
+                    "id": 26,
+                    "time": 33
+                  },
+                  {
+                    "id": 27,
+                    "time": 26
+                  }
+                ]
+              },
+              {
+                "id": 2,
+                "machines": [
+                  {
+                    "id": 12,
+                    "time": 14
+                  },
+                  {
+                    "id": 13,
+                    "time": 11
+                  },
+                  {
+                    "id": 14,
+                    "time": 13
+                  },
+                  {
+                    "id": 15,
+                    "time": 17
+                  },
+                  {
+                    "id": 28,
+                    "time": 9
+                  },
+                  {
+                    "id": 29,
+                    "time": 14
+                  },
+                  {
+                    "id": 30,
+                    "time": 19
+                  },
+                  {
+                    "id": 31,
+                    "time": 24
+                  }
+                ]
+              },
+              {
+                "id": 3,
+                "machines": [
+                  {
+                    "id": 4,
+                    "time": 24
+                  },
+                  {
+                    "id": 5,
+                    "time": 34
+                  },
+                  {
+                    "id": 6,
+                    "time": 19
+                  },
+                  {
+                    "id": 7,
+                    "time": 19
+                  },
+                  {
+                    "id": 12,
+                    "time": 28
+                  },
+                  {
+                    "id": 13,
+                    "time": 19
+                  },
+                  {
+                    "id": 14,
+                    "time": 30
+                  },
+                  {
+                    "id": 15,
+                    "time": 30
+                  },
+                  {
+                    "id": 16,
+                    "time": 19
+                  },
+                  {
+                    "id": 17,
+                    "time": 13
+                  },
+                  {
+                    "id": 18,
+                    "time": 23
+                  },
+                  {
+                    "id": 19,
+                    "time": 11
+                  },
+                  {
+                    "id": 20,
+                    "time": 15
+                  },
+                  {
+                    "id": 21,
+                    "time": 18
+                  },
+                  {
+                    "id": 22,
+                    "time": 11
+                  },
+                  {
+                    "id": 23,
+                    "time": 22
+                  },
+                  {
+                    "id": 24,
+                    "time": 17
+                  },
+                  {
+                    "id": 25,
+                    "time": 23
+                  },
+                  {
+                    "id": 26,
+                    "time": 19
+                  },
+                  {
+                    "id": 27,
+                    "time": 24
+                  },
+                  {
+                    "id": 28,
+                    "time": 28
+                  },
+                  {
+                    "id": 29,
+                    "time": 12
+                  },
+                  {
+                    "id": 30,
+                    "time": 15
+                  },
+                  {
+                    "id": 31,
+                    "time": 33
+                  },
+                  {
+                    "id": 32,
+                    "time": 17
+                  },
+                  {
+                    "id": 33,
+                    "time": 31
+                  },
+                  {
+                    "id": 34,
+                    "time": 15
+                  },
+                  {
+                    "id": 35,
+                    "time": 11
+                  }
+                ]
+              },
+              {
+                "id": 4,
+                "machines": [
+                  {
+                    "id": 36,
+                    "time": 25
+                  },
+                  {
+                    "id": 37,
+                    "time": 19
+                  },
+                  {
+                    "id": 38,
+                    "time": 24
+                  },
+                  {
+                    "id": 39,
+                    "time": 17
+                  }
+                ]
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "timestamp": 54.22,
+      "type": "packet_factory.AGV_FAIL",
+      "args": [
+        "recover",
+        {
+          "id": 5
+        }
+      ]
+    },
+    {
+      "timestamp": 56.32,
+      "type": "packet_factory.MACHINE_FAIL",
+      "args": [
+        "recover",
+        {
+          "id": 12
+        }
+      ]
+    },
+    {
+      "timestamp": 56.63,
+      "type": "packet_factory.JOB_ADD",
+      "args": [
+        "trigger",
+        {
+          "job": {
+            "id": 103,
+            "operations": [
+              {
+                "id": 0,
+                "machines": [
+                  {
+                    "id": 0,
+                    "time": 32
+                  },
+                  {
+                    "id": 1,
+                    "time": 28
+                  },
+                  {
+                    "id": 2,
+                    "time": 17
+                  },
+                  {
+                    "id": 3,
+                    "time": 22
+                  }
+                ]
+              },
+              {
+                "id": 1,
+                "machines": [
+                  {
+                    "id": 24,
+                    "time": 28
+                  },
+                  {
+                    "id": 25,
+                    "time": 22
+                  },
+                  {
+                    "id": 26,
+                    "time": 21
+                  },
+                  {
+                    "id": 27,
+                    "time": 28
+                  }
+                ]
+              },
+              {
+                "id": 2,
+                "machines": [
+                  {
+                    "id": 28,
+                    "time": 24
+                  },
+                  {
+                    "id": 29,
+                    "time": 21
+                  },
+                  {
+                    "id": 30,
+                    "time": 24
+                  },
+                  {
+                    "id": 31,
+                    "time": 13
+                  }
+                ]
+              },
+              {
+                "id": 3,
+                "machines": [
+                  {
+                    "id": 8,
+                    "time": 25
+                  },
+                  {
+                    "id": 9,
+                    "time": 22
+                  },
+                  {
+                    "id": 10,
+                    "time": 25
+                  },
+                  {
+                    "id": 11,
+                    "time": 12
+                  },
+                  {
+                    "id": 12,
+                    "time": 12
+                  },
+                  {
+                    "id": 13,
+                    "time": 29
+                  },
+                  {
+                    "id": 14,
+                    "time": 14
+                  },
+                  {
+                    "id": 15,
+                    "time": 14
+                  },
+                  {
+                    "id": 24,
+                    "time": 15
+                  },
+                  {
+                    "id": 25,
+                    "time": 14
+                  },
+                  {
+                    "id": 26,
+                    "time": 30
+                  },
+                  {
+                    "id": 27,
+                    "time": 19
+                  }
+                ]
+              },
+              {
+                "id": 4,
+                "machines": [
+                  {
+                    "id": 36,
+                    "time": 33
+                  },
+                  {
+                    "id": 37,
+                    "time": 28
+                  },
+                  {
+                    "id": 38,
+                    "time": 20
+                  },
+                  {
+                    "id": 39,
+                    "time": 28
+                  }
+                ]
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "timestamp": 57.35,
+      "type": "packet_factory.MACHINE_FAIL",
+      "args": [
+        "recover",
+        {
+          "id": 32
+        }
+      ]
+    },
+    {
+      "timestamp": 61.09,
+      "type": "packet_factory.JOB_ADD",
+      "args": [
+        "trigger",
+        {
+          "job": {
+            "id": 102,
+            "operations": [
+              {
+                "id": 0,
+                "machines": [
+                  {
+                    "id": 0,
+                    "time": 17
+                  },
+                  {
+                    "id": 1,
+                    "time": 20
+                  },
+                  {
+                    "id": 2,
+                    "time": 13
+                  },
+                  {
+                    "id": 3,
+                    "time": 14
+                  }
+                ]
+              },
+              {
+                "id": 1,
+                "machines": [
+                  {
+                    "id": 4,
+                    "time": 18
+                  },
+                  {
+                    "id": 5,
+                    "time": 19
+                  },
+                  {
+                    "id": 6,
+                    "time": 15
+                  },
+                  {
+                    "id": 7,
+                    "time": 23
+                  },
+                  {
+                    "id": 12,
+                    "time": 29
+                  },
+                  {
+                    "id": 13,
+                    "time": 22
+                  },
+                  {
+                    "id": 14,
+                    "time": 12
+                  },
+                  {
+                    "id": 15,
+                    "time": 16
+                  },
+                  {
+                    "id": 16,
+                    "time": 27
+                  },
+                  {
+                    "id": 17,
+                    "time": 24
+                  },
+                  {
+                    "id": 18,
+                    "time": 26
+                  },
+                  {
+                    "id": 19,
+                    "time": 21
+                  },
+                  {
+                    "id": 24,
+                    "time": 13
+                  },
+                  {
+                    "id": 25,
+                    "time": 25
+                  },
+                  {
+                    "id": 26,
+                    "time": 11
+                  },
+                  {
+                    "id": 27,
+                    "time": 14
+                  },
+                  {
+                    "id": 28,
+                    "time": 14
+                  },
+                  {
+                    "id": 29,
+                    "time": 20
+                  },
+                  {
+                    "id": 30,
+                    "time": 22
+                  },
+                  {
+                    "id": 31,
+                    "time": 24
+                  },
+                  {
+                    "id": 32,
+                    "time": 19
+                  },
+                  {
+                    "id": 33,
+                    "time": 24
+                  },
+                  {
+                    "id": 34,
+                    "time": 15
+                  },
+                  {
+                    "id": 35,
+                    "time": 25
+                  }
+                ]
+              },
+              {
+                "id": 2,
+                "machines": [
+                  {
+                    "id": 4,
+                    "time": 11
+                  },
+                  {
+                    "id": 5,
+                    "time": 23
+                  },
+                  {
+                    "id": 6,
+                    "time": 11
+                  },
+                  {
+                    "id": 7,
+                    "time": 20
+                  },
+                  {
+                    "id": 8,
+                    "time": 17
+                  },
+                  {
+                    "id": 9,
+                    "time": 26
+                  },
+                  {
+                    "id": 10,
+                    "time": 26
+                  },
+                  {
+                    "id": 11,
+                    "time": 13
+                  },
+                  {
+                    "id": 16,
+                    "time": 21
+                  },
+                  {
+                    "id": 17,
+                    "time": 13
+                  },
+                  {
+                    "id": 18,
+                    "time": 30
+                  },
+                  {
+                    "id": 19,
+                    "time": 18
+                  },
+                  {
+                    "id": 20,
+                    "time": 11
+                  },
+                  {
+                    "id": 21,
+                    "time": 29
+                  },
+                  {
+                    "id": 22,
+                    "time": 32
+                  },
+                  {
+                    "id": 23,
+                    "time": 11
+                  },
+                  {
+                    "id": 24,
+                    "time": 16
+                  },
+                  {
+                    "id": 25,
+                    "time": 11
+                  },
+                  {
+                    "id": 26,
+                    "time": 20
+                  },
+                  {
+                    "id": 27,
+                    "time": 20
+                  },
+                  {
+                    "id": 28,
+                    "time": 18
+                  },
+                  {
+                    "id": 29,
+                    "time": 30
+                  },
+                  {
+                    "id": 30,
+                    "time": 10
+                  },
+                  {
+                    "id": 31,
+                    "time": 17
+                  }
+                ]
+              },
+              {
+                "id": 3,
+                "machines": [
+                  {
+                    "id": 4,
+                    "time": 12
+                  },
+                  {
+                    "id": 5,
+                    "time": 21
+                  },
+                  {
+                    "id": 6,
+                    "time": 25
+                  },
+                  {
+                    "id": 7,
+                    "time": 15
+                  },
+                  {
+                    "id": 8,
+                    "time": 19
+                  },
+                  {
+                    "id": 9,
+                    "time": 23
+                  },
+                  {
+                    "id": 10,
+                    "time": 11
+                  },
+                  {
+                    "id": 11,
+                    "time": 11
+                  },
+                  {
+                    "id": 12,
+                    "time": 28
+                  },
+                  {
+                    "id": 13,
+                    "time": 10
+                  },
+                  {
+                    "id": 14,
+                    "time": 18
+                  },
+                  {
+                    "id": 15,
+                    "time": 14
+                  },
+                  {
+                    "id": 16,
+                    "time": 30
+                  },
+                  {
+                    "id": 17,
+                    "time": 16
+                  },
+                  {
+                    "id": 18,
+                    "time": 18
+                  },
+                  {
+                    "id": 19,
+                    "time": 33
+                  },
+                  {
+                    "id": 20,
+                    "time": 18
+                  },
+                  {
+                    "id": 21,
+                    "time": 33
+                  },
+                  {
+                    "id": 22,
+                    "time": 30
+                  },
+                  {
+                    "id": 23,
+                    "time": 19
+                  },
+                  {
+                    "id": 24,
+                    "time": 15
+                  },
+                  {
+                    "id": 25,
+                    "time": 14
+                  },
+                  {
+                    "id": 26,
+                    "time": 30
+                  },
+                  {
+                    "id": 27,
+                    "time": 12
+                  },
+                  {
+                    "id": 28,
+                    "time": 23
+                  },
+                  {
+                    "id": 29,
+                    "time": 17
+                  },
+                  {
+                    "id": 30,
+                    "time": 24
+                  },
+                  {
+                    "id": 31,
+                    "time": 31
+                  },
+                  {
+                    "id": 32,
+                    "time": 25
+                  },
+                  {
+                    "id": 33,
+                    "time": 31
+                  },
+                  {
+                    "id": 34,
+                    "time": 11
+                  },
+                  {
+                    "id": 35,
+                    "time": 19
+                  }
+                ]
+              },
+              {
+                "id": 4,
+                "machines": [
+                  {
+                    "id": 36,
+                    "time": 26
+                  },
+                  {
+                    "id": 37,
+                    "time": 24
+                  },
+                  {
+                    "id": 38,
+                    "time": 9
+                  },
+                  {
+                    "id": 39,
+                    "time": 21
+                  }
+                ]
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "timestamp": 61.29,
+      "type": "packet_factory.JOB_ADD",
+      "args": [
+        "trigger",
+        {
+          "job": {
+            "id": 101,
+            "operations": [
+              {
+                "id": 0,
+                "machines": [
+                  {
+                    "id": 0,
+                    "time": 29
+                  },
+                  {
+                    "id": 1,
+                    "time": 20
+                  },
+                  {
+                    "id": 2,
+                    "time": 15
+                  },
+                  {
+                    "id": 3,
+                    "time": 27
+                  }
+                ]
+              },
+              {
+                "id": 1,
+                "machines": [
+                  {
+                    "id": 8,
+                    "time": 27
+                  },
+                  {
+                    "id": 9,
+                    "time": 21
+                  },
+                  {
+                    "id": 10,
+                    "time": 26
+                  },
+                  {
+                    "id": 11,
+                    "time": 10
+                  },
+                  {
+                    "id": 16,
+                    "time": 25
+                  },
+                  {
+                    "id": 17,
+                    "time": 29
+                  },
+                  {
+                    "id": 18,
+                    "time": 14
+                  },
+                  {
+                    "id": 19,
+                    "time": 12
+                  },
+                  {
+                    "id": 20,
+                    "time": 17
+                  },
+                  {
+                    "id": 21,
+                    "time": 22
+                  },
+                  {
+                    "id": 22,
+                    "time": 26
+                  },
+                  {
+                    "id": 23,
+                    "time": 24
+                  },
+                  {
+                    "id": 24,
+                    "time": 18
+                  },
+                  {
+                    "id": 25,
+                    "time": 22
+                  },
+                  {
+                    "id": 26,
+                    "time": 17
+                  },
+                  {
+                    "id": 27,
+                    "time": 10
+                  },
+                  {
+                    "id": 28,
+                    "time": 20
+                  },
+                  {
+                    "id": 29,
+                    "time": 20
+                  },
+                  {
+                    "id": 30,
+                    "time": 14
+                  },
+                  {
+                    "id": 31,
+                    "time": 17
+                  },
+                  {
+                    "id": 32,
+                    "time": 19
+                  },
+                  {
+                    "id": 33,
+                    "time": 14
+                  },
+                  {
+                    "id": 34,
+                    "time": 31
+                  },
+                  {
+                    "id": 35,
+                    "time": 22
+                  }
+                ]
+              },
+              {
+                "id": 2,
+                "machines": [
+                  {
+                    "id": 12,
+                    "time": 16
+                  },
+                  {
+                    "id": 13,
+                    "time": 31
+                  },
+                  {
+                    "id": 14,
+                    "time": 28
+                  },
+                  {
+                    "id": 15,
+                    "time": 14
+                  },
+                  {
+                    "id": 16,
+                    "time": 26
+                  },
+                  {
+                    "id": 17,
+                    "time": 16
+                  },
+                  {
+                    "id": 18,
+                    "time": 29
+                  },
+                  {
+                    "id": 19,
+                    "time": 21
+                  },
+                  {
+                    "id": 20,
+                    "time": 18
+                  },
+                  {
+                    "id": 21,
+                    "time": 12
+                  },
+                  {
+                    "id": 22,
+                    "time": 21
+                  },
+                  {
+                    "id": 23,
+                    "time": 10
+                  },
+                  {
+                    "id": 24,
+                    "time": 18
+                  },
+                  {
+                    "id": 25,
+                    "time": 14
+                  },
+                  {
+                    "id": 26,
+                    "time": 31
+                  },
+                  {
+                    "id": 27,
+                    "time": 21
+                  },
+                  {
+                    "id": 28,
+                    "time": 26
+                  },
+                  {
+                    "id": 29,
+                    "time": 32
+                  },
+                  {
+                    "id": 30,
+                    "time": 12
+                  },
+                  {
+                    "id": 31,
+                    "time": 10
+                  },
+                  {
+                    "id": 32,
+                    "time": 15
+                  },
+                  {
+                    "id": 33,
+                    "time": 15
+                  },
+                  {
+                    "id": 34,
+                    "time": 23
+                  },
+                  {
+                    "id": 35,
+                    "time": 20
+                  }
+                ]
+              },
+              {
+                "id": 3,
+                "machines": [
+                  {
+                    "id": 4,
+                    "time": 20
+                  },
+                  {
+                    "id": 5,
+                    "time": 9
+                  },
+                  {
+                    "id": 6,
+                    "time": 13
+                  },
+                  {
+                    "id": 7,
+                    "time": 10
+                  },
+                  {
+                    "id": 8,
+                    "time": 14
+                  },
+                  {
+                    "id": 9,
+                    "time": 21
+                  },
+                  {
+                    "id": 10,
+                    "time": 29
+                  },
+                  {
+                    "id": 11,
+                    "time": 13
+                  }
+                ]
+              },
+              {
+                "id": 4,
+                "machines": [
+                  {
+                    "id": 36,
+                    "time": 32
+                  },
+                  {
+                    "id": 37,
+                    "time": 12
+                  },
+                  {
+                    "id": 38,
+                    "time": 22
+                  },
+                  {
+                    "id": 39,
+                    "time": 12
+                  }
+                ]
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "timestamp": 64.15,
+      "type": "packet_factory.JOB_ADD",
+      "args": [
+        "trigger",
+        {
+          "job": {
+            "id": 104,
+            "operations": [
+              {
+                "id": 0,
+                "machines": [
+                  {
+                    "id": 0,
+                    "time": 16
+                  },
+                  {
+                    "id": 1,
+                    "time": 23
+                  },
+                  {
+                    "id": 2,
+                    "time": 25
+                  },
+                  {
+                    "id": 3,
+                    "time": 26
+                  }
+                ]
+              },
+              {
+                "id": 1,
+                "machines": [
+                  {
+                    "id": 4,
+                    "time": 12
+                  },
+                  {
+                    "id": 5,
+                    "time": 19
+                  },
+                  {
+                    "id": 6,
+                    "time": 29
+                  },
+                  {
+                    "id": 7,
+                    "time": 23
+                  },
+                  {
+                    "id": 8,
+                    "time": 23
+                  },
+                  {
+                    "id": 9,
+                    "time": 12
+                  },
+                  {
+                    "id": 10,
+                    "time": 14
+                  },
+                  {
+                    "id": 11,
+                    "time": 23
+                  },
+                  {
+                    "id": 12,
+                    "time": 14
+                  },
+                  {
+                    "id": 13,
+                    "time": 11
+                  },
+                  {
+                    "id": 14,
+                    "time": 29
+                  },
+                  {
+                    "id": 15,
+                    "time": 34
+                  },
+                  {
+                    "id": 16,
+                    "time": 14
+                  },
+                  {
+                    "id": 17,
+                    "time": 26
+                  },
+                  {
+                    "id": 18,
+                    "time": 12
+                  },
+                  {
+                    "id": 19,
+                    "time": 19
+                  },
+                  {
+                    "id": 24,
+                    "time": 18
+                  },
+                  {
+                    "id": 25,
+                    "time": 18
+                  },
+                  {
+                    "id": 26,
+                    "time": 32
+                  },
+                  {
+                    "id": 27,
+                    "time": 20
+                  },
+                  {
+                    "id": 28,
+                    "time": 18
+                  },
+                  {
+                    "id": 29,
+                    "time": 12
+                  },
+                  {
+                    "id": 30,
+                    "time": 16
+                  },
+                  {
+                    "id": 31,
+                    "time": 16
+                  },
+                  {
+                    "id": 32,
+                    "time": 18
+                  },
+                  {
+                    "id": 33,
+                    "time": 12
+                  },
+                  {
+                    "id": 34,
+                    "time": 23
+                  },
+                  {
+                    "id": 35,
+                    "time": 26
+                  }
+                ]
+              },
+              {
+                "id": 2,
+                "machines": [
+                  {
+                    "id": 4,
+                    "time": 25
+                  },
+                  {
+                    "id": 5,
+                    "time": 23
+                  },
+                  {
+                    "id": 6,
+                    "time": 27
+                  },
+                  {
+                    "id": 7,
+                    "time": 34
+                  },
+                  {
+                    "id": 8,
+                    "time": 14
+                  },
+                  {
+                    "id": 9,
+                    "time": 22
+                  },
+                  {
+                    "id": 10,
+                    "time": 27
+                  },
+                  {
+                    "id": 11,
+                    "time": 25
+                  },
+                  {
+                    "id": 12,
+                    "time": 17
+                  },
+                  {
+                    "id": 13,
+                    "time": 14
+                  },
+                  {
+                    "id": 14,
+                    "time": 17
+                  },
+                  {
+                    "id": 15,
+                    "time": 23
+                  }
+                ]
+              },
+              {
+                "id": 3,
+                "machines": [
+                  {
+                    "id": 8,
+                    "time": 12
+                  },
+                  {
+                    "id": 9,
+                    "time": 14
+                  },
+                  {
+                    "id": 10,
+                    "time": 26
+                  },
+                  {
+                    "id": 11,
+                    "time": 19
+                  },
+                  {
+                    "id": 12,
+                    "time": 12
+                  },
+                  {
+                    "id": 13,
+                    "time": 18
+                  },
+                  {
+                    "id": 14,
+                    "time": 21
+                  },
+                  {
+                    "id": 15,
+                    "time": 18
+                  },
+                  {
+                    "id": 16,
+                    "time": 29
+                  },
+                  {
+                    "id": 17,
+                    "time": 20
+                  },
+                  {
+                    "id": 18,
+                    "time": 24
+                  },
+                  {
+                    "id": 19,
+                    "time": 13
+                  },
+                  {
+                    "id": 24,
+                    "time": 8
+                  },
+                  {
+                    "id": 25,
+                    "time": 24
+                  },
+                  {
+                    "id": 26,
+                    "time": 12
+                  },
+                  {
+                    "id": 27,
+                    "time": 35
+                  },
+                  {
+                    "id": 32,
+                    "time": 22
+                  },
+                  {
+                    "id": 33,
+                    "time": 12
+                  },
+                  {
+                    "id": 34,
+                    "time": 24
+                  },
+                  {
+                    "id": 35,
+                    "time": 25
+                  }
+                ]
+              },
+              {
+                "id": 4,
+                "machines": [
+                  {
+                    "id": 36,
+                    "time": 9
+                  },
+                  {
+                    "id": 37,
+                    "time": 18
+                  },
+                  {
+                    "id": 38,
+                    "time": 27
+                  },
+                  {
+                    "id": 39,
+                    "time": 11
+                  }
+                ]
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "timestamp": 73.39,
+      "type": "packet_factory.AGV_FAIL",
+      "args": [
+        "trigger",
+        {
+          "id": 4
+        }
+      ]
+    },
+    {
+      "timestamp": 78.02,
+      "type": "packet_factory.AGV_FAIL",
+      "args": [
+        "recover",
+        {
+          "id": 4
+        }
+      ]
+    },
+    {
+      "timestamp": 85.23,
+      "type": "packet_factory.MACHINE_FAIL",
+      "args": [
+        "trigger",
+        {
+          "id": 39
+        }
+      ]
+    },
+    {
+      "timestamp": 86.85,
+      "type": "packet_factory.MACHINE_FAIL",
+      "args": [
+        "trigger",
+        {
+          "id": 13
+        }
+      ]
+    },
+    {
+      "timestamp": 89.15,
+      "type": "packet_factory.MACHINE_FAIL",
+      "args": [
+        "recover",
+        {
+          "id": 39
+        }
+      ]
+    },
+    {
+      "timestamp": 91.77,
+      "type": "packet_factory.MACHINE_FAIL",
+      "args": [
+        "recover",
+        {
+          "id": 13
+        }
+      ]
+    }
+  ]
+}

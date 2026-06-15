@@ -1,0 +1,134 @@
+{
+  "source_instance": "hurink\\rdata\\la12_agv.txt",
+  "instance_info": {
+    "job_count": 20,
+    "machine_count": 5,
+    "agv_count": 2,
+    "estimated_makespan": 935.2
+  },
+  "generation_config": {
+    "seed": 1768,
+    "machine_fail_prob": 0.15,
+    "agv_fail_prob": 0.1,
+    "job_add_prob": 0.05,
+    "machine_fail_duration_range": [
+      3,
+      10
+    ],
+    "agv_fail_duration_range": [
+      2,
+      8
+    ],
+    "timeline_span_ratio": 0.8,
+    "min_events": 2
+  },
+  "event_counts": {
+    "machine_fail_trigger": 1,
+    "machine_fail_recover": 1,
+    "agv_fail_trigger": 0,
+    "agv_fail_recover": 0,
+    "job_add": 1,
+    "total": 3
+  },
+  "event_timeline": [
+    {
+      "timestamp": 235.1,
+      "type": "packet_factory.MACHINE_FAIL",
+      "args": [
+        "trigger",
+        {
+          "id": 4
+        }
+      ]
+    },
+    {
+      "timestamp": 241.84,
+      "type": "packet_factory.MACHINE_FAIL",
+      "args": [
+        "recover",
+        {
+          "id": 4
+        }
+      ]
+    },
+    {
+      "timestamp": 259.67,
+      "type": "packet_factory.JOB_ADD",
+      "args": [
+        "trigger",
+        {
+          "job": {
+            "id": 20,
+            "operations": [
+              {
+                "id": 0,
+                "machines": [
+                  {
+                    "id": 1,
+                    "time": 74
+                  },
+                  {
+                    "id": 3,
+                    "time": 55
+                  },
+                  {
+                    "id": 4,
+                    "time": 62
+                  }
+                ]
+              },
+              {
+                "id": 1,
+                "machines": [
+                  {
+                    "id": 3,
+                    "time": 63
+                  }
+                ]
+              },
+              {
+                "id": 2,
+                "machines": [
+                  {
+                    "id": 4,
+                    "time": 40
+                  },
+                  {
+                    "id": 3,
+                    "time": 44
+                  },
+                  {
+                    "id": 2,
+                    "time": 40
+                  }
+                ]
+              },
+              {
+                "id": 3,
+                "machines": [
+                  {
+                    "id": 2,
+                    "time": 87
+                  },
+                  {
+                    "id": 0,
+                    "time": 62
+                  }
+                ]
+              },
+              {
+                "id": 4,
+                "machines": [
+                  {
+                    "id": 0,
+                    "time": 45
+                  }
+                ]
+              }
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}

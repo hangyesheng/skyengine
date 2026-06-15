@@ -1,0 +1,275 @@
+{
+  "source_instance": "behnke\\lar01_5_agv.txt",
+  "instance_info": {
+    "job_count": 10,
+    "machine_count": 60,
+    "agv_count": 30,
+    "estimated_makespan": 68
+  },
+  "generation_config": {
+    "seed": 6338,
+    "machine_fail_prob": 0.15,
+    "agv_fail_prob": 0.1,
+    "job_add_prob": 0.05,
+    "machine_fail_duration_range": [
+      3,
+      10
+    ],
+    "agv_fail_duration_range": [
+      2,
+      8
+    ],
+    "timeline_span_ratio": 0.8,
+    "min_events": 2
+  },
+  "event_counts": {
+    "machine_fail_trigger": 9,
+    "machine_fail_recover": 9,
+    "agv_fail_trigger": 3,
+    "agv_fail_recover": 3,
+    "job_add": 0,
+    "total": 24
+  },
+  "event_timeline": [
+    {
+      "timestamp": 9.37,
+      "type": "packet_factory.MACHINE_FAIL",
+      "args": [
+        "trigger",
+        {
+          "id": 19
+        }
+      ]
+    },
+    {
+      "timestamp": 12.97,
+      "type": "packet_factory.MACHINE_FAIL",
+      "args": [
+        "trigger",
+        {
+          "id": 13
+        }
+      ]
+    },
+    {
+      "timestamp": 17.16,
+      "type": "packet_factory.MACHINE_FAIL",
+      "args": [
+        "recover",
+        {
+          "id": 13
+        }
+      ]
+    },
+    {
+      "timestamp": 17.5,
+      "type": "packet_factory.MACHINE_FAIL",
+      "args": [
+        "recover",
+        {
+          "id": 19
+        }
+      ]
+    },
+    {
+      "timestamp": 17.66,
+      "type": "packet_factory.AGV_FAIL",
+      "args": [
+        "trigger",
+        {
+          "id": 5
+        }
+      ]
+    },
+    {
+      "timestamp": 20.69,
+      "type": "packet_factory.AGV_FAIL",
+      "args": [
+        "recover",
+        {
+          "id": 5
+        }
+      ]
+    },
+    {
+      "timestamp": 27.1,
+      "type": "packet_factory.MACHINE_FAIL",
+      "args": [
+        "trigger",
+        {
+          "id": 40
+        }
+      ]
+    },
+    {
+      "timestamp": 29.44,
+      "type": "packet_factory.MACHINE_FAIL",
+      "args": [
+        "trigger",
+        {
+          "id": 18
+        }
+      ]
+    },
+    {
+      "timestamp": 29.7,
+      "type": "packet_factory.MACHINE_FAIL",
+      "args": [
+        "trigger",
+        {
+          "id": 57
+        }
+      ]
+    },
+    {
+      "timestamp": 31.57,
+      "type": "packet_factory.AGV_FAIL",
+      "args": [
+        "trigger",
+        {
+          "id": 24
+        }
+      ]
+    },
+    {
+      "timestamp": 31.85,
+      "type": "packet_factory.MACHINE_FAIL",
+      "args": [
+        "trigger",
+        {
+          "id": 28
+        }
+      ]
+    },
+    {
+      "timestamp": 35.0,
+      "type": "packet_factory.MACHINE_FAIL",
+      "args": [
+        "trigger",
+        {
+          "id": 15
+        }
+      ]
+    },
+    {
+      "timestamp": 35.43,
+      "type": "packet_factory.MACHINE_FAIL",
+      "args": [
+        "recover",
+        {
+          "id": 40
+        }
+      ]
+    },
+    {
+      "timestamp": 35.84,
+      "type": "packet_factory.MACHINE_FAIL",
+      "args": [
+        "recover",
+        {
+          "id": 28
+        }
+      ]
+    },
+    {
+      "timestamp": 36.27,
+      "type": "packet_factory.AGV_FAIL",
+      "args": [
+        "trigger",
+        {
+          "id": 29
+        }
+      ]
+    },
+    {
+      "timestamp": 37.9,
+      "type": "packet_factory.MACHINE_FAIL",
+      "args": [
+        "recover",
+        {
+          "id": 18
+        }
+      ]
+    },
+    {
+      "timestamp": 37.91,
+      "type": "packet_factory.MACHINE_FAIL",
+      "args": [
+        "trigger",
+        {
+          "id": 13
+        }
+      ]
+    },
+    {
+      "timestamp": 37.99,
+      "type": "packet_factory.AGV_FAIL",
+      "args": [
+        "recover",
+        {
+          "id": 24
+        }
+      ]
+    },
+    {
+      "timestamp": 38.56,
+      "type": "packet_factory.MACHINE_FAIL",
+      "args": [
+        "recover",
+        {
+          "id": 57
+        }
+      ]
+    },
+    {
+      "timestamp": 40.34,
+      "type": "packet_factory.MACHINE_FAIL",
+      "args": [
+        "trigger",
+        {
+          "id": 5
+        }
+      ]
+    },
+    {
+      "timestamp": 41.39,
+      "type": "packet_factory.MACHINE_FAIL",
+      "args": [
+        "recover",
+        {
+          "id": 13
+        }
+      ]
+    },
+    {
+      "timestamp": 41.94,
+      "type": "packet_factory.AGV_FAIL",
+      "args": [
+        "recover",
+        {
+          "id": 29
+        }
+      ]
+    },
+    {
+      "timestamp": 43.2,
+      "type": "packet_factory.MACHINE_FAIL",
+      "args": [
+        "recover",
+        {
+          "id": 15
+        }
+      ]
+    },
+    {
+      "timestamp": 47.69,
+      "type": "packet_factory.MACHINE_FAIL",
+      "args": [
+        "recover",
+        {
+          "id": 5
+        }
+      ]
+    }
+  ]
+}

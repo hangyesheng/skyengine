@@ -1,0 +1,75 @@
+{
+  "source_instance": "behnke\\sm01_2_agv.txt",
+  "instance_info": {
+    "job_count": 10,
+    "machine_count": 20,
+    "agv_count": 10,
+    "estimated_makespan": 75
+  },
+  "generation_config": {
+    "seed": 3066,
+    "machine_fail_prob": 0.15,
+    "agv_fail_prob": 0.1,
+    "job_add_prob": 0.05,
+    "machine_fail_duration_range": [
+      3,
+      10
+    ],
+    "agv_fail_duration_range": [
+      2,
+      8
+    ],
+    "timeline_span_ratio": 0.8,
+    "min_events": 2
+  },
+  "event_counts": {
+    "machine_fail_trigger": 2,
+    "machine_fail_recover": 2,
+    "agv_fail_trigger": 0,
+    "agv_fail_recover": 0,
+    "job_add": 0,
+    "total": 4
+  },
+  "event_timeline": [
+    {
+      "timestamp": 28.58,
+      "type": "packet_factory.MACHINE_FAIL",
+      "args": [
+        "trigger",
+        {
+          "id": 13
+        }
+      ]
+    },
+    {
+      "timestamp": 34.52,
+      "type": "packet_factory.MACHINE_FAIL",
+      "args": [
+        "recover",
+        {
+          "id": 13
+        }
+      ]
+    },
+    {
+      "timestamp": 38.53,
+      "type": "packet_factory.MACHINE_FAIL",
+      "args": [
+        "trigger",
+        {
+          "id": 18
+        }
+      ]
+    },
+    {
+      "timestamp": 45.67,
+      "type": "packet_factory.MACHINE_FAIL",
+      "args": [
+        "recover",
+        {
+          "id": 18
+        }
+      ]
+    }
+  ]
+}

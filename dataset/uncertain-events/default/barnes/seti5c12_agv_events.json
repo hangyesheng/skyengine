@@ -1,0 +1,95 @@
+{
+  "source_instance": "barnes\\seti5c12_agv.txt",
+  "instance_info": {
+    "job_count": 15,
+    "machine_count": 16,
+    "agv_count": 8,
+    "estimated_makespan": 955
+  },
+  "generation_config": {
+    "seed": 3775,
+    "machine_fail_prob": 0.15,
+    "agv_fail_prob": 0.1,
+    "job_add_prob": 0.05,
+    "machine_fail_duration_range": [
+      3,
+      10
+    ],
+    "agv_fail_duration_range": [
+      2,
+      8
+    ],
+    "timeline_span_ratio": 0.8,
+    "min_events": 2
+  },
+  "event_counts": {
+    "machine_fail_trigger": 1,
+    "machine_fail_recover": 1,
+    "agv_fail_trigger": 2,
+    "agv_fail_recover": 2,
+    "job_add": 0,
+    "total": 6
+  },
+  "event_timeline": [
+    {
+      "timestamp": 114.27,
+      "type": "packet_factory.MACHINE_FAIL",
+      "args": [
+        "trigger",
+        {
+          "id": 4
+        }
+      ]
+    },
+    {
+      "timestamp": 115.1,
+      "type": "packet_factory.AGV_FAIL",
+      "args": [
+        "trigger",
+        {
+          "id": 8
+        }
+      ]
+    },
+    {
+      "timestamp": 119.62,
+      "type": "packet_factory.AGV_FAIL",
+      "args": [
+        "recover",
+        {
+          "id": 8
+        }
+      ]
+    },
+    {
+      "timestamp": 121.52,
+      "type": "packet_factory.MACHINE_FAIL",
+      "args": [
+        "recover",
+        {
+          "id": 4
+        }
+      ]
+    },
+    {
+      "timestamp": 224.49,
+      "type": "packet_factory.AGV_FAIL",
+      "args": [
+        "trigger",
+        {
+          "id": 7
+        }
+      ]
+    },
+    {
+      "timestamp": 230.99,
+      "type": "packet_factory.AGV_FAIL",
+      "args": [
+        "recover",
+        {
+          "id": 7
+        }
+      ]
+    }
+  ]
+}
