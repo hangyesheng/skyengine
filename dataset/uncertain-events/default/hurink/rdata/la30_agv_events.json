@@ -1,0 +1,359 @@
+{
+  "source_instance": "hurink\\rdata\\la30_agv.txt",
+  "instance_info": {
+    "job_count": 20,
+    "machine_count": 10,
+    "agv_count": 5,
+    "estimated_makespan": 1068.0
+  },
+  "generation_config": {
+    "seed": 4119,
+    "machine_fail_prob": 0.15,
+    "agv_fail_prob": 0.1,
+    "job_add_prob": 0.05,
+    "machine_fail_duration_range": [
+      3,
+      10
+    ],
+    "agv_fail_duration_range": [
+      2,
+      8
+    ],
+    "timeline_span_ratio": 0.8,
+    "min_events": 2
+  },
+  "event_counts": {
+    "machine_fail_trigger": 2,
+    "machine_fail_recover": 2,
+    "agv_fail_trigger": 0,
+    "agv_fail_recover": 0,
+    "job_add": 2,
+    "total": 6
+  },
+  "event_timeline": [
+    {
+      "timestamp": 268.41,
+      "type": "packet_factory.MACHINE_FAIL",
+      "args": [
+        "trigger",
+        {
+          "id": 2
+        }
+      ]
+    },
+    {
+      "timestamp": 272.13,
+      "type": "packet_factory.MACHINE_FAIL",
+      "args": [
+        "recover",
+        {
+          "id": 2
+        }
+      ]
+    },
+    {
+      "timestamp": 309.06,
+      "type": "packet_factory.MACHINE_FAIL",
+      "args": [
+        "trigger",
+        {
+          "id": 4
+        }
+      ]
+    },
+    {
+      "timestamp": 315.41,
+      "type": "packet_factory.JOB_ADD",
+      "args": [
+        "trigger",
+        {
+          "job": {
+            "id": 20,
+            "operations": [
+              {
+                "id": 0,
+                "machines": [
+                  {
+                    "id": 5,
+                    "time": 80
+                  },
+                  {
+                    "id": 2,
+                    "time": 82
+                  }
+                ]
+              },
+              {
+                "id": 1,
+                "machines": [
+                  {
+                    "id": 6,
+                    "time": 98
+                  },
+                  {
+                    "id": 7,
+                    "time": 84
+                  },
+                  {
+                    "id": 5,
+                    "time": 89
+                  }
+                ]
+              },
+              {
+                "id": 2,
+                "machines": [
+                  {
+                    "id": 3,
+                    "time": 77
+                  },
+                  {
+                    "id": 1,
+                    "time": 80
+                  }
+                ]
+              },
+              {
+                "id": 3,
+                "machines": [
+                  {
+                    "id": 9,
+                    "time": 79
+                  },
+                  {
+                    "id": 6,
+                    "time": 97
+                  }
+                ]
+              },
+              {
+                "id": 4,
+                "machines": [
+                  {
+                    "id": 2,
+                    "time": 68
+                  }
+                ]
+              },
+              {
+                "id": 5,
+                "machines": [
+                  {
+                    "id": 0,
+                    "time": 27
+                  },
+                  {
+                    "id": 8,
+                    "time": 37
+                  }
+                ]
+              },
+              {
+                "id": 6,
+                "machines": [
+                  {
+                    "id": 7,
+                    "time": 50
+                  },
+                  {
+                    "id": 1,
+                    "time": 68
+                  },
+                  {
+                    "id": 8,
+                    "time": 64
+                  }
+                ]
+              },
+              {
+                "id": 7,
+                "machines": [
+                  {
+                    "id": 8,
+                    "time": 99
+                  },
+                  {
+                    "id": 0,
+                    "time": 81
+                  }
+                ]
+              },
+              {
+                "id": 8,
+                "machines": [
+                  {
+                    "id": 4,
+                    "time": 65
+                  }
+                ]
+              },
+              {
+                "id": 9,
+                "machines": [
+                  {
+                    "id": 1,
+                    "time": 33
+                  }
+                ]
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "timestamp": 316.85,
+      "type": "packet_factory.MACHINE_FAIL",
+      "args": [
+        "recover",
+        {
+          "id": 4
+        }
+      ]
+    },
+    {
+      "timestamp": 494.03,
+      "type": "packet_factory.JOB_ADD",
+      "args": [
+        "trigger",
+        {
+          "job": {
+            "id": 21,
+            "operations": [
+              {
+                "id": 0,
+                "machines": [
+                  {
+                    "id": 2,
+                    "time": 50
+                  },
+                  {
+                    "id": 7,
+                    "time": 48
+                  },
+                  {
+                    "id": 9,
+                    "time": 59
+                  }
+                ]
+              },
+              {
+                "id": 1,
+                "machines": [
+                  {
+                    "id": 3,
+                    "time": 16
+                  },
+                  {
+                    "id": 0,
+                    "time": 14
+                  }
+                ]
+              },
+              {
+                "id": 2,
+                "machines": [
+                  {
+                    "id": 9,
+                    "time": 27
+                  }
+                ]
+              },
+              {
+                "id": 3,
+                "machines": [
+                  {
+                    "id": 4,
+                    "time": 40
+                  },
+                  {
+                    "id": 6,
+                    "time": 39
+                  }
+                ]
+              },
+              {
+                "id": 4,
+                "machines": [
+                  {
+                    "id": 7,
+                    "time": 17
+                  },
+                  {
+                    "id": 0,
+                    "time": 19
+                  },
+                  {
+                    "id": 2,
+                    "time": 23
+                  }
+                ]
+              },
+              {
+                "id": 5,
+                "machines": [
+                  {
+                    "id": 5,
+                    "time": 91
+                  },
+                  {
+                    "id": 1,
+                    "time": 69
+                  }
+                ]
+              },
+              {
+                "id": 6,
+                "machines": [
+                  {
+                    "id": 8,
+                    "time": 68
+                  },
+                  {
+                    "id": 7,
+                    "time": 69
+                  }
+                ]
+              },
+              {
+                "id": 7,
+                "machines": [
+                  {
+                    "id": 0,
+                    "time": 47
+                  }
+                ]
+              },
+              {
+                "id": 8,
+                "machines": [
+                  {
+                    "id": 6,
+                    "time": 90
+                  }
+                ]
+              },
+              {
+                "id": 9,
+                "machines": [
+                  {
+                    "id": 1,
+                    "time": 75
+                  },
+                  {
+                    "id": 4,
+                    "time": 78
+                  },
+                  {
+                    "id": 5,
+                    "time": 66
+                  }
+                ]
+              }
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,115 @@
+{
+  "source_instance": "hurink\\rdata\\abz7_agv.txt",
+  "instance_info": {
+    "job_count": 20,
+    "machine_count": 15,
+    "agv_count": 7,
+    "estimated_makespan": 491.06666666666666
+  },
+  "generation_config": {
+    "seed": 8113,
+    "machine_fail_prob": 0.15,
+    "agv_fail_prob": 0.1,
+    "job_add_prob": 0.05,
+    "machine_fail_duration_range": [
+      3,
+      10
+    ],
+    "agv_fail_duration_range": [
+      2,
+      8
+    ],
+    "timeline_span_ratio": 0.8,
+    "min_events": 2
+  },
+  "event_counts": {
+    "machine_fail_trigger": 3,
+    "machine_fail_recover": 3,
+    "agv_fail_trigger": 1,
+    "agv_fail_recover": 1,
+    "job_add": 0,
+    "total": 8
+  },
+  "event_timeline": [
+    {
+      "timestamp": 179.17,
+      "type": "packet_factory.AGV_FAIL",
+      "args": [
+        "trigger",
+        {
+          "id": 6
+        }
+      ]
+    },
+    {
+      "timestamp": 181.43,
+      "type": "packet_factory.AGV_FAIL",
+      "args": [
+        "recover",
+        {
+          "id": 6
+        }
+      ]
+    },
+    {
+      "timestamp": 199.35,
+      "type": "packet_factory.MACHINE_FAIL",
+      "args": [
+        "trigger",
+        {
+          "id": 11
+        }
+      ]
+    },
+    {
+      "timestamp": 207.3,
+      "type": "packet_factory.MACHINE_FAIL",
+      "args": [
+        "recover",
+        {
+          "id": 11
+        }
+      ]
+    },
+    {
+      "timestamp": 251.95,
+      "type": "packet_factory.MACHINE_FAIL",
+      "args": [
+        "trigger",
+        {
+          "id": 8
+        }
+      ]
+    },
+    {
+      "timestamp": 257.1,
+      "type": "packet_factory.MACHINE_FAIL",
+      "args": [
+        "recover",
+        {
+          "id": 8
+        }
+      ]
+    },
+    {
+      "timestamp": 260.5,
+      "type": "packet_factory.MACHINE_FAIL",
+      "args": [
+        "trigger",
+        {
+          "id": 0
+        }
+      ]
+    },
+    {
+      "timestamp": 267.13,
+      "type": "packet_factory.MACHINE_FAIL",
+      "args": [
+        "recover",
+        {
+          "id": 0
+        }
+      ]
+    }
+  ]
+}

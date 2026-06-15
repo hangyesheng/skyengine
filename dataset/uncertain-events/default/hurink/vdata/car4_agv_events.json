@@ -1,0 +1,113 @@
+{
+  "source_instance": "hurink\\vdata\\car4_agv.txt",
+  "instance_info": {
+    "job_count": 14,
+    "machine_count": 4,
+    "agv_count": 2,
+    "estimated_makespan": 6513.5
+  },
+  "generation_config": {
+    "seed": 7496,
+    "machine_fail_prob": 0.15,
+    "agv_fail_prob": 0.1,
+    "job_add_prob": 0.05,
+    "machine_fail_duration_range": [
+      3,
+      10
+    ],
+    "agv_fail_duration_range": [
+      2,
+      8
+    ],
+    "timeline_span_ratio": 0.8,
+    "min_events": 2
+  },
+  "event_counts": {
+    "machine_fail_trigger": 1,
+    "machine_fail_recover": 1,
+    "agv_fail_trigger": 0,
+    "agv_fail_recover": 0,
+    "job_add": 1,
+    "total": 3
+  },
+  "event_timeline": [
+    {
+      "timestamp": 1987.92,
+      "type": "packet_factory.JOB_ADD",
+      "args": [
+        "trigger",
+        {
+          "job": {
+            "id": 14,
+            "operations": [
+              {
+                "id": 0,
+                "machines": [
+                  {
+                    "id": 0,
+                    "time": 589
+                  },
+                  {
+                    "id": 1,
+                    "time": 533
+                  }
+                ]
+              },
+              {
+                "id": 1,
+                "machines": [
+                  {
+                    "id": 1,
+                    "time": 186
+                  }
+                ]
+              },
+              {
+                "id": 2,
+                "machines": [
+                  {
+                    "id": 2,
+                    "time": 482
+                  },
+                  {
+                    "id": 3,
+                    "time": 490
+                  }
+                ]
+              },
+              {
+                "id": 3,
+                "machines": [
+                  {
+                    "id": 3,
+                    "time": 142
+                  }
+                ]
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "timestamp": 2889.11,
+      "type": "packet_factory.MACHINE_FAIL",
+      "args": [
+        "trigger",
+        {
+          "id": 1
+        }
+      ]
+    },
+    {
+      "timestamp": 2898.19,
+      "type": "packet_factory.MACHINE_FAIL",
+      "args": [
+        "recover",
+        {
+          "id": 1
+        }
+      ]
+    }
+  ]
+}

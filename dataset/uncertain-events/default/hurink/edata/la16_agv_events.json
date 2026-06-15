@@ -1,0 +1,135 @@
+{
+  "source_instance": "hurink\\edata\\la16_agv.txt",
+  "instance_info": {
+    "job_count": 10,
+    "machine_count": 10,
+    "agv_count": 5,
+    "estimated_makespan": 717
+  },
+  "generation_config": {
+    "seed": 7822,
+    "machine_fail_prob": 0.15,
+    "agv_fail_prob": 0.1,
+    "job_add_prob": 0.05,
+    "machine_fail_duration_range": [
+      3,
+      10
+    ],
+    "agv_fail_duration_range": [
+      2,
+      8
+    ],
+    "timeline_span_ratio": 0.8,
+    "min_events": 2
+  },
+  "event_counts": {
+    "machine_fail_trigger": 4,
+    "machine_fail_recover": 4,
+    "agv_fail_trigger": 1,
+    "agv_fail_recover": 1,
+    "job_add": 0,
+    "total": 10
+  },
+  "event_timeline": [
+    {
+      "timestamp": 191.81,
+      "type": "packet_factory.MACHINE_FAIL",
+      "args": [
+        "trigger",
+        {
+          "id": 6
+        }
+      ]
+    },
+    {
+      "timestamp": 199.39,
+      "type": "packet_factory.MACHINE_FAIL",
+      "args": [
+        "recover",
+        {
+          "id": 6
+        }
+      ]
+    },
+    {
+      "timestamp": 225.99,
+      "type": "packet_factory.MACHINE_FAIL",
+      "args": [
+        "trigger",
+        {
+          "id": 4
+        }
+      ]
+    },
+    {
+      "timestamp": 230.45,
+      "type": "packet_factory.MACHINE_FAIL",
+      "args": [
+        "recover",
+        {
+          "id": 4
+        }
+      ]
+    },
+    {
+      "timestamp": 243.15,
+      "type": "packet_factory.AGV_FAIL",
+      "args": [
+        "trigger",
+        {
+          "id": 5
+        }
+      ]
+    },
+    {
+      "timestamp": 245.31,
+      "type": "packet_factory.AGV_FAIL",
+      "args": [
+        "recover",
+        {
+          "id": 5
+        }
+      ]
+    },
+    {
+      "timestamp": 271.18,
+      "type": "packet_factory.MACHINE_FAIL",
+      "args": [
+        "trigger",
+        {
+          "id": 9
+        }
+      ]
+    },
+    {
+      "timestamp": 279.96,
+      "type": "packet_factory.MACHINE_FAIL",
+      "args": [
+        "recover",
+        {
+          "id": 9
+        }
+      ]
+    },
+    {
+      "timestamp": 285.66,
+      "type": "packet_factory.MACHINE_FAIL",
+      "args": [
+        "trigger",
+        {
+          "id": 3
+        }
+      ]
+    },
+    {
+      "timestamp": 294.86,
+      "type": "packet_factory.MACHINE_FAIL",
+      "args": [
+        "recover",
+        {
+          "id": 3
+        }
+      ]
+    }
+  ]
+}

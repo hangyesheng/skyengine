@@ -1,0 +1,327 @@
+{
+  "source_instance": "hurink\\edata\\mt10_agv.txt",
+  "instance_info": {
+    "job_count": 10,
+    "machine_count": 10,
+    "agv_count": 5,
+    "estimated_makespan": 655
+  },
+  "generation_config": {
+    "seed": 1864,
+    "machine_fail_prob": 0.15,
+    "agv_fail_prob": 0.1,
+    "job_add_prob": 0.05,
+    "machine_fail_duration_range": [
+      3,
+      10
+    ],
+    "agv_fail_duration_range": [
+      2,
+      8
+    ],
+    "timeline_span_ratio": 0.8,
+    "min_events": 2
+  },
+  "event_counts": {
+    "machine_fail_trigger": 4,
+    "machine_fail_recover": 4,
+    "agv_fail_trigger": 0,
+    "agv_fail_recover": 0,
+    "job_add": 2,
+    "total": 10
+  },
+  "event_timeline": [
+    {
+      "timestamp": 132.59,
+      "type": "packet_factory.MACHINE_FAIL",
+      "args": [
+        "trigger",
+        {
+          "id": 4
+        }
+      ]
+    },
+    {
+      "timestamp": 142.33,
+      "type": "packet_factory.MACHINE_FAIL",
+      "args": [
+        "recover",
+        {
+          "id": 4
+        }
+      ]
+    },
+    {
+      "timestamp": 179.66,
+      "type": "packet_factory.MACHINE_FAIL",
+      "args": [
+        "trigger",
+        {
+          "id": 5
+        }
+      ]
+    },
+    {
+      "timestamp": 188.04,
+      "type": "packet_factory.MACHINE_FAIL",
+      "args": [
+        "recover",
+        {
+          "id": 5
+        }
+      ]
+    },
+    {
+      "timestamp": 192.26,
+      "type": "packet_factory.MACHINE_FAIL",
+      "args": [
+        "trigger",
+        {
+          "id": 4
+        }
+      ]
+    },
+    {
+      "timestamp": 197.23,
+      "type": "packet_factory.JOB_ADD",
+      "args": [
+        "trigger",
+        {
+          "job": {
+            "id": 10,
+            "operations": [
+              {
+                "id": 0,
+                "machines": [
+                  {
+                    "id": 1,
+                    "time": 45
+                  }
+                ]
+              },
+              {
+                "id": 1,
+                "machines": [
+                  {
+                    "id": 0,
+                    "time": 41
+                  }
+                ]
+              },
+              {
+                "id": 2,
+                "machines": [
+                  {
+                    "id": 3,
+                    "time": 73
+                  }
+                ]
+              },
+              {
+                "id": 3,
+                "machines": [
+                  {
+                    "id": 2,
+                    "time": 14
+                  }
+                ]
+              },
+              {
+                "id": 4,
+                "machines": [
+                  {
+                    "id": 6,
+                    "time": 37
+                  }
+                ]
+              },
+              {
+                "id": 5,
+                "machines": [
+                  {
+                    "id": 5,
+                    "time": 25
+                  }
+                ]
+              },
+              {
+                "id": 6,
+                "machines": [
+                  {
+                    "id": 9,
+                    "time": 38
+                  }
+                ]
+              },
+              {
+                "id": 7,
+                "machines": [
+                  {
+                    "id": 8,
+                    "time": 75
+                  }
+                ]
+              },
+              {
+                "id": 8,
+                "machines": [
+                  {
+                    "id": 7,
+                    "time": 26
+                  }
+                ]
+              },
+              {
+                "id": 9,
+                "machines": [
+                  {
+                    "id": 4,
+                    "time": 51
+                  }
+                ]
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "timestamp": 202.13,
+      "type": "packet_factory.MACHINE_FAIL",
+      "args": [
+        "recover",
+        {
+          "id": 4
+        }
+      ]
+    },
+    {
+      "timestamp": 224.57,
+      "type": "packet_factory.JOB_ADD",
+      "args": [
+        "trigger",
+        {
+          "job": {
+            "id": 11,
+            "operations": [
+              {
+                "id": 0,
+                "machines": [
+                  {
+                    "id": 1,
+                    "time": 81
+                  }
+                ]
+              },
+              {
+                "id": 1,
+                "machines": [
+                  {
+                    "id": 0,
+                    "time": 11
+                  }
+                ]
+              },
+              {
+                "id": 2,
+                "machines": [
+                  {
+                    "id": 2,
+                    "time": 57
+                  },
+                  {
+                    "id": 4,
+                    "time": 53
+                  }
+                ]
+              },
+              {
+                "id": 3,
+                "machines": [
+                  {
+                    "id": 6,
+                    "time": 6
+                  }
+                ]
+              },
+              {
+                "id": 4,
+                "machines": [
+                  {
+                    "id": 8,
+                    "time": 62
+                  }
+                ]
+              },
+              {
+                "id": 5,
+                "machines": [
+                  {
+                    "id": 9,
+                    "time": 82
+                  }
+                ]
+              },
+              {
+                "id": 6,
+                "machines": [
+                  {
+                    "id": 5,
+                    "time": 52
+                  }
+                ]
+              },
+              {
+                "id": 7,
+                "machines": [
+                  {
+                    "id": 3,
+                    "time": 59
+                  }
+                ]
+              },
+              {
+                "id": 8,
+                "machines": [
+                  {
+                    "id": 4,
+                    "time": 92
+                  }
+                ]
+              },
+              {
+                "id": 9,
+                "machines": [
+                  {
+                    "id": 7,
+                    "time": 49
+                  }
+                ]
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "timestamp": 234.34,
+      "type": "packet_factory.MACHINE_FAIL",
+      "args": [
+        "trigger",
+        {
+          "id": 0
+        }
+      ]
+    },
+    {
+      "timestamp": 243.75,
+      "type": "packet_factory.MACHINE_FAIL",
+      "args": [
+        "recover",
+        {
+          "id": 0
+        }
+      ]
+    }
+  ]
+}

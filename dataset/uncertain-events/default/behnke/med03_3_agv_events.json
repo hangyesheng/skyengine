@@ -1,0 +1,414 @@
+{
+  "source_instance": "behnke\\med03_3_agv.txt",
+  "instance_info": {
+    "job_count": 50,
+    "machine_count": 40,
+    "agv_count": 20,
+    "estimated_makespan": 76.45
+  },
+  "generation_config": {
+    "seed": 9528,
+    "machine_fail_prob": 0.15,
+    "agv_fail_prob": 0.1,
+    "job_add_prob": 0.05,
+    "machine_fail_duration_range": [
+      3,
+      10
+    ],
+    "agv_fail_duration_range": [
+      2,
+      8
+    ],
+    "timeline_span_ratio": 0.8,
+    "min_events": 2
+  },
+  "event_counts": {
+    "machine_fail_trigger": 7,
+    "machine_fail_recover": 7,
+    "agv_fail_trigger": 2,
+    "agv_fail_recover": 2,
+    "job_add": 1,
+    "total": 19
+  },
+  "event_timeline": [
+    {
+      "timestamp": 8.48,
+      "type": "packet_factory.MACHINE_FAIL",
+      "args": [
+        "trigger",
+        {
+          "id": 3
+        }
+      ]
+    },
+    {
+      "timestamp": 11.95,
+      "type": "packet_factory.MACHINE_FAIL",
+      "args": [
+        "trigger",
+        {
+          "id": 34
+        }
+      ]
+    },
+    {
+      "timestamp": 13.95,
+      "type": "packet_factory.MACHINE_FAIL",
+      "args": [
+        "trigger",
+        {
+          "id": 32
+        }
+      ]
+    },
+    {
+      "timestamp": 15.42,
+      "type": "packet_factory.JOB_ADD",
+      "args": [
+        "trigger",
+        {
+          "job": {
+            "id": 50,
+            "operations": [
+              {
+                "id": 0,
+                "machines": [
+                  {
+                    "id": 0,
+                    "time": 17
+                  },
+                  {
+                    "id": 1,
+                    "time": 17
+                  },
+                  {
+                    "id": 2,
+                    "time": 12
+                  },
+                  {
+                    "id": 3,
+                    "time": 14
+                  }
+                ]
+              },
+              {
+                "id": 1,
+                "machines": [
+                  {
+                    "id": 4,
+                    "time": 20
+                  },
+                  {
+                    "id": 5,
+                    "time": 10
+                  },
+                  {
+                    "id": 6,
+                    "time": 10
+                  },
+                  {
+                    "id": 7,
+                    "time": 25
+                  },
+                  {
+                    "id": 12,
+                    "time": 18
+                  },
+                  {
+                    "id": 13,
+                    "time": 20
+                  },
+                  {
+                    "id": 14,
+                    "time": 23
+                  },
+                  {
+                    "id": 15,
+                    "time": 14
+                  },
+                  {
+                    "id": 24,
+                    "time": 16
+                  },
+                  {
+                    "id": 25,
+                    "time": 14
+                  },
+                  {
+                    "id": 26,
+                    "time": 24
+                  },
+                  {
+                    "id": 27,
+                    "time": 17
+                  }
+                ]
+              },
+              {
+                "id": 2,
+                "machines": [
+                  {
+                    "id": 4,
+                    "time": 27
+                  },
+                  {
+                    "id": 5,
+                    "time": 16
+                  },
+                  {
+                    "id": 6,
+                    "time": 23
+                  },
+                  {
+                    "id": 7,
+                    "time": 23
+                  },
+                  {
+                    "id": 20,
+                    "time": 14
+                  },
+                  {
+                    "id": 21,
+                    "time": 11
+                  },
+                  {
+                    "id": 22,
+                    "time": 15
+                  },
+                  {
+                    "id": 23,
+                    "time": 9
+                  },
+                  {
+                    "id": 28,
+                    "time": 23
+                  },
+                  {
+                    "id": 29,
+                    "time": 16
+                  },
+                  {
+                    "id": 30,
+                    "time": 10
+                  },
+                  {
+                    "id": 31,
+                    "time": 17
+                  },
+                  {
+                    "id": 32,
+                    "time": 21
+                  },
+                  {
+                    "id": 33,
+                    "time": 24
+                  },
+                  {
+                    "id": 34,
+                    "time": 32
+                  },
+                  {
+                    "id": 35,
+                    "time": 23
+                  }
+                ]
+              },
+              {
+                "id": 3,
+                "machines": [
+                  {
+                    "id": 28,
+                    "time": 17
+                  },
+                  {
+                    "id": 29,
+                    "time": 19
+                  },
+                  {
+                    "id": 30,
+                    "time": 22
+                  },
+                  {
+                    "id": 31,
+                    "time": 18
+                  }
+                ]
+              },
+              {
+                "id": 4,
+                "machines": [
+                  {
+                    "id": 36,
+                    "time": 21
+                  },
+                  {
+                    "id": 37,
+                    "time": 20
+                  },
+                  {
+                    "id": 38,
+                    "time": 20
+                  },
+                  {
+                    "id": 39,
+                    "time": 18
+                  }
+                ]
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "timestamp": 16.37,
+      "type": "packet_factory.MACHINE_FAIL",
+      "args": [
+        "trigger",
+        {
+          "id": 38
+        }
+      ]
+    },
+    {
+      "timestamp": 17.18,
+      "type": "packet_factory.MACHINE_FAIL",
+      "args": [
+        "recover",
+        {
+          "id": 3
+        }
+      ]
+    },
+    {
+      "timestamp": 20.69,
+      "type": "packet_factory.MACHINE_FAIL",
+      "args": [
+        "recover",
+        {
+          "id": 34
+        }
+      ]
+    },
+    {
+      "timestamp": 20.76,
+      "type": "packet_factory.MACHINE_FAIL",
+      "args": [
+        "recover",
+        {
+          "id": 32
+        }
+      ]
+    },
+    {
+      "timestamp": 22.75,
+      "type": "packet_factory.MACHINE_FAIL",
+      "args": [
+        "trigger",
+        {
+          "id": 12
+        }
+      ]
+    },
+    {
+      "timestamp": 24.68,
+      "type": "packet_factory.MACHINE_FAIL",
+      "args": [
+        "recover",
+        {
+          "id": 38
+        }
+      ]
+    },
+    {
+      "timestamp": 25.22,
+      "type": "packet_factory.AGV_FAIL",
+      "args": [
+        "trigger",
+        {
+          "id": 9
+        }
+      ]
+    },
+    {
+      "timestamp": 26.56,
+      "type": "packet_factory.MACHINE_FAIL",
+      "args": [
+        "trigger",
+        {
+          "id": 39
+        }
+      ]
+    },
+    {
+      "timestamp": 30.52,
+      "type": "packet_factory.AGV_FAIL",
+      "args": [
+        "recover",
+        {
+          "id": 9
+        }
+      ]
+    },
+    {
+      "timestamp": 31.29,
+      "type": "packet_factory.MACHINE_FAIL",
+      "args": [
+        "recover",
+        {
+          "id": 12
+        }
+      ]
+    },
+    {
+      "timestamp": 33.73,
+      "type": "packet_factory.MACHINE_FAIL",
+      "args": [
+        "recover",
+        {
+          "id": 39
+        }
+      ]
+    },
+    {
+      "timestamp": 41.93,
+      "type": "packet_factory.MACHINE_FAIL",
+      "args": [
+        "trigger",
+        {
+          "id": 24
+        }
+      ]
+    },
+    {
+      "timestamp": 43.93,
+      "type": "packet_factory.AGV_FAIL",
+      "args": [
+        "trigger",
+        {
+          "id": 3
+        }
+      ]
+    },
+    {
+      "timestamp": 45.08,
+      "type": "packet_factory.MACHINE_FAIL",
+      "args": [
+        "recover",
+        {
+          "id": 24
+        }
+      ]
+    },
+    {
+      "timestamp": 51.72,
+      "type": "packet_factory.AGV_FAIL",
+      "args": [
+        "recover",
+        {
+          "id": 3
+        }
+      ]
+    }
+  ]
+}

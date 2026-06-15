@@ -1,0 +1,227 @@
+{
+  "source_instance": "hurink\\rdata\\la28_agv.txt",
+  "instance_info": {
+    "job_count": 20,
+    "machine_count": 10,
+    "agv_count": 5,
+    "estimated_makespan": 1068.2
+  },
+  "generation_config": {
+    "seed": 3685,
+    "machine_fail_prob": 0.15,
+    "agv_fail_prob": 0.1,
+    "job_add_prob": 0.05,
+    "machine_fail_duration_range": [
+      3,
+      10
+    ],
+    "agv_fail_duration_range": [
+      2,
+      8
+    ],
+    "timeline_span_ratio": 0.8,
+    "min_events": 2
+  },
+  "event_counts": {
+    "machine_fail_trigger": 1,
+    "machine_fail_recover": 1,
+    "agv_fail_trigger": 2,
+    "agv_fail_recover": 2,
+    "job_add": 1,
+    "total": 7
+  },
+  "event_timeline": [
+    {
+      "timestamp": 185.95,
+      "type": "packet_factory.AGV_FAIL",
+      "args": [
+        "trigger",
+        {
+          "id": 4
+        }
+      ]
+    },
+    {
+      "timestamp": 192.94,
+      "type": "packet_factory.AGV_FAIL",
+      "args": [
+        "recover",
+        {
+          "id": 4
+        }
+      ]
+    },
+    {
+      "timestamp": 207.59,
+      "type": "packet_factory.AGV_FAIL",
+      "args": [
+        "trigger",
+        {
+          "id": 2
+        }
+      ]
+    },
+    {
+      "timestamp": 211.62,
+      "type": "packet_factory.AGV_FAIL",
+      "args": [
+        "recover",
+        {
+          "id": 2
+        }
+      ]
+    },
+    {
+      "timestamp": 234.18,
+      "type": "packet_factory.MACHINE_FAIL",
+      "args": [
+        "trigger",
+        {
+          "id": 7
+        }
+      ]
+    },
+    {
+      "timestamp": 237.5,
+      "type": "packet_factory.MACHINE_FAIL",
+      "args": [
+        "recover",
+        {
+          "id": 7
+        }
+      ]
+    },
+    {
+      "timestamp": 415.04,
+      "type": "packet_factory.JOB_ADD",
+      "args": [
+        "trigger",
+        {
+          "job": {
+            "id": 20,
+            "operations": [
+              {
+                "id": 0,
+                "machines": [
+                  {
+                    "id": 7,
+                    "time": 82
+                  },
+                  {
+                    "id": 9,
+                    "time": 87
+                  }
+                ]
+              },
+              {
+                "id": 1,
+                "machines": [
+                  {
+                    "id": 4,
+                    "time": 79
+                  }
+                ]
+              },
+              {
+                "id": 2,
+                "machines": [
+                  {
+                    "id": 3,
+                    "time": 21
+                  },
+                  {
+                    "id": 5,
+                    "time": 22
+                  }
+                ]
+              },
+              {
+                "id": 3,
+                "machines": [
+                  {
+                    "id": 1,
+                    "time": 36
+                  }
+                ]
+              },
+              {
+                "id": 4,
+                "machines": [
+                  {
+                    "id": 2,
+                    "time": 83
+                  }
+                ]
+              },
+              {
+                "id": 5,
+                "machines": [
+                  {
+                    "id": 8,
+                    "time": 36
+                  },
+                  {
+                    "id": 2,
+                    "time": 37
+                  },
+                  {
+                    "id": 1,
+                    "time": 33
+                  }
+                ]
+              },
+              {
+                "id": 6,
+                "machines": [
+                  {
+                    "id": 9,
+                    "time": 33
+                  }
+                ]
+              },
+              {
+                "id": 7,
+                "machines": [
+                  {
+                    "id": 6,
+                    "time": 75
+                  },
+                  {
+                    "id": 9,
+                    "time": 71
+                  }
+                ]
+              },
+              {
+                "id": 8,
+                "machines": [
+                  {
+                    "id": 5,
+                    "time": 40
+                  },
+                  {
+                    "id": 1,
+                    "time": 32
+                  },
+                  {
+                    "id": 9,
+                    "time": 39
+                  }
+                ]
+              },
+              {
+                "id": 9,
+                "machines": [
+                  {
+                    "id": 0,
+                    "time": 39
+                  }
+                ]
+              }
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}

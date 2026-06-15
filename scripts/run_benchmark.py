@@ -243,8 +243,13 @@ def parse_agv_instance(filepath: Path) -> dict:
 
 # ==================== 配置构建 ====================
 
-def generate_instance_config(parsed_data: dict) -> dict:
-    """从解析的数据生成 job_config / map_config / event_config"""
+def generate_instance_config(parsed_data: dict, uncertain_events: Optional[List[dict]] = None) -> dict:
+    """从解析的数据生成 job_config / map_config / event_config
+
+    Args:
+        parsed_data: parse_agv_instance() 的输出
+        uncertain_events: 可选的预生成不确定性事件时间线
+    """
     points = [{"point": {"id": pid, "coordinate": [x, y]}} for pid, x, y in parsed_data["points"]]
     links = [{"link": {"id": lid, "begin": p1, "end": p2}} for lid, p1, p2, _ in parsed_data["links"]]
     machines = [
@@ -269,21 +274,64 @@ def generate_instance_config(parsed_data: dict) -> dict:
             job_entry["job"]["operations"].append(op_entry)
         jobs_yaml.append(job_entry)
 
+    event_config = {
+        "event_type": [
+            "packet_factory.JUST_TEST",
+            "packet_factory.ENV_PAUSED",
+            "packet_factory.ENV_RECOVER",
+            "packet_factory.ENV_RESTART",
+            "packet_factory.AGV_FAIL",
+            "packet_factory.MACHINE_FAIL",
+            "packet_factory.JOB_ADD",
+        ]
+    }
+
+    # 如果有预生成的不确定性事件，注入 event_timeline
+    if uncertain_events:
+        event_config["event_timeline"] = [{"event": e} for e in uncertain_events]
+
     return {
-        "event_config": {
-            "event_type": [
-                "packet_factory.JUST_TEST",
-                "packet_factory.ENV_PAUSED",
-                "packet_factory.ENV_RECOVER",
-                "packet_factory.ENV_RESTART",
-                "packet_factory.AGV_FAIL",
-                "packet_factory.MACHINE_FAIL",
-                "packet_factory.JOB_ADD",
-            ]
-        },
+        "event_config": event_config,
         "job_config": {"jobs": jobs_yaml},
         "map_config": {"width": width, "height": height, "points": points, "machines": machines, "links": links, "agvs": agvs},
     }
+
+
+# ==================== 不确定性事件加载 ====================
+
+def load_uncertain_events_for_instance(instance_path: Path, scenario: str) -> Optional[List[dict]]:
+    """
+    加载与实例对应的不确定性事件数据
+
+    Args:
+        instance_path: AGV 实例文件路径（绝对路径，来自 DATA_DIR 的 glob 结果）
+        scenario: 场景名称
+
+    Returns:
+        event_timeline 列表，若不存在返回 None
+    """
+    from dataset import UNCERTAIN_EVENTS_DIR
+
+    instance_path = Path(instance_path)
+
+    # 解析相对路径
+    try:
+        relative = instance_path.relative_to(DATA_DIR)
+    except ValueError:
+        relative = instance_path
+
+    event_filename = instance_path.stem + "_events.json"
+    event_relative = relative.parent / event_filename
+
+    event_path = Path(UNCERTAIN_EVENTS_DIR) / scenario / event_relative
+
+    if not event_path.exists():
+        return None
+
+    with open(event_path, 'r', encoding='utf-8') as f:
+        data = json.load(f)
+
+    return data.get("event_timeline", [])
 
 
 def build_config(agent_key: str, instance_config: dict, base_yaml_path: Optional[str] = None, time_limit: int = 30) -> dict:
@@ -561,6 +609,12 @@ def run_benchmark(args):
 
                 instance_config = generate_instance_config(parsed)
 
+                # 加载不确定性事件（如果指定了场景）
+                if args.uncertain_scenario:
+                    uncertain_events = load_uncertain_events_for_instance(instance_file, args.uncertain_scenario)
+                    if uncertain_events:
+                        instance_config = generate_instance_config(parsed, uncertain_events=uncertain_events)
+
                 for run in range(1, num_runs + 1):
                     if _shutdown_requested:
                         break
@@ -672,6 +726,8 @@ def parse_args():
                         help="小规模实例的最大作业数阈值 (默认: 15)")
     parser.add_argument("--small-max-machines", type=int, default=10,
                         help="小规模实例的最大机器数阈值 (默认: 10)")
+    parser.add_argument("--uncertain-scenario", type=str, default=None,
+                        help="不确定性事件场景名（如 default, heavy），加载 dataset/uncertain-events/<scenario>/ 下的预生成事件数据")
 
     return parser.parse_args()
 
@@ -689,6 +745,8 @@ if __name__ == "__main__":
     logger.info(f"Backend Log Level: {args.backend_log_level.upper()}")
     if args.small_only:
         logger.info(f"Small-only mode: max_jobs={args.small_max_jobs}, max_machines={args.small_max_machines}")
+    if args.uncertain_scenario:
+        logger.info(f"Uncertain scenario: {args.uncertain_scenario}")
     if args.config_yaml:
         logger.info(f"Base YAML: {args.config_yaml}")
     logger.info("=" * 60)

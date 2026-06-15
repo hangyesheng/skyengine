@@ -1,0 +1,75 @@
+{
+  "source_instance": "hurink\\vdata\\orb8_agv.txt",
+  "instance_info": {
+    "job_count": 10,
+    "machine_count": 10,
+    "agv_count": 5,
+    "estimated_makespan": 573
+  },
+  "generation_config": {
+    "seed": 6964,
+    "machine_fail_prob": 0.15,
+    "agv_fail_prob": 0.1,
+    "job_add_prob": 0.05,
+    "machine_fail_duration_range": [
+      3,
+      10
+    ],
+    "agv_fail_duration_range": [
+      2,
+      8
+    ],
+    "timeline_span_ratio": 0.8,
+    "min_events": 2
+  },
+  "event_counts": {
+    "machine_fail_trigger": 1,
+    "machine_fail_recover": 1,
+    "agv_fail_trigger": 1,
+    "agv_fail_recover": 1,
+    "job_add": 0,
+    "total": 4
+  },
+  "event_timeline": [
+    {
+      "timestamp": 110.26,
+      "type": "packet_factory.AGV_FAIL",
+      "args": [
+        "trigger",
+        {
+          "id": 5
+        }
+      ]
+    },
+    {
+      "timestamp": 112.57,
+      "type": "packet_factory.AGV_FAIL",
+      "args": [
+        "recover",
+        {
+          "id": 5
+        }
+      ]
+    },
+    {
+      "timestamp": 148.36,
+      "type": "packet_factory.MACHINE_FAIL",
+      "args": [
+        "trigger",
+        {
+          "id": 4
+        }
+      ]
+    },
+    {
+      "timestamp": 151.81,
+      "type": "packet_factory.MACHINE_FAIL",
+      "args": [
+        "recover",
+        {
+          "id": 4
+        }
+      ]
+    }
+  ]
+}
