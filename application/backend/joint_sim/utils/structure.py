@@ -10,7 +10,7 @@
 
 from dataclasses import dataclass
 from typing import List, Dict, Tuple, Optional
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ConfigDict
 from enum import Enum
 
 
@@ -156,9 +156,7 @@ class RoutingTask(BaseModel):
         """为动态任务分配目标，并更新状态"""
         object.__setattr__(self, "destination", dest)
 
-    class Config:
-        frozen = False  # 允许修改属性
-        validate_assignment = True  # 修改时自动类型校验
+    model_config = ConfigDict(frozen=False, validate_assignment=True)
 
 
 class AGV(BaseModel):

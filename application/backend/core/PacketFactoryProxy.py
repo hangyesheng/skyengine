@@ -228,6 +228,19 @@ class PacketFactoryProxy(BaseFactoryProxy):
             )
             return JSONResponse({"success": True})
 
+        # ========== 拓扑 & 状态路由 (3D 可视化) ==========
+        @RouteRegistry.register_route("/map/topology", method="GET")
+        async def api_map_topology():
+            """返回当前环境的图拓扑数据 (points, links, machines, agvs)"""
+            topology = RouteRegistry._current_backend_core.get_topology()
+            return JSONResponse(topology)
+
+        @RouteRegistry.register_route("/map/state", method="GET")
+        async def api_map_state():
+            """返回当前环境状态快照 (AGV 位置, 机器状态)"""
+            snapshot = RouteRegistry._current_backend_core.get_state_snapshot()
+            return JSONResponse(snapshot)
+
         @RouteRegistry.register_route("/factory/list", method="GET")
         async def api_factory_list():
             # 从内存中读取配置列表
