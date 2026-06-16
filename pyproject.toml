@@ -36,7 +36,19 @@ dependencies = [
 ]
 
 [tool.uv]
-override-dependencies = ["pydantic>=1.10.13,<2.0.0"]
+# pogema-toolbox 强制 pydantic<=1.9.1，但 fastapi 0.115+ 需要 pydantic v2。
+# pogema-toolbox 仅在 dataset/map_dataset/pogema-benchmark-main/ 中使用，
+# 实际兼容 pydantic v2，因此覆盖其约束以解锁 pydantic v2 + 最新 fastapi。
+override-dependencies = [
+    "pydantic>=2.0",
+    "matplotlib>=3.8.3",
+    "pyyaml>=6.0.1",
+]
+
+[[tool.uv.index]]
+name = "tuna"
+url = "https://pypi.tuna.tsinghua.edu.cn/simple"
+default = true
 
 [[tool.uv.index]]
 name = "pytorch-cu129"

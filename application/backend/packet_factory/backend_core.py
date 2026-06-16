@@ -486,7 +486,20 @@ class BackendCore:
         if self.env is None:
             return []
         agvs: List[AGV] = self.env.getAGVs()
-        agv_list = [{"id": agv.id} for agv in agvs]
+        agv_list = []
+        for agv in agvs:
+            info = {"id": agv.id}
+            if hasattr(agv, 'pack'):
+                info = agv.pack()
+            else:
+                info.update({
+                    "x": getattr(agv, 'x', 0),
+                    "y": getattr(agv, 'y', 0),
+                    "point_id": getattr(agv, 'point_id', -1),
+                    "status": getattr(agv, 'status', 'READY'),
+                    "velocity": getattr(agv, 'velocity', 0),
+                })
+            agv_list.append(info)
         return agv_list
 
     def pause_agv(self, agv_id):
@@ -503,7 +516,19 @@ class BackendCore:
         if self.env is None:
             return []
         machines: List[Machine] = self.env.getMachines()
-        machine_list = [{"id": machine.id} for machine in machines]
+        machine_list = []
+        for machine in machines:
+            info = {"id": machine.id}
+            if hasattr(machine, 'pack'):
+                info = machine.pack()
+            else:
+                info.update({
+                    "x": getattr(machine, 'x', 0),
+                    "y": getattr(machine, 'y', 0),
+                    "point_id": getattr(machine, 'point_id', -1),
+                    "status": getattr(machine, 'status', 'READY'),
+                })
+            machine_list.append(info)
         return machine_list
 
     def pause_machine(self, machine_id):
@@ -725,3 +750,99 @@ class BackendCore:
             gantt_data.append(machine_info)
         
         return {"machines": gantt_data}
+
+    def get_topology(self) -> dict:
+        """
+        返回当前环境的图拓扑数据，用于 3D 可视化。
+        包含：点 (坐标)、边 (连接关系)、机器 (绑定点)、AGV (初始位置)。
+        """
+        if self.env is None:
+            return {"points": [], "links": [], "machines": [], "agvs": [],
+                    "gridWidth": 0, "gridHeight": 0, "timeline": 0}
+
+        graph = self.env.getGraph()
+        points = []
+        for p in graph.points:
+            points.append({
+                "id": p.id,
+                "x": p.x,
+                "y": p.y,
+            })
+
+        links = []
+        for link in graph.links:
+            links.append({
+                "id": link.id,
+                "source": link.point1,
+                "target": link.point2,
+                "weight": link.weight,
+            })
+
+        machines = self.get_machines()
+        agvs = self.get_agvs()
+
+        # 从点坐标范围推算网格尺寸（向上取整 + 边距）
+        xs = [p["x"] for p in points]
+        ys = [p["y"] for p in points]
+        grid_width = int(max(xs)) + 2 if xs else 0
+        grid_height = int(max(ys)) + 2 if ys else 0
+
+        return {
+            "points": points,
+            "links": links,
+            "machines": machines,
+            "agvs": agvs,
+            "gridWidth": grid_width,
+            "gridHeight": grid_height,
+            "timeline": self.env.env_timeline,
+        }
+
+    def get_state_snapshot(self) -> dict:
+        """
+        返回当前环境状态快照，用于 3D 可视化实时更新。
+        格式与 grid_factory 的 SSE state frame 兼容。
+        """
+        if self.env is None:
+            return {"grid_state": {"positions_xy": [], "is_active": []},
+                    "machines": {}, "timeline": 0, "status": "idle"}
+
+        agvs = self.env.getAGVs()
+        positions_xy = [[agv.x, agv.y] for agv in agvs]
+        # AGV 状态映射: READY=空闲, 其余=活跃
+        from executor.packet_factory.packet_factory.packet_factory_env.Agv.AGV import AGVStatus
+        is_active = [getattr(agv, 'status', AGVStatus.READY) != AGVStatus.READY
+                     for agv in agvs]
+
+        machines = self.env.getMachines()
+        machine_states = {}
+        for m in machines:
+            status_str = str(getattr(m, 'status', 'READY'))
+            # 映射 PacketFactory 的状态名到前端期望的格式
+            status_map = {
+                'READY': 'IDLE', 'WORKING': 'WORKING',
+                'FAILED': 'BROKEN', 'EXCEPTION': 'MAINTENANCE',
+            }
+            mapped_status = status_map.get(status_str, 'IDLE')
+            # 计算加工进度
+            progress = 0
+            if hasattr(m, 'input_queue') and m.input_queue:
+                current_op = m.input_queue[0]
+                if hasattr(current_op, 'process_time') and hasattr(current_op, 'durations'):
+                    if current_op.durations:
+                        max_time = max(d[1] for d in current_op.durations)
+                        progress = int((current_op.process_time / max_time) * 100) if max_time > 0 else 0
+            # key 使用 "M{id}" 格式，与前端 convertTopologyFor3D 中的 key 一致
+            machine_states[f"M{m.id}"] = {
+                "status": mapped_status,
+                "progress": progress,
+            }
+
+        return {
+            "grid_state": {
+                "positions_xy": positions_xy,
+                "is_active": is_active,
+            },
+            "machines": machine_states,
+            "timeline": self.env.env_timeline,
+            "status": "running" if self.is_factory_alive() else "finished",
+        }
