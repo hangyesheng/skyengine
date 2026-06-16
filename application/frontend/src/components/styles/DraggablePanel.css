@@ -140,7 +140,7 @@
 .dp-body {
   flex: 1;
   overflow-y: auto;
-  overflow-x: hidden;
+  overflow-x: auto;
   color: rgba(200, 220, 255, 0.85);
   font-size: 12px;
 }
@@ -148,6 +148,7 @@
 /* 滚动条 */
 .dp-body::-webkit-scrollbar {
   width: 4px;
+  height: 4px;
 }
 
 .dp-body::-webkit-scrollbar-track {
@@ -163,6 +164,10 @@
   background: rgba(100, 180, 255, 0.35);
 }
 
+.dp-body::-webkit-scrollbar-corner {
+  background: transparent;
+}
+
 /* 折叠态提示 */
 .dp-collapsed-hint {
   padding: 6px 10px;
@@ -172,6 +177,56 @@
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+/* 缩放中 */
+.draggable-panel.resizing {
+  border-color: rgba(100, 180, 255, 0.4);
+  box-shadow:
+    0 8px 40px rgba(0, 0, 0, 0.5),
+    0 0 16px rgba(100, 180, 255, 0.18),
+    inset 0 1px 0 rgba(255, 255, 255, 0.1);
+  transition: none;
+}
+
+/* 缩放手柄 — 右下角斜线三角 */
+.dp-resize-handle {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  width: 18px;
+  height: 18px;
+  cursor: nwse-resize;
+  z-index: 20;
+}
+
+.dp-resize-handle::before,
+.dp-resize-handle::after {
+  content: '';
+  position: absolute;
+  right: 4px;
+  border-style: solid;
+  border-color: rgba(100, 180, 255, 0.35);
+}
+
+/* 三条小斜线 */
+.dp-resize-handle::before {
+  bottom: 4px;
+  border-width: 0 0 1.5px 1.5px;
+  width: 10px;
+  height: 10px;
+}
+
+.dp-resize-handle::after {
+  bottom: 8px;
+  border-width: 0 0 1px 1px;
+  width: 6px;
+  height: 6px;
+}
+
+.dp-resize-handle:hover::before,
+.dp-resize-handle:hover::after {
+  border-color: rgba(100, 180, 255, 0.7);
 }
 
 /* ============================================================

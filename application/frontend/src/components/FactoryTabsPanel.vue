@@ -7,6 +7,7 @@
     :height="480"
     :initial-pos="{ x: 12, y: 12 }"
     :max-height="0"
+    :resizable="true"
     @close="$emit('update:showPanel', false)"
   >
     <!-- Tab 栏 -->

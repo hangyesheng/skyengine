@@ -19,20 +19,23 @@
     
     <div v-else class="gantt-content" ref="ganttContentRef">
       <!-- 时间轴 -->
-      <div class="timeline-axis">
-        <div 
-          v-for="(tick, index) in timeTicks" 
-          :key="index"
-          class="time-tick"
-          :style="{ left: tick.position + '%' }"
-        >
-          {{ tick.label }}
+      <div class="timeline-row">
+        <div class="resource-label timeline-spacer"></div>
+        <div class="timeline-axis">
+          <div
+            v-for="(tick, index) in timeTicks"
+            :key="index"
+            class="time-tick"
+            :style="{ left: tick.position + '%' }"
+          >
+            {{ tick.label }}
+          </div>
         </div>
       </div>
-      
+
       <!-- 资源行 -->
-      <div 
-        v-for="resource in resources" 
+      <div
+        v-for="resource in resources"
         :key="resource.id"
         class="resource-row"
       >
@@ -149,17 +152,22 @@ const resources = computed(() => {
 
 // 检查是否有数据
 const hasData = computed(() => {
-  return resources.value.some(resource => resource.operations && resource.operations.length > 0);
+  return resources.value.some(resource => {
+    const hasOps = resource.operations && resource.operations.length > 0;
+    const hasEmptyMoves = resource.empty_moves && resource.empty_moves.length > 0;
+    return hasOps || hasEmptyMoves;
+  });
 });
 
-// 计算时间范围
+// 计算时间范围（同时考虑 operations 和 empty_moves）
 const timeRange = computed(() => {
   let minTime = Infinity;
   let maxTime = 0;
-  
+
   resources.value.forEach(resource => {
-    if (resource.operations) {
-      resource.operations.forEach(op => {
+    const processItems = (items) => {
+      if (!items) return;
+      items.forEach(op => {
         if (op.start_time !== null && op.start_time !== undefined) {
           minTime = Math.min(minTime, op.start_time);
         }
@@ -167,13 +175,15 @@ const timeRange = computed(() => {
           maxTime = Math.max(maxTime, op.end_time);
         }
       });
-    }
+    };
+    processItems(resource.operations);
+    processItems(resource.empty_moves);
   });
-  
+
   if (minTime === Infinity || maxTime === 0) {
     return { min: 0, max: 100 };
   }
-  
+
   // 添加5%的边距
   const padding = (maxTime - minTime) * 0.05;
   return {
@@ -280,8 +290,10 @@ onUnmounted(() => {
   padding: 15px;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
   height: 100%;
+  min-height: 0;
   display: flex;
   flex-direction: column;
+  overflow: hidden;
 }
 
 .gantt-header {
@@ -317,17 +329,26 @@ onUnmounted(() => {
   flex: 1;
   overflow: auto;
   position: relative;
-  min-height: 200px;
+  min-height: 0;
+}
+
+.timeline-row {
+  display: flex;
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  background: white;
+  border-bottom: 1px solid #dcdfe6;
+}
+
+.timeline-spacer {
+  height: 30px;
 }
 
 .timeline-axis {
-  position: sticky;
-  top: 0;
-  background: white;
+  flex: 1;
+  position: relative;
   height: 30px;
-  border-bottom: 1px solid #dcdfe6;
-  margin-left: 100px;
-  z-index: 10;
 }
 
 .time-tick {
