@@ -742,6 +742,11 @@ experiment/data/*
 sky_logs/metrics/*
 sky_logs/renders/*
 
+# PacketFactory logs
+training_logs/*
+benchmark_plots/*
+benchmark_results/*
+
 # Claude Code local settings (含本地路径和权限信息)
 .claude/settings.local.json
 
