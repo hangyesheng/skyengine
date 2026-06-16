@@ -16,6 +16,7 @@
         @update:show-grid="$emit('update:show-grid', $event)"
         @update:show-labels="$emit('update:show-labels', $event)"
         @update:show-status="$emit('update:show-status', $event)"
+        @edit-mode-change="$emit('edit-mode-change', $event)"
       >
         <slot name="config-extra"></slot>
       </ConfigPanel>
@@ -23,6 +24,8 @@
       <MetricsPanel :show-chart="showChart">
         <slot name="metrics-extra"></slot>
       </MetricsPanel>
+
+      <AgentPanel />
 
       <EventPanel :title="eventPanelTitle" />
     </div>
@@ -34,6 +37,7 @@ import { ref } from 'vue'
 import ConfigPanel from './ConfigPanel.vue'
 import MetricsPanel from './MetricsPanel.vue'
 import EventPanel from './EventPanel.vue'
+import AgentPanel from './AgentPanel.vue'
 
 const configPanelRef = ref(null)
 
@@ -61,6 +65,7 @@ defineEmits([
   'update:show-grid',
   'update:show-labels',
   'update:show-status',
+  'edit-mode-change',
 ])
 
 // 暴露 ConfigPanel 的方法

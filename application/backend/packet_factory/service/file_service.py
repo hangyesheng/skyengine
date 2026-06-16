@@ -12,6 +12,9 @@ import application.backend.packet_factory.config_set as config_set
 import application.backend.packet_factory.config as config
 import executor.packet_factory.logger.backend_logs as BACKEND_LOGGER
 import executor.packet_factory.logger.system_logs as SYSTEM_LOGGER
+import logging
+
+logger = logging.getLogger(__name__)
 
 def get_config_set_dir():
     return config_set.dir_path

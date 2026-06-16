@@ -1,33 +1,45 @@
+/* ============================================================
+   RightSidePanel — 暗色玻璃风格
+   ============================================================ */
+
 .right-side-panel {
-  width: 340px;
+  width: 380px;
   height: 100%;
   display: flex;
   flex-direction: column;
   flex-shrink: 0;
   box-sizing: border-box;
-  /* 移除 overflow-y: auto，由内部 panel-content 负责滚动 */
-  overflow: hidden; 
+  overflow: hidden;
+  background: rgba(10, 14, 28, 0.72);
+  backdrop-filter: blur(16px) saturate(1.4);
+  -webkit-backdrop-filter: blur(16px) saturate(1.4);
+  border-left: 1px solid rgba(100, 180, 255, 0.12);
 }
 
 .panel-content {
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 12px;
   flex: 1;
-  min-height: 0; 
-  padding: 12px 12px 20px 8px; /* 留出阴影空间 */
+  min-height: 0;
+  padding: 10px 10px 16px 8px;
   overflow-y: auto;
   overflow-x: hidden;
 }
 
-/* 滚动条美化 */
 .panel-content::-webkit-scrollbar {
-  width: 6px;
+  width: 4px;
 }
+
 .panel-content::-webkit-scrollbar-track {
   background: transparent;
 }
+
 .panel-content::-webkit-scrollbar-thumb {
-  background: #ccc;
-  border-radius: 3px;
+  background: rgba(100, 180, 255, 0.15);
+  border-radius: 2px;
+}
+
+.panel-content::-webkit-scrollbar-thumb:hover {
+  background: rgba(100, 180, 255, 0.25);
 }
