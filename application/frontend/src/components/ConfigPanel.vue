@@ -5,6 +5,110 @@
     </div>
 
     <div class="panel-content">
+      <!-- ===== 数据源 ===== -->
+      <div class="section-block">
+        <div class="section-title"><i class="el-icon-folder-opened"></i> 数据源</div>
+
+        <!-- FJSP 任务选择 -->
+        <div class="data-source-row">
+          <label>任务实例</label>
+          <div class="data-source-selects">
+            <el-select
+              v-model="selectedFjspCategory"
+              placeholder="选择类别"
+              size="small"
+              @change="onFjspCategoryChange"
+            >
+              <el-option
+                v-for="cat in fjspCategories"
+                :key="cat"
+                :label="cat"
+                :value="cat"
+              />
+            </el-select>
+            <el-select
+              v-model="selectedFjspInstance"
+              placeholder="选择实例"
+              size="small"
+              filterable
+            >
+              <el-option
+                v-for="inst in currentFjspInstances"
+                :key="inst"
+                :label="inst"
+                :value="inst"
+              />
+            </el-select>
+          </div>
+        </div>
+
+        <!-- MAPF 地图选择 -->
+        <div class="data-source-row">
+          <label>地图</label>
+          <div class="data-source-selects">
+            <el-select
+              v-model="selectedMapCategory"
+              placeholder="选择类别"
+              size="small"
+              @change="onMapCategoryChange"
+            >
+              <el-option
+                v-for="cat in mapCategories"
+                :key="cat"
+                :label="cat"
+                :value="cat"
+              />
+            </el-select>
+            <el-select
+              v-model="selectedMapName"
+              placeholder="选择地图"
+              size="small"
+              filterable
+            >
+              <el-option
+                v-for="m in currentMapNames"
+                :key="m"
+                :label="m"
+                :value="m"
+              />
+            </el-select>
+          </div>
+        </div>
+
+        <!-- 参数 -->
+        <div class="data-source-row data-source-params">
+          <div class="param-item">
+            <label>AGV 数量</label>
+            <el-input-number v-model="numAgvs" :min="1" :max="20" size="small" controls-position="right" />
+          </div>
+          <div class="param-item">
+            <label>随机种子</label>
+            <el-input-number v-model="seed" :min="0" size="small" controls-position="right" />
+          </div>
+        </div>
+
+        <!-- 生成 / 导出按钮 -->
+        <div class="action-buttons">
+          <el-button size="small" :disabled="!canGenerate && !isGenerating" @click="resetDataSource"> ✕ 重置</el-button>
+          <el-button
+            size="small"
+            :disabled="!store.currentConfig"
+            @click="exportConfig"
+          >
+            📤 导出配置
+          </el-button>
+          <el-button
+            size="small"
+            type="primary"
+            :loading="isGenerating"
+            :disabled="!canGenerate"
+            @click="generateConfig"
+          >
+            {{ isGenerating ? '生成中...' : '✓ 生成配置' }}
+          </el-button>
+        </div>
+      </div>
+
       <!-- ===== 生产线配置管理 ===== -->
       <div class="section-block">
         <div class="section-title"><i class="el-icon-upload"></i> 生产线配置管理</div>
@@ -108,80 +212,28 @@
         </div>
       </div>
 
-      <!-- ===== 工厂节点资产 ===== -->
-      <div class="section-block flex-grow">
-        <div class="section-title">
-          <i class="el-icon-s-grid"></i>
-          工厂资产
-          <el-tooltip content="包含逻辑节点与物理设备" placement="top">
-            <span class="info-icon">ⓘ</span>
-          </el-tooltip>
-        </div>
-
-        <!-- 资产统计 -->
-        <div v-if="store.currentConfigId" class="assets-stats">
-          <div class="stat-item">
-            <span class="stat-label">区域:</span>
-            <span class="stat-value">{{ assetsStats.zoneCount }}</span>
-          </div>
-          <div class="stat-item">
-            <span class="stat-label">机器:</span>
-            <span class="stat-value">{{ assetsStats.machineCount }}</span>
-          </div>
-          <div class="stat-item">
-            <span class="stat-label">路由点:</span>
-            <span class="stat-value">{{ assetsStats.waypointCount }}</span>
-          </div>
-          <div class="stat-item">
-            <span class="stat-label">总计:</span>
-            <span class="stat-value">{{ assetsStats.totalAssets }}</span>
-          </div>
-        </div>
-
-        <!-- 资产列表 -->
-        <div class="services-list-container">
-          <div v-if="assetsList.length === 0" class="empty-state">
-            <div class="empty-icon">📦</div>
-            <p>请先选择或上传配置文件</p>
-          </div>
-          <ul v-else class="services-list">
-            <li
-              v-for="(asset, index) in assetsList"
-              :key="index"
-              class="service-item"
-              :class="`asset-type-${asset.type}`"
-            >
-              <el-tooltip placement="left" :open-delay="500" effect="dark">
-                <template #content>
-                  <div class="tooltip-content">{{ asset.description }}</div>
-                </template>
-                <div
-                  class="draggable-node"
-                  draggable="true"
-                  @dragstart="onDragStart($event, asset)"
-                >
-                  <span class="node-icon">{{ asset.icon }}</span>
-                  <span class="node-name">{{ asset.name }}</span>
-                  <span class="drag-handle">⋮⋮</span>
-                </div>
-              </el-tooltip>
-            </li>
-          </ul>
-        </div>
-      </div>
+      <!-- ===== 工厂资产（独立组件） ===== -->
+      <FactoryAssetPanel @edit-mode-change="onEditModeChange" />
     </div>
   </div>
 </template>
 
 <script setup>
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { ElMessage } from 'element-plus'
 import { useFactoryStore } from '@/stores/factory'
 import { validateAndNormalizeConfig } from '@/utils/configValidator'
 import { apiPost, API_ROUTES } from '@/utils/api'
+import FactoryAssetPanel from './FactoryAssetPanel.vue'
 
 // --- Store ---
 const store = useFactoryStore()
+
+// --- Emits (向上传递编辑模式状态) ---
+const emit = defineEmits(['edit-mode-change'])
+function onEditModeChange(val) {
+  emit('edit-mode-change', val)
+}
 
 // --- Props & Emits ---
 const props = defineProps({
@@ -204,25 +256,32 @@ const isLoading = ref(false)
 const validationError = ref(null)
 const successMessage = ref(null)
 
+// --- 数据源 State ---
+const isGenerating = ref(false)
+
+const selectedFjspCategory = ref(null)
+const selectedFjspInstance = ref(null)
+const selectedMapCategory = ref(null)
+const selectedMapName = ref(null)
+const numAgvs = ref(4)
+const seed = ref(42)
+
+const fjspCategories = computed(() => Object.keys(store.datasetList?.fjsp_instances || {}))
+const currentFjspInstances = computed(() =>
+  (store.datasetList?.fjsp_instances || {})[selectedFjspCategory.value] || [],
+)
+const mapCategories = computed(() => Object.keys(store.datasetList?.mapf_maps || {}))
+const currentMapNames = computed(() =>
+  (store.datasetList?.mapf_maps || {})[selectedMapCategory.value] || [],
+)
+const canGenerate = computed(() => selectedFjspInstance.value && selectedMapName.value)
+
 // --- Computed ---
 const loadedConfigs = computed(() => {
   return Object.values(store.factoryConfigs || {})
 })
 
 const currentConfigId = computed(() => store.currentConfigId)
-
-// 动态生成工厂资产列表（根据当前选中的配置）
-const assetsList = computed(() => {
-  if (!store.currentConfigId) {
-    return []
-  }
-  return store.formatAssetsList()
-})
-
-// 资产统计信息
-const assetsStats = computed(() => {
-  return store.getAssetsStats()
-})
 
 // --- Methods ---
 function handleFileSelect(event) {
@@ -364,6 +423,13 @@ function downloadTemplate() {
           size: [2, 2],
           status: 'IDLE',
         },
+        MACHINE_2: {
+          id: 'MACHINE_2',
+          name: '机器 02',
+          location: [10, 5],
+          size: [2, 2],
+          status: 'IDLE',
+        },
       },
       waypoints: {
         WP_1: { location: [1, 1], type: 'dock', name: '上货点' },
@@ -387,6 +453,22 @@ function downloadTemplate() {
         status: 'IDLE',
       },
     ],
+    // 任务配置示例
+    jobs: {
+      job_list: [
+        {
+          job_id: 0,
+          name: '示例任务-01',
+          operations: [
+            { machine_id: 0, duration: 5, name: '工序1-加工' },
+            { machine_id: 1, duration: 3, name: '工序2-组装' },
+          ],
+          arrival_time: 0,
+          due_time: 50,
+          priority: 1,
+        },
+      ],
+    },
     renderConfig: {
       baseGridSize: 40,
       colors: {},
@@ -406,17 +488,104 @@ function downloadTemplate() {
   ElMessage.success('模板下载成功')
 }
 
+// --- 数据源 Methods ---
+function resetDataSource() {
+  selectedFjspCategory.value = null
+  selectedFjspInstance.value = null
+  selectedMapCategory.value = null
+  selectedMapName.value = null
+  numAgvs.value = 4
+  seed.value = 42
+}
+
+function onFjspCategoryChange(cat) {
+  selectedFjspInstance.value = null
+  const instances = (store.datasetList?.fjsp_instances || {})[cat]
+  if (instances && instances.length > 0) {
+    selectedFjspInstance.value = instances[0]
+  }
+}
+
+function onMapCategoryChange(cat) {
+  selectedMapName.value = null
+  const names = (store.datasetList?.mapf_maps || {})[cat]
+  if (names && names.length > 0) {
+    selectedMapName.value = names[0]
+  }
+}
+
+async function loadDatasets() {
+  try {
+    await store.fetchDatasets()
+  } catch (e) {
+    console.error('加载数据集失败:', e)
+  }
+}
+
+async function generateConfig() {
+  if (!canGenerate.value) return
+  isGenerating.value = true
+  validationError.value = null
+  successMessage.value = null
+  try {
+    const { config } = await apiPost(API_ROUTES.DATASET_GENERATE, {
+      fjsp_category: selectedFjspCategory.value,
+      fjsp_instance: selectedFjspInstance.value,
+      map_category: selectedMapCategory.value,
+      map_name: selectedMapName.value,
+      num_agvs: numAgvs.value,
+      seed: seed.value,
+    })
+    // 1. 清空旧配置，保存到前端 Store
+    store.factoryConfigs = {}
+    store.reset()
+    store.loadConfigFromFile(config)
+    store.initializeAGVs()
+    // 2. 上传到后端
+    const response = await apiPost(API_ROUTES.FACTORY_CONFIG_UPLOAD, {
+      filename: `${config.id || 'generated'}.json`,
+      config: config,
+    })
+    if (response.status !== 'ok') {
+      throw new Error(response.message || '后端同步失败')
+    }
+    successMessage.value = `配置生成成功: ${config.name || config.id}`
+    setTimeout(() => {
+      successMessage.value = null
+    }, 3000)
+  } catch (e) {
+    validationError.value = `生成失败: ${e.message}`
+  } finally {
+    isGenerating.value = false
+  }
+}
+
+onMounted(() => {
+  loadDatasets()
+})
+
+function exportConfig() {
+  const config = store.exportCurrentConfig()
+  if (!config) {
+    ElMessage.warning('没有可导出的配置')
+    return
+  }
+  const dataStr = JSON.stringify(config, null, 2)
+  const blob = new Blob([dataStr], { type: 'application/json' })
+  const url = URL.createObjectURL(blob)
+  const link = document.createElement('a')
+  link.href = url
+  link.download = `${config.id || 'factory_config'}.json`
+  link.click()
+  URL.revokeObjectURL(url)
+  ElMessage.success('配置已导出')
+}
+
 /**
  * 暴露给父组件的方法
  */
 function getSelectedFile() {
   return selectedFile.value
-}
-
-// --- Drag Logic ---
-const onDragStart = (event, service) => {
-  event.dataTransfer.setData('application/node-data', JSON.stringify(service))
-  event.dataTransfer.effectAllowed = 'copy'
 }
 
 // 暴露方法给父组件

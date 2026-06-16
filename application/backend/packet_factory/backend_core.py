@@ -19,6 +19,9 @@ from application.backend.packet_factory.service import file_service
 
 from executor.packet_factory.logger.logger import Logger
 from executor.packet_factory.packet_factory.Agent.BaseAgent import FRONTEND, BACKEND, TRAINING, INFERENCE
+import logging
+
+logger = logging.getLogger(__name__)
 
 # 训练间隔：每隔多少步调用一次 agent.train()
 # 避免每步都训练导致性能瓶颈（尤其是 GraphDPAgent 的 rewalk 开销随 episode 增长）
@@ -461,18 +464,22 @@ class BackendCore:
 
     def factory_start(self):
         if self.env is not None and self.env.env_visualizer is not None:
+            logger.info("factory_start")
             self.env.env_visualizer.run()
 
     def factory_pause(self):
         if self.env is not None and self.env.env_visualizer is not None:
+            logger.info("factory_pause")
             self.env.env_visualizer.pause()
 
     def factory_reset(self):
         if self.env is not None and self.env.env_visualizer is not None:
+            logger.info("factory_reset")
             self.env.env_visualizer.restart()
 
     def change_factory_speed(self, speed_level: int):
         if self.env is not None and self.env.env_visualizer is not None:
+            logger.info(f"change_factory_speed: {speed_level}")
             self.env.env_visualizer.change_speed(speed_level)
 
     def get_agvs(self):
@@ -484,10 +491,12 @@ class BackendCore:
 
     def pause_agv(self, agv_id):
         if self.env is not None and self.env.env_visualizer is not None:
+            logger.info("pause_agv")
             self.env.env_visualizer.pause_agv(agv_id)
 
     def resume_agv(self, agv_id):
         if self.env is not None and self.env.env_visualizer is not None:
+            logger.info("resume_agv")
             self.env.env_visualizer.resume_agv(agv_id)
 
     def get_machines(self):
@@ -499,10 +508,12 @@ class BackendCore:
 
     def pause_machine(self, machine_id):
         if self.env is not None and self.env.env_visualizer is not None:
+            logger.info("pause_machine")
             self.env.env_visualizer.pause_machine(machine_id)
 
     def resume_machine(self, machine_id):
         if self.env is not None and self.env.env_visualizer is not None:
+            logger.info("resume_machine")
             self.env.env_visualizer.resume_machine(machine_id)
 
     def get_job_templates(self):
@@ -514,6 +525,7 @@ class BackendCore:
 
     def add_job(self, job_id: int):
         if self.env is not None and self.env.env_visualizer is not None:
+            logger.info(f"Job {job_id} added")
             self.env.env_visualizer.add_job(job_id)
 
     def get_jobs_progress(self):
@@ -597,7 +609,7 @@ class BackendCore:
         try:
             pic = self.env.env_visualizer.get_map()
         except Exception as e:
-            print(e)
+            logger.debug(f"get_map_current failed: {e}")
         return pic
 
     def get_gantt_agv_data(self) -> dict:

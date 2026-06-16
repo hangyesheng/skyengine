@@ -1,19 +1,158 @@
 import { defineStore } from "pinia";
-import { ref, computed } from "vue";
+import { ref, computed, nextTick } from "vue";
+import { ZONE_COLORS } from "@/utils/assets";
+import { apiGet, API_ROUTES } from "@/utils/api";
+
+// ─────────────────────────────────────────────
+// 常量
+// ─────────────────────────────────────────────
+
+/** 将 Three.js 十六进制颜色转为 CSS rgba 字符串 */
+function hexToRgba(hex, alpha = 0.15) {
+  const r = (hex >> 16) & 0xff;
+  const g = (hex >> 8) & 0xff;
+  const b = hex & 0xff;
+  return `rgba(${r},${g},${b},${alpha})`;
+}
+const STORAGE_KEYS = {
+  SELECTED_FACTORY: "selectedFactoryId",
+};
+
+const DEFAULT_RENDER_CONFIG = Object.freeze({
+  baseGridSize: 40,
+  gridWidth: 20,
+  gridHeight: 14,
+  colors: {},
+});
+
+// ─────────────────────────────────────────────
+// 资产模板注册表
+// ─────────────────────────────────────────────
+export const ASSET_TEMPLATES = Object.freeze({
+  zone_restricted: {
+    type: 'zone',
+    icon: '🔒',
+    name: '禁区',
+    template: { type: 'restricted', area: { x: 0, y: 0, w: 2, h: 2 }, color: hexToRgba(ZONE_COLORS.restricted) },
+  },
+  zone_workbench: {
+    type: 'zone',
+    icon: '🔧',
+    name: '工位',
+    template: { type: 'workbench', area: { x: 0, y: 0, w: 1, h: 1 }, color: hexToRgba(ZONE_COLORS.workbench) },
+  },
+  zone_obstacle: {
+    type: 'zone',
+    icon: '🚫',
+    name: '障碍物',
+    template: { type: 'obstacle', area: { x: 0, y: 0, w: 1, h: 1 }, color: hexToRgba(ZONE_COLORS.obstacle) },
+  },
+  zone_workarea: {
+    type: 'zone',
+    icon: '📦',
+    name: '工作区',
+    template: { type: 'workarea', area: { x: 0, y: 0, w: 3, h: 2 }, color: hexToRgba(ZONE_COLORS.workarea) },
+  },
+  machine: {
+    type: 'machine',
+    icon: '⚙️',
+    name: '加工机器',
+    template: { size: [2, 2], status: 'IDLE' },
+  },
+  waypoint_dock: {
+    type: 'waypoint',
+    icon: '🚪',
+    name: '停靠点',
+    template: { type: 'dock' },
+  },
+  waypoint_route: {
+    type: 'waypoint',
+    icon: '📍',
+    name: '路由点',
+    template: { type: 'route' },
+  },
+  agv: {
+    type: 'agv',
+    icon: '🤖',
+    name: 'AGV',
+    template: { velocity: 1.0, capacity: 100, status: 'IDLE' },
+  },
+  // ── 装饰资产（统一编码为 obstacle 区域） ──
+  decor_bollard: {
+    type: 'zone',
+    icon: '🔶',
+    name: '警示柱',
+    template: { type: 'obstacle', decor: 'bollard', area: { x: 0, y: 0, w: 1, h: 1 }, color: hexToRgba(ZONE_COLORS.obstacle) },
+  },
+  decor_rack: {
+    type: 'zone',
+    icon: '🗄️',
+    name: '储物架',
+    template: { type: 'obstacle', decor: 'rack', area: { x: 0, y: 0, w: 1, h: 1 }, color: hexToRgba(ZONE_COLORS.obstacle) },
+  },
+  decor_cabinet: {
+    type: 'zone',
+    icon: '🔌',
+    name: '配电箱',
+    template: { type: 'obstacle', decor: 'cabinet', area: { x: 0, y: 0, w: 1, h: 1 }, color: hexToRgba(ZONE_COLORS.obstacle) },
+  },
+  decor_barrier: {
+    type: 'zone',
+    icon: '🚧',
+    name: '安全隔离栏',
+    template: { type: 'obstacle', decor: 'barrier', area: { x: 0, y: 0, w: 3, h: 1 }, color: hexToRgba(ZONE_COLORS.obstacle) },
+  },
+});
+
+const EMPTY_GRID_STATE = Object.freeze({
+  env_timeline: "0",
+  grid_state: { positions_xy: [], is_active: [] },
+  machines: {},
+  active_transfers: [],
+});
+
+// ─────────────────────────────────────────────
+// 工具函数
+// ─────────────────────────────────────────────
 
 /**
- * 工厂管理和动画状态 (Unified Store)
- * 核心设计：所有动画帧都存储在 historyBuffer 中，无论是离线加载还是实时推送
+ * 构建工厂静态资源 URL。
+ * 使用 import.meta.url 确保 Vite 生产构建后路径依然有效。
  */
-
-// 辅助函数：动态获取资源路径
 function getAssetUrl(name) {
   if (!name) return "";
-  return `/src/assets/factories/${name}`;
+  return new URL(`../assets/factories/${name}`, import.meta.url).href;
 }
+
+/**
+ * 校验配置对象的必要字段，通过返回 true。
+ */
+function validateConfig(config) {
+  if (!config || typeof config !== "object") return false;
+  if (typeof config.id !== "string" || !config.id.trim()) return false;
+  return true;
+}
+
+/**
+ * 规范化快照，填充缺失字段，保证后续消费安全。
+ */
+function normalizeSnapshot(snapshot, fallbackIndex) {
+  return {
+    env_timeline:
+      snapshot.timestamp ?? snapshot.env_timeline ?? `T+${fallbackIndex}`,
+    grid_state: snapshot.grid_state ?? { positions_xy: [], is_active: [] },
+    machines: snapshot.machines ?? {},
+    active_transfers: snapshot.active_transfers ?? [],
+  };
+}
+
+// ─────────────────────────────────────────────
+// Store 定义
+// ─────────────────────────────────────────────
 export const useFactoryStore = defineStore("factory", () => {
-  // ============ 1. 工厂列表管理 (无需改动) ============
-  // 工厂列表
+  // ══════════════════════════════════════════
+  // 1. 工厂列表
+  // ══════════════════════════════════════════
   const factories = ref([
     {
       id: "packet_factory",
@@ -43,84 +182,91 @@ export const useFactoryStore = defineStore("factory", () => {
         "https://images.unsplash.com/photo-1454165804606-c3d57bc86b40?q=80&w=1000&auto=format&fit=crop",
       description: "地处西南核心制造区，拥有先进的铝材生产线。",
     },
+    {
+      id: "grid_factory_new",
+      name: "翼辉原料分拣仓 (容器化)",
+      image: getAssetUrl("grid_factory.jpg"),
+      description:
+        "Docker 容器化仿真引擎，算法按需启动，支持动态调度。",
+    },
   ]);
 
   const selectedFactoryId = ref(
-    localStorage.getItem("selectedFactoryId") || "packet_factory",
+    localStorage.getItem(STORAGE_KEYS.SELECTED_FACTORY) ?? "packet_factory",
   );
 
   const currentFactory = computed(() =>
-    factories.value.find((f) => f.id === selectedFactoryId.value),
+    factories.value.find((f) => f.id === selectedFactoryId.value) ?? null,
   );
 
-  const setCurrentFactory = (factoryId) => {
-    const factory = factories.value.find((f) => f.id === factoryId);
-    if (factory) {
-      selectedFactoryId.value = factoryId;
-      localStorage.setItem("selectedFactoryId", factoryId);
+  function getFactories() {
+    return factories.value;
+  }
+
+  function setCurrentFactory(factoryId) {
+    const exists = factories.value.some((f) => f.id === factoryId);
+    if (!exists) {
+      console.warn(`[FactoryStore] 未知工厂 ID: ${factoryId}`);
+      return;
     }
-  };
+    selectedFactoryId.value = factoryId;
+    localStorage.setItem(STORAGE_KEYS.SELECTED_FACTORY, factoryId);
+  }
 
-  const getFactories = () => factories.value;
+  // ══════════════════════════════════════════
+  // 2. 工厂配置管理
+  // ══════════════════════════════════════════
 
-  // ============ 1.5. 工厂配置管理 (Factory Configuration) ============
-  // 用户上传的工厂配置文件
+  /**
+   * 配置持久化到 localStorage，刷新后可恢复完整内容。
+   * 读取时做 validateConfig 二次校验，防止缓存数据损坏导致崩溃。
+   */
   const factoryConfigs = ref({});
-  // 当前选中的配置 ID
+
   const currentConfigId = ref(null);
+
+  /** 3D 重建提示：记录最近一次编辑操作的资产类型，供 watch 精准局部重建 */
+  const rebuildHint = ref(null);   // 'zone' | 'machine' | 'waypoint' | 'agv' | null
 
   const currentConfig = computed(() => {
     if (!currentConfigId.value) return null;
-    return factoryConfigs.value[currentConfigId.value];
+    return factoryConfigs.value[currentConfigId.value] ?? null;
   });
 
-  const currentTopologyConfig = computed(() => {
-    return currentConfig.value?.topology || null;
-  });
+  const currentTopologyConfig = computed(
+    () => currentConfig.value?.topology ?? null,
+  );
 
-  const currentRenderConfig = computed(() => {
-    return (
-      currentConfig.value?.renderConfig || {
-        baseGridSize: 40,
-        gridWidth: 20,
-        gridHeight: 14,
-        colors: {},
-      }
-    );
-  });
+  const currentRenderConfig = computed(
+    () => currentConfig.value?.renderConfig ?? { ...DEFAULT_RENDER_CONFIG },
+  );
 
   /**
-   * 加载工厂配置文件
-   * @param {Object} config - 验证过的配置对象
+   * 加载并激活一个外部配置文件对象。
+   * 会先做字段校验，失败时抛出错误而非静默写入。
    */
   function loadConfigFromFile(config) {
+    if (!validateConfig(config)) {
+      throw new Error(
+        "[FactoryStore] loadConfigFromFile: 无效配置，缺少 id 字段。",
+      );
+    }
     factoryConfigs.value[config.id] = config;
     currentConfigId.value = config.id;
-
-    // 可选：保存到 localStorage
-    localStorage.setItem("currentConfigId", config.id);
   }
 
-  /**
-   * 切换当前使用的配置
-   */
   function setCurrentConfig(configId) {
-    if (factoryConfigs.value[configId]) {
-      currentConfigId.value = configId;
-      localStorage.setItem("currentConfigId", configId);
+    if (!factoryConfigs.value[configId]) {
+      console.warn(`[FactoryStore] 未找到配置 ID: ${configId}`);
+      return;
     }
+    currentConfigId.value = configId;
   }
 
-  /**
-   * 获取所有已加载的配置
-   */
   function getLoadedConfigs() {
     return Object.values(factoryConfigs.value);
   }
 
-  /**
-   * 删除一个配置
-   */
   function deleteConfig(configId) {
     delete factoryConfigs.value[configId];
     if (currentConfigId.value === configId) {
@@ -129,346 +275,598 @@ export const useFactoryStore = defineStore("factory", () => {
   }
 
   /**
-   * 直接设置拓扑配置（用于从 JSON 加载或临时配置）
-   * @param {Object} topologyData - 拓扑数据 { zones, machines, waypoints, baseGridSize, gridWidth, gridHeight }
-   * @returns {string} 配置 ID
+   * 从拓扑数据对象直接构建完整配置并激活。
+   * @returns {string} 生成的配置 ID
    */
   function setCurrentTopologyConfig(topologyData) {
-    // 生成临时配置 ID（如果没有提供）
-    const configId = topologyData.id || `temp_config_${Date.now()}`;
+    const configId =
+      typeof topologyData.id === "string" && topologyData.id.trim()
+        ? topologyData.id
+        : `temp_config_${Date.now()}`;
 
-    // 创建完整的配置对象
     const completeConfig = {
       id: configId,
-      name: topologyData.name || "临时配置",
-      version: topologyData.version || "1.0",
+      name: topologyData.name ?? "临时配置",
+      version: topologyData.version ?? "1.0",
       timestamp: Date.now(),
       topology: {
-        zones: topologyData.zones || [],
-        machines: topologyData.machines || {},
-        waypoints: topologyData.waypoints || {},
-        gridWidth: topologyData.gridWidth || 20,
-        gridHeight: topologyData.gridHeight || 14,
+        zones: topologyData.zones ?? [],
+        machines: topologyData.machines ?? {},
+        waypoints: topologyData.waypoints ?? {},
+        gridWidth: topologyData.gridWidth ?? DEFAULT_RENDER_CONFIG.gridWidth,
+        gridHeight: topologyData.gridHeight ?? DEFAULT_RENDER_CONFIG.gridHeight,
       },
-      agvs: (topologyData.agvs || []).map((agv) => ({
+      agvs: (topologyData.agvs ?? []).map((agv) => ({
         id: agv.id,
-        name: agv.name || `AGV-${agv.id}`,
-        initialLocation: agv.initialLocation || [0, 0],
-        velocity: agv.velocity || 1.0,
-        capacity: agv.capacity || 100,
-        status: agv.status || "IDLE",
+        name: agv.name ?? `AGV-${agv.id}`,
+        initialLocation: agv.initialLocation ?? [0, 0],
+        velocity: agv.velocity ?? 1.0,
+        capacity: agv.capacity ?? 100,
+        status: agv.status ?? "IDLE",
       })),
       renderConfig: {
-        baseGridSize: topologyData.baseGridSize || 40,
-        gridWidth: topologyData.gridWidth || 20,
-        gridHeight: topologyData.gridHeight || 14,
-        colors: topologyData.colors || {},
+        baseGridSize:
+          topologyData.baseGridSize ?? DEFAULT_RENDER_CONFIG.baseGridSize,
+        gridWidth: topologyData.gridWidth ?? DEFAULT_RENDER_CONFIG.gridWidth,
+        gridHeight: topologyData.gridHeight ?? DEFAULT_RENDER_CONFIG.gridHeight,
+        colors: topologyData.colors ?? {},
       },
     };
 
-    // 存储到配置库
     factoryConfigs.value[configId] = completeConfig;
     currentConfigId.value = configId;
-
-    // 持久化当前配置 ID
-    localStorage.setItem("currentConfigId", configId);
 
     return configId;
   }
 
-  /**
-   * 获取当前配置中的 AGV 列表
-   * @returns {Array} AGV 配置数组
-   */
+  // ──────────────────────────────────────────
+  // 配置辅助查询
+  // ──────────────────────────────────────────
+
   function getAGVs() {
-    if (!currentConfig.value) {
-      return [];
-    }
-    return currentConfig.value.agvs || [];
+    return currentConfig.value?.agvs ?? [];
   }
 
-  /**
-   * 初始化 AGV 到动画系统（推送初始位置快照）
-   */
-  function initializeAGVs() {
-    const agvs = getAGVs();
-    if (agvs.length === 0) {
-      return;
-    }
-
-    // 创建初始快照，包含所有 AGV 的初始位置
-    const initialPositions = agvs.map((agv) => agv.initialLocation);
-    const initialActiveStates = agvs.map(() => true);
-
-    const initialSnapshot = {
-      timestamp: "T+0",
-      env_timeline: "0",
-      grid_state: {
-        positions_xy: initialPositions,
-        is_active: initialActiveStates,
-      },
-      machines: {},
-      active_transfers: [],
-    };
-
-    // 清除历史记录并推送初始帧
-    reset();
-    pushSnapshot(initialSnapshot);
-
-    console.log(`✅ 已初始化 ${agvs.length} 个 AGV`);
-  }
-
-  /**
-   * 获取当前配置中的所有资产（节点信息）
-   * @returns {Object} { zones, machines, waypoints }
-   */
   function getCurrentAssets() {
-    if (!currentConfig.value) {
-      return { zones: [], machines: {}, waypoints: {} };
-    }
     return (
-      currentConfig.value.topology || { zones: [], machines: {}, waypoints: {} }
+      currentConfig.value?.topology ?? {
+        zones: [],
+        machines: {},
+        waypoints: {},
+      }
     );
   }
 
-  /**
-   * 获取资产统计信息
-   * @returns {Object} 统计数据
-   */
   function getAssetsStats() {
-    const assets = getCurrentAssets();
+    const { zones = [], machines = {}, waypoints = {} } = getCurrentAssets();
+    const agvCount = getAGVs().length;
+    const zoneCount = zones.length;
+    const machineCount = Object.keys(machines).length;
+    const waypointCount = Object.keys(waypoints).length;
     return {
-      zoneCount: (assets.zones || []).length,
-      machineCount: Object.keys(assets.machines || {}).length,
-      waypointCount: Object.keys(assets.waypoints || {}).length,
-      totalAssets:
-        (assets.zones || []).length +
-        Object.keys(assets.machines || {}).length +
-        Object.keys(assets.waypoints || {}).length,
+      zoneCount,
+      machineCount,
+      waypointCount,
+      agvCount,
+      totalAssets: zoneCount + machineCount + waypointCount + agvCount,
     };
   }
 
-  /**
-   * 格式化资产列表（用于 UI 显示）
-   * @returns {Array} 格式化的资产数组
-   */
   function formatAssetsList() {
-    const assets = getCurrentAssets();
+    const { zones = [], machines = {}, waypoints = {} } = getCurrentAssets();
+    const agvs = getAGVs();
     const list = [];
 
-    // 添加区域
-    if (assets.zones) {
-      assets.zones.forEach((zone) => {
-        list.push({
-          type: "zone",
-          icon: "🔒",
-          name: zone.name || `Zone ${zone.id}`,
-          description: `区域类型: ${zone.type || "unknown"}`,
-          data: zone,
-        });
-      });
-    }
+    const ZONE_ICON_MAP = {
+      restricted: '🔒',
+      workbench: '🔧',
+      obstacle: '🚫',
+      workarea: '📦',
+    };
+    const DECOR_ICON_MAP = {
+      bollard: '🔶',
+      rack: '🗄️',
+      cabinet: '🔌',
+      barrier: '🚧',
+    };
 
-    // 添加机器
-    if (assets.machines) {
-      Object.entries(assets.machines).forEach(([key, machine]) => {
-        list.push({
-          type: "machine",
-          icon: "⚙️",
-          name: machine.name || `Machine ${key}`,
-          description: `状态: ${machine.status || "UNKNOWN"}`,
-          data: machine,
-        });
+    zones.forEach((zone) => {
+      const isDecor = !!zone.decor;
+      list.push({
+        type: "zone",
+        icon: isDecor ? (DECOR_ICON_MAP[zone.decor] ?? '🚫') : (ZONE_ICON_MAP[zone.type] ?? '🔒'),
+        name: zone.name ?? `Zone ${zone.id}`,
+        description: isDecor ? `装饰物: ${zone.decor}` : `区域类型: ${zone.type ?? "unknown"}`,
+        data: zone,
       });
-    }
+    });
 
-    // 添加路由点
-    if (assets.waypoints) {
-      Object.entries(assets.waypoints).forEach(([key, waypoint]) => {
-        const icon = waypoint.type === "dock" ? "🚪" : "📍";
-        list.push({
-          type: "waypoint",
-          icon: icon,
-          name: waypoint.name || `Waypoint ${key}`,
-          description: `类型: ${waypoint.type || "route"}`,
-          data: waypoint,
-        });
+    Object.entries(machines).forEach(([key, machine]) => {
+      list.push({
+        type: "machine",
+        icon: "⚙️",
+        name: machine.name ?? `Machine ${key}`,
+        description: `状态: ${machine.status ?? "UNKNOWN"}`,
+        data: machine,
       });
-    }
+    });
+
+    Object.entries(waypoints).forEach(([key, waypoint]) => {
+      list.push({
+        type: "waypoint",
+        icon: waypoint.type === "dock" ? "🚪" : "📍",
+        name: waypoint.name ?? `Waypoint ${key}`,
+        description: `类型: ${waypoint.type ?? "route"}`,
+        data: waypoint,
+      });
+    });
+
+    agvs.forEach((agv) => {
+      list.push({
+        type: "agv",
+        icon: "🤖",
+        name: agv.name ?? `AGV-${agv.id}`,
+        description: `速度: ${agv.velocity ?? 1.0}, 容量: ${agv.capacity ?? 100}`,
+        data: agv,
+      });
+    });
 
     return list;
   }
 
-  // ============ 2. 核心动画状态 (Animation State) ============
+  // ──────────────────────────────────────────
+  // 资产编辑 CRUD
+  // ──────────────────────────────────────────
 
-  // 统一的数据源：历史帧队列
+  /**
+   * 获取所有已占用的网格坐标集合。
+   * 返回 Set<string>，key 格式 "gx,gy"。
+   */
+  function getOccupiedCells(excludeAssetId = null, excludeAssetType = null) {
+    const cfg = currentConfig.value;
+    if (!cfg) return new Set();
+    const topo = cfg.topology;
+    const occupied = new Set();
+
+    // 机器占用 location 所在格
+    Object.entries(topo.machines || {}).forEach(([key, m]) => {
+      if (excludeAssetType === 'machine' && key === excludeAssetId) return;
+      if (m.location) {
+        const [x, y] = m.location;
+        const sw = m.size?.[0] || 1;
+        const sh = m.size?.[1] || 1;
+        for (let dx = 0; dx < sw; dx++) {
+          for (let dy = 0; dy < sh; dy++) {
+            occupied.add(`${x + dx},${y + dy}`);
+          }
+        }
+      }
+    });
+
+    // 路由点占 1 格
+    Object.entries(topo.waypoints || {}).forEach(([key, wp]) => {
+      if (excludeAssetType === 'waypoint' && key === excludeAssetId) return;
+      if (wp.location) occupied.add(`${wp.location[0]},${wp.location[1]}`);
+    });
+
+    // 区域占 area 范围
+    (topo.zones || []).forEach((z) => {
+      if (excludeAssetType === 'zone' && z.id === excludeAssetId) return;
+      if (z.area) {
+        const { x, y, w, h } = z.area;
+        for (let dx = 0; dx < (w || 1); dx++) {
+          for (let dy = 0; dy < (h || 1); dy++) {
+            occupied.add(`${x + dx},${y + dy}`);
+          }
+        }
+      }
+    });
+
+    // AGV 占 initialLocation 所在格
+    (cfg.agvs || []).forEach((agv) => {
+      if (excludeAssetType === 'agv' && String(agv.id) === String(excludeAssetId)) return;
+      if (agv.initialLocation) occupied.add(`${agv.initialLocation[0]},${agv.initialLocation[1]}`);
+    });
+
+    return occupied;
+  }
+
+  /**
+   * 从中心开始螺旋扫描，找到第一个空闲位置。
+   */
+  function findFreeCell(occupied, gridW, gridH) {
+    const cx = Math.floor(gridW / 2);
+    const cy = Math.floor(gridH / 2);
+    // 螺旋搜索
+    for (let r = 0; r < Math.max(gridW, gridH); r++) {
+      for (let dx = -r; dx <= r; dx++) {
+        for (let dy = -r; dy <= r; dy++) {
+          if (Math.abs(dx) !== r && Math.abs(dy) !== r) continue; // 只检查边界
+          const gx = cx + dx;
+          const gy = cy + dy;
+          if (gx < 0 || gx >= gridW || gy < 0 || gy >= gridH) continue;
+          if (!occupied.has(`${gx},${gy}`)) return [gx, gy];
+        }
+      }
+    }
+    return [cx, cy]; // fallback
+  }
+
+  /**
+   * 从模板添加资产到当前配置，返回新资产名称。
+   * 自动寻找空闲网格位置。
+   */
+  function addAssetFromTemplate(templateId) {
+    const tpl = ASSET_TEMPLATES[templateId];
+    if (!tpl) throw new Error(`未知模板: ${templateId}`);
+    const cfg = currentConfig.value;
+    if (!cfg) throw new Error('请先加载或创建配置');
+
+    // 设置重建提示，让 3D 组件只重建受影响的组
+    rebuildHint.value = tpl.type;
+
+    const topo = cfg.topology;
+    const gw = topo.gridWidth || 20;
+    const gh = topo.gridHeight || 14;
+    const id = `${tpl.type}_${Date.now()}`;
+    const defaultName = `${tpl.name}_${Object.keys(
+      tpl.type === 'zone' ? (topo.zones || []) :
+      tpl.type === 'machine' ? (topo.machines || {}) :
+      (topo.waypoints || {})
+    ).length + 1}`;
+
+    const occupied = getOccupiedCells();
+    const [freeX, freeY] = findFreeCell(occupied, gw, gh);
+
+    if (tpl.type === 'zone') {
+      if (!topo.zones) topo.zones = [];
+      const area = { ...(tpl.template.area || { x: 0, y: 0, w: 1, h: 1 }) };
+      area.x = freeX;
+      area.y = freeY;
+      topo.zones.push({ id, name: defaultName, ...tpl.template, area });
+    } else if (tpl.type === 'machine') {
+      if (!topo.machines) topo.machines = {};
+      topo.machines[id] = { id, name: defaultName, location: [freeX, freeY], ...tpl.template };
+    } else if (tpl.type === 'waypoint') {
+      if (!topo.waypoints) topo.waypoints = {};
+      topo.waypoints[id] = { location: [freeX, freeY], ...tpl.template, name: defaultName, id };
+    } else if (tpl.type === 'agv') {
+      if (!cfg.agvs) cfg.agvs = [];
+      const agvId = cfg.agvs.length;
+      cfg.agvs.push({
+        id: agvId,
+        name: defaultName,
+        initialLocation: [freeX, freeY],
+        ...tpl.template,
+      });
+    }
+
+    // rebuildHint 由 3D 组件的 deep watcher 负责清除，
+    // 避免 nextTick 时序竞争导致 watcher 读到 null 而触发全量重建。
+    return defaultName;
+  }
+
+  /**
+   * 检查目标位置是否被其他资产占用。
+   */
+  function isCellOccupied(gridX, gridY, excludeAssetId = null, excludeAssetType = null) {
+    const occupied = getOccupiedCells(excludeAssetId, excludeAssetType);
+    return occupied.has(`${gridX},${gridY}`);
+  }
+
+  /**
+   * 更新资产网格位置（带碰撞校验）。
+   * 返回 true 表示移动成功，false 表示位置被占用。
+   */
+  function updateAssetPosition(assetType, assetId, gridX, gridY) {
+    const cfg = currentConfig.value;
+    if (!cfg) return false;
+    const topo = cfg.topology;
+
+    // 碰撞校验：排除自身
+    if (isCellOccupied(gridX, gridY, assetId, assetType)) return false;
+
+    if (assetType === 'machine' && topo.machines?.[assetId]) {
+      topo.machines[assetId].location = [gridX, gridY];
+    } else if (assetType === 'waypoint' && topo.waypoints?.[assetId]) {
+      topo.waypoints[assetId].location = [gridX, gridY];
+    } else if (assetType === 'zone' && topo.zones) {
+      const zone = topo.zones.find(z => z.id === assetId);
+      if (zone && zone.area) {
+        zone.area.x = gridX;
+        zone.area.y = gridY;
+      }
+    } else if (assetType === 'agv' && cfg.agvs) {
+      const agv = cfg.agvs.find(a => String(a.id) === String(assetId));
+      if (agv) agv.initialLocation = [gridX, gridY];
+    }
+    return true;
+  }
+
+  /**
+   * 重命名资产。
+   */
+  function renameAsset(assetType, assetId, newName) {
+    const cfg = currentConfig.value;
+    if (!cfg) return;
+    const topo = cfg.topology;
+
+    if (assetType === 'machine' && topo.machines?.[assetId]) {
+      topo.machines[assetId].name = newName;
+    } else if (assetType === 'waypoint' && topo.waypoints?.[assetId]) {
+      topo.waypoints[assetId].name = newName;
+    } else if (assetType === 'zone' && topo.zones) {
+      const zone = topo.zones.find(z => z.id === assetId);
+      if (zone) zone.name = newName;
+    } else if (assetType === 'agv' && cfg.agvs) {
+      const agv = cfg.agvs.find(a => String(a.id) === String(assetId));
+      if (agv) agv.name = newName;
+    }
+  }
+
+  /**
+   * 删除资产。
+   */
+  function removeAsset(assetType, assetId) {
+    const cfg = currentConfig.value;
+    if (!cfg) return;
+    const topo = cfg.topology;
+
+    rebuildHint.value = assetType;
+
+    if (assetType === 'machine' && topo.machines) {
+      delete topo.machines[assetId];
+    } else if (assetType === 'waypoint' && topo.waypoints) {
+      delete topo.waypoints[assetId];
+    } else if (assetType === 'zone' && topo.zones) {
+      topo.zones = topo.zones.filter(z => z.id !== assetId);
+    } else if (assetType === 'agv' && cfg.agvs) {
+      cfg.agvs = cfg.agvs.filter(a => String(a.id) !== String(assetId));
+    }
+    // rebuildHint 由 3D 组件的 deep watcher 负责清除。
+  }
+
+  /**
+   * 导出当前配置的深拷贝（用于下载）。
+   */
+  function exportCurrentConfig() {
+    if (!currentConfig.value) return null;
+    return JSON.parse(JSON.stringify(currentConfig.value));
+  }
+
+  // ══════════════════════════════════════════
+  // 3. 动画状态
+  // ══════════════════════════════════════════
+
   const historyBuffer = ref([]);
-
-  // 辅助状态：是否处于“命令模式”（用于 ControlPanel 判断是否显示“脚本运行中”）
   const commandQueue = ref([]);
-
   const currentIndex = ref(0);
   const isPlaying = ref(false);
   const playbackSpeed = ref(1000);
 
-  // 计算属性：总步数
+  /**
+   * 是否处于"跟随直播尾部"模式。
+   * 用户手动拖动进度条后自动关闭，新帧推入时如果处于此模式则自动跟进。
+   */
+  const isLiveMode = ref(true);
+
   const totalSteps = computed(() => historyBuffer.value.length);
 
-  // 计算属性：当前帧状态 (UI 渲染源头)
   const currentState = computed(() => {
-    // 安全回退：如果 Buffer 为空，返回默认空对象
-    if (historyBuffer.value.length === 0) {
-      return {
-        env_timeline: "0",
-        grid_state: { positions_xy: [], is_active: [] },
-        machines: {},
-        active_transfers: [],
-      };
-    }
-
-    // 确保索引合法
-    const idx = Math.min(currentIndex.value, historyBuffer.value.length - 1);
+    if (historyBuffer.value.length === 0) return { ...EMPTY_GRID_STATE };
+    const idx = Math.min(
+      Math.max(0, currentIndex.value),
+      historyBuffer.value.length - 1,
+    );
     return historyBuffer.value[idx];
   });
 
-  // ============ 3. 动作方法 (Actions) ============
+  // ──────────────────────────────────────────
+  // 动画动作
+  // ──────────────────────────────────────────
 
-  /**
-   * 重置所有状态
-   */
   function reset() {
     isPlaying.value = false;
     currentIndex.value = 0;
-    historyBuffer.value = []; // 清空数据源
-    commandQueue.value = []; // 清空命令标记
+    historyBuffer.value = [];
+    commandQueue.value = [];
+    isLiveMode.value = true;
   }
 
   /**
-   * [核心] 向 Buffer 尾部追加一帧数据 (Push)
-   * 适用于：SSE 实时推送、runFullSystemTest 脚本驱动
+   * 向 Buffer 尾部追加一帧（SSE 实时推送 / 脚本驱动均使用此方法）。
+   * 只有在 isLiveMode 为 true 时才自动跟进到最新帧，
+   * 避免打断用户正在手动回放的操作。
    */
   function pushSnapshot(snapshot) {
-    // 1. 数据清洗与规范化
-    const frame = {
-      env_timeline: snapshot.timestamp || `T+${historyBuffer.value.length}`,
-      grid_state: snapshot.grid_state || { positions_xy: [], is_active: [] },
-      machines: snapshot.machines || {},
-      active_transfers: snapshot.active_transfers || [],
-      _meta: { wait: 0 }, // 可选元数据
-    };
-
-    // 2. 入队
+    const frame = normalizeSnapshot(snapshot, historyBuffer.value.length);
     historyBuffer.value.push(frame);
 
-    // 3. 自动跟进 (Live Mode 逻辑)
-    // 如果当前正处于最新帧（或者正在播放中），则自动跳到新的一帧
-    // 这样用户在查看历史数据时不会被强制打断
-    if (
-      isPlaying.value ||
-      currentIndex.value >= historyBuffer.value.length - 2
-    ) {
+    if (isLiveMode.value || isPlaying.value) {
       currentIndex.value = historyBuffer.value.length - 1;
     }
   }
 
   /**
-   * 加载完整历史数据 (离线回放模式)
-   * 直接替换整个 Buffer
+   * 加载完整离线历史数据，替换整个 Buffer。
    */
   function loadData(data) {
     reset();
     historyBuffer.value = data;
     currentIndex.value = 0;
+    isLiveMode.value = false;
   }
 
   /**
-   * 加载命令队列 (测试模式标记)
-   * 注意：这里只是标记“我们将要运行这些命令”，实际的数据生成由 runFullSystemTest.js 驱动 pushSnapshot 完成
+   * 标记"将要运行命令序列"（测试模式）。
+   * 实际帧数据由外部通过 pushSnapshot 驱动写入。
    */
   function loadCommandQueue(queue) {
     reset();
-    commandQueue.value = queue; // 仅用于 UI 显示总进度或当前模式
-    // 实际数据不在这里生成，而是等待 pushSnapshot
+    commandQueue.value = queue;
   }
 
-  // 切换播放
   function togglePlay() {
     if (historyBuffer.value.length === 0) return;
-
-    // 如果已到末尾，点击播放则重头开始
+    // 已到末尾时从头播放
     if (!isPlaying.value && currentIndex.value >= totalSteps.value - 1) {
       currentIndex.value = 0;
     }
     isPlaying.value = !isPlaying.value;
   }
 
-  // 手动拖动进度条
+  /**
+   * 手动定位到某帧（用于进度条拖动）。
+   * 离开尾部时退出 liveMode，回到尾部时重新进入。
+   */
   function setIndex(val) {
-    let index = parseInt(val);
+    if (historyBuffer.value.length === 0) return;
+
+    let index = parseInt(val, 10);
     if (isNaN(index)) index = 0;
-    if (index < 0) index = 0;
-    if (index >= historyBuffer.value.length)
-      index = historyBuffer.value.length - 1;
+    index = Math.max(0, Math.min(index, historyBuffer.value.length - 1));
 
     currentIndex.value = index;
+    isLiveMode.value = index === historyBuffer.value.length - 1;
   }
 
-  // 动画循环步进 (给 FactoryPlayerSSE 内部 requestAnimationFrame 用)
+  /**
+   * 动画循环步进，由 requestAnimationFrame 驱动调用。
+   * @returns {boolean} 是否成功步进（false 表示已到末尾或暂停）
+   */
   function nextStep() {
     if (!isPlaying.value) return false;
 
     if (currentIndex.value < totalSteps.value - 1) {
       currentIndex.value++;
       return true;
-    } else {
-      isPlaying.value = false;
-      return false;
     }
+
+    isPlaying.value = false;
+    return false;
   }
 
+  /**
+   * 初始化所有 AGV 到动画系统（写入初始快照）。
+   * 只在 buffer 为空时执行，避免意外清除已有历史数据。
+   */
+  function initializeAGVs() {
+    const agvs = getAGVs();
+    if (agvs.length === 0) return;
+
+    if (historyBuffer.value.length > 0) {
+      console.warn(
+        "[FactoryStore] initializeAGVs: buffer 非空，跳过初始化以保留现有数据。",
+      );
+      return;
+    }
+
+    const initialSnapshot = {
+      timestamp: "T+0",
+      env_timeline: "0",
+      grid_state: {
+        positions_xy: agvs.map((agv) => agv.initialLocation),
+        is_active: agvs.map(() => true),
+      },
+      machines: {},
+      active_transfers: [],
+    };
+
+    pushSnapshot(initialSnapshot);
+  }
+
+  // ══════════════════════════════════════════
+  // 数据集缓存（首次请求后缓存在 Pinia）
+  // ══════════════════════════════════════════
+  const datasetList = ref(null);
+  let _datasetPromise = null;
+
+  async function fetchDatasets() {
+    if (datasetList.value) return datasetList.value;
+    if (_datasetPromise) return _datasetPromise;
+    _datasetPromise = (async () => {
+      try {
+        const data = await apiGet(API_ROUTES.DATASET_LIST);
+        datasetList.value = data;
+        return data;
+      } catch (e) {
+        console.error('[FactoryStore] 加载数据集失败:', e);
+        _datasetPromise = null;
+        throw e;
+      }
+    })();
+    return _datasetPromise;
+  }
+
+  // ══════════════════════════════════════════
+  // 全量清理 (退出工厂时调用)
+  // ══════════════════════════════════════════
+  function clearAll() {
+    // 动画状态
+    reset();
+    // 配置
+    factoryConfigs.value = {};
+    currentConfigId.value = null;
+    // 工厂选择仍保留 localStorage
+    localStorage.removeItem(STORAGE_KEYS.SELECTED_FACTORY);
+  }
+
+  // ══════════════════════════════════════════
+  // 公开接口
+  // ══════════════════════════════════════════
   return {
-    // State - Factories & Configs
+    // ── 工厂列表 ──
     factories,
     selectedFactoryId,
+    currentFactory,
+    getFactories,
+    setCurrentFactory,
+
+    // ── 配置管理 ──
     factoryConfigs,
     currentConfigId,
-
-    // State - Animation
-    historyBuffer, // 统一使用这个作为数据源
-    commandQueue, // 用于 UI 判断模式
-    currentIndex,
-    isPlaying,
-    playbackSpeed,
-
-    // Getters - Factories & Configs
-    currentFactory,
     currentConfig,
     currentTopologyConfig,
     currentRenderConfig,
-    totalSteps,
-    currentState,
-    getFactories,
-    getLoadedConfigs,
-
-    // Actions - Factories & Configs
-    setCurrentFactory,
+    rebuildHint,
     loadConfigFromFile,
     setCurrentConfig,
+    getLoadedConfigs,
     deleteConfig,
     setCurrentTopologyConfig,
+    getAGVs,
+    initializeAGVs,
     getCurrentAssets,
     getAssetsStats,
     formatAssetsList,
-    getAGVs,
-    initializeAGVs,
+    addAssetFromTemplate,
+    getOccupiedCells,
+    isCellOccupied,
+    updateAssetPosition,
+    renameAsset,
+    removeAsset,
+    exportCurrentConfig,
 
-    // Actions - Animation
+    // ── 动画状态 ──
+    historyBuffer,
+    commandQueue,
+    currentIndex,
+    isPlaying,
+    isLiveMode,
+    playbackSpeed,
+    totalSteps,
+    currentState,
     reset,
+    clearAll,
     pushSnapshot,
     loadData,
     loadCommandQueue,
     togglePlay,
     setIndex,
     nextStep,
+
+    // ── 数据集缓存 ──
+    datasetList,
+    fetchDatasets,
   };
 });

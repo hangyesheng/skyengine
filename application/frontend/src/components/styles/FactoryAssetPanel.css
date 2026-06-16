@@ -1,0 +1,408 @@
+/* ============================================================
+   FactoryAssetPanel — 暗色玻璃风格
+   ============================================================ */
+
+/* --- 面板容器 --- */
+.factory-asset-panel {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+  color: rgba(200, 220, 255, 0.85);
+  font-size: 12px;
+}
+
+/* --- 面板标题 --- */
+.panel-header {
+  padding: 8px 10px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+}
+
+.panel-header h3 {
+  margin: 0;
+  font-size: 12px;
+  font-weight: 600;
+  flex: 1;
+  color: rgba(200, 220, 255, 0.9);
+}
+
+.header-actions {
+  display: flex;
+  gap: 6px;
+}
+
+.edit-toggle-btn {
+  font-size: 10px;
+  padding: 2px 8px;
+  border-radius: 4px;
+  border: 1px solid rgba(100, 180, 255, 0.2);
+  background: transparent;
+  color: rgba(160, 190, 230, 0.7);
+  cursor: pointer;
+  transition: all 0.2s;
+  white-space: nowrap;
+}
+
+.edit-toggle-btn:hover {
+  background: rgba(100, 180, 255, 0.1);
+  color: rgba(200, 220, 255, 0.9);
+}
+
+.edit-toggle-btn.active {
+  background: rgba(100, 180, 255, 0.15);
+  border-color: rgba(100, 180, 255, 0.35);
+  color: rgba(200, 220, 255, 0.95);
+}
+
+.export-btn {
+  font-size: 10px;
+  padding: 2px 8px;
+  border-radius: 4px;
+  border: 1px solid rgba(76, 175, 80, 0.3);
+  background: rgba(76, 175, 80, 0.08);
+  color: rgba(76, 175, 80, 0.7);
+  cursor: pointer;
+  transition: all 0.2s;
+  white-space: nowrap;
+}
+
+.export-btn:hover {
+  background: rgba(76, 175, 80, 0.15);
+  color: rgba(76, 175, 80, 0.9);
+}
+
+/* --- 面板内容区 --- */
+.panel-body {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  padding: 8px 10px;
+  gap: 8px;
+  min-height: 0;
+  overflow: hidden;
+}
+
+/* --- 资产池 --- */
+.asset-pool {
+  border: 1px solid rgba(100, 180, 255, 0.12);
+  border-radius: 6px;
+  overflow: hidden;
+  flex-shrink: 0;
+}
+
+.asset-pool-header {
+  background: rgba(100, 180, 255, 0.08);
+  color: rgba(200, 220, 255, 0.8);
+  padding: 5px 10px;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.asset-pool-body {
+  padding: 8px;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  background: rgba(100, 180, 255, 0.02);
+}
+
+.asset-select {
+  width: 100%;
+}
+
+/* --- 预览槽 --- */
+.preview-slot {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 6px;
+  background: rgba(100, 180, 255, 0.04);
+  border: 1px solid rgba(100, 180, 255, 0.1);
+  border-radius: 4px;
+  white-space: nowrap;
+}
+
+.preview-shape {
+  width: 24px;
+  height: 24px;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.preview-zone {
+  background: rgba(255, 152, 0, 0.1);
+  border: 1px solid rgba(255, 152, 0, 0.25);
+}
+
+.preview-machine {
+  background: rgba(33, 150, 243, 0.1);
+  border: 1px solid rgba(33, 150, 243, 0.25);
+}
+
+.preview-waypoint {
+  background: rgba(76, 175, 80, 0.1);
+  border: 1px solid rgba(76, 175, 80, 0.25);
+}
+
+.preview-agv {
+  background: rgba(255, 87, 34, 0.1);
+  border: 1px solid rgba(255, 87, 34, 0.25);
+}
+
+.preview-icon {
+  font-size: 12px;
+}
+
+.preview-name {
+  font-size: 10px;
+  color: rgba(160, 190, 230, 0.6);
+  font-weight: 500;
+}
+
+.add-asset-btn {
+  white-space: nowrap;
+}
+
+/* --- 资产统计 --- */
+.assets-stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(55px, 1fr));
+  gap: 5px;
+  padding: 8px;
+  background: rgba(100, 180, 255, 0.06);
+  border: 1px solid rgba(100, 180, 255, 0.1);
+  border-radius: 6px;
+  flex-shrink: 0;
+}
+
+.stat-item {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 6px;
+  background: rgba(100, 180, 255, 0.06);
+  border-radius: 4px;
+  color: rgba(200, 220, 255, 0.8);
+}
+
+.stat-label {
+  font-size: 10px;
+  color: rgba(160, 190, 230, 0.5);
+}
+
+.stat-value {
+  font-size: 13px;
+  font-weight: bold;
+  color: rgba(200, 220, 255, 0.9);
+  font-variant-numeric: tabular-nums;
+}
+
+/* --- 资产列表 --- */
+.services-list-container {
+  flex: 1;
+  min-height: 60px;
+  overflow-y: auto;
+  border: 1px solid rgba(100, 180, 255, 0.08);
+  border-radius: 6px;
+  padding: 6px;
+  background: rgba(100, 180, 255, 0.02);
+}
+
+.services-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+/* --- 拖拽节点 --- */
+.draggable-node {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 8px;
+  background: rgba(100, 180, 255, 0.04);
+  border: 1px solid rgba(100, 180, 255, 0.1);
+  border-radius: 4px;
+  cursor: grab;
+  transition: all 0.2s ease;
+  user-select: none;
+}
+
+.draggable-node:hover {
+  background: rgba(100, 180, 255, 0.08);
+  border-color: rgba(100, 180, 255, 0.2);
+}
+
+.draggable-node:active {
+  cursor: grabbing;
+  transform: scale(0.98);
+}
+
+.node-icon {
+  font-size: 13px;
+  flex-shrink: 0;
+}
+
+.node-name {
+  flex: 1;
+  font-size: 11px;
+  color: rgba(200, 220, 255, 0.8);
+  font-weight: 500;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.drag-handle {
+  font-size: 10px;
+  color: rgba(160, 190, 230, 0.3);
+  flex-shrink: 0;
+  opacity: 0;
+  transition: opacity 0.2s;
+}
+
+.draggable-node:hover .drag-handle {
+  opacity: 1;
+}
+
+.tooltip-content {
+  max-width: 200px;
+  font-size: 11px;
+  line-height: 1.4;
+}
+
+/* --- 类型色条 --- */
+.service-item.asset-type-zone .draggable-node,
+.service-item.asset-type-zone .editable-node {
+  border-left: 3px solid rgba(255, 152, 0, 0.6);
+}
+
+.service-item.asset-type-machine .draggable-node,
+.service-item.asset-type-machine .editable-node {
+  border-left: 3px solid rgba(33, 150, 243, 0.6);
+}
+
+.service-item.asset-type-waypoint .draggable-node,
+.service-item.asset-type-waypoint .editable-node {
+  border-left: 3px solid rgba(76, 175, 80, 0.6);
+}
+
+.service-item.asset-type-agv .draggable-node,
+.service-item.asset-type-agv .editable-node {
+  border-left: 3px solid rgba(255, 87, 34, 0.6);
+}
+
+/* --- 编辑模式节点 --- */
+.editable-node {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 8px;
+  background: rgba(100, 180, 255, 0.04);
+  border: 1px solid rgba(100, 180, 255, 0.1);
+  border-radius: 4px;
+  transition: all 0.2s;
+}
+
+.service-item.edit-mode {
+  animation: slideIn 0.2s ease;
+}
+
+.rename-input {
+  flex: 1;
+  font-size: 11px;
+  color: rgba(200, 220, 255, 0.85);
+  font-weight: 500;
+  border: none;
+  border-bottom: 1px solid transparent;
+  background: transparent;
+  outline: none;
+  padding: 2px 0;
+  min-width: 0;
+}
+
+.rename-input:hover {
+  border-bottom-color: rgba(100, 180, 255, 0.15);
+}
+
+.rename-input:focus {
+  border-bottom-color: rgba(100, 180, 255, 0.4);
+}
+
+.delete-btn {
+  background: none;
+  border: none;
+  color: rgba(160, 190, 230, 0.3);
+  cursor: pointer;
+  font-size: 11px;
+  padding: 2px 4px;
+  border-radius: 2px;
+  transition: all 0.15s;
+  flex-shrink: 0;
+}
+
+.delete-btn:hover {
+  color: rgba(244, 67, 54, 0.8);
+  background: rgba(244, 67, 54, 0.08);
+}
+
+/* --- 空状态 --- */
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 20px 16px;
+  color: rgba(160, 190, 230, 0.2);
+}
+
+.empty-icon {
+  font-size: 32px;
+  opacity: 0.4;
+  margin-bottom: 8px;
+}
+
+.empty-state p {
+  margin: 0;
+  font-size: 11px;
+  color: rgba(160, 190, 230, 0.3);
+}
+
+/* --- 滚动条 --- */
+.services-list-container::-webkit-scrollbar {
+  width: 4px;
+}
+
+.services-list-container::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.services-list-container::-webkit-scrollbar-thumb {
+  background: rgba(100, 180, 255, 0.15);
+  border-radius: 2px;
+}
+
+.services-list-container::-webkit-scrollbar-thumb:hover {
+  background: rgba(100, 180, 255, 0.25);
+}
+
+/* --- 动画 --- */
+@keyframes slideIn {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}

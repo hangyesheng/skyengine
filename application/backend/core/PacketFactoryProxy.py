@@ -1,11 +1,14 @@
 import asyncio
 import os
+import logging
 from typing import List, Optional
 from fastapi import Query, File, UploadFile, Form, Body, Request
 from starlette.responses import JSONResponse, FileResponse, StreamingResponse
 
 from application.backend.core.BaseFactoryProxy import BaseFactoryProxy
 from application.backend.core.RouteRegistry import RouteRegistry
+
+logger = logging.getLogger(__name__)
 # 导入后端服务
 from application.backend.packet_factory.backend_server import APIHandler
 from application.backend.packet_factory.backend_core import BackendCore

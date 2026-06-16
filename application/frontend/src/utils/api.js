@@ -3,7 +3,7 @@
  * 集中管理所有后端 API 路由和请求
  */
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:8000";
+const API_BASE_URL = import.meta.env.VITE_API_URL || "/api";
 
 /**
  * API 路由配置
@@ -19,6 +19,7 @@ export const API_ROUTES = {
   FACTORY_CONTROL_RESET: "/factory/control/reset",
   FACTORY_CONTROL_PLAY: "/factory/control/play",
   FACTORY_CONTROL_SWITCH: "/factory/control/switch",
+  FACTORY_CONTROL_DISCONNECT: "/factory/control/disconnect",
 
   // 调度算法相关
   FACTORY_ALGORITHM_SET: "/factory/algorithm/set",
@@ -28,10 +29,23 @@ export const API_ROUTES = {
   STREAM_STATE: "/stream/state",
   STREAM_METRICS: "/stream/metrics",
   STREAM_CONTROL: "/stream/control",
+  STREAM_EVENTS: "/stream/events",
 
   // 监控相关
   MONITOR_STATUS: "/monitor/status",
   MONITOR_METRICS: "/monitor/metrics",
+
+  // 数据集相关
+  DATASET_LIST: "/dataset/list",
+  DATASET_GENERATE: "/dataset/generate",
+
+  // 历史记录
+  HISTORY_RUNS: "/history/runs",
+  HISTORY_RUN_DETAIL: "/history/run/:run_id",
+  HISTORY_RUN_LOGS: "/history/run/:run_id/logs",
+  HISTORY_COMPARE: "/history/compare",
+  HISTORY_STATS: "/history/stats",
+  HISTORY_RUN_COMPLETE: "/history/run/:run_id/complete",
 };
 
 /**

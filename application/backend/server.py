@@ -8,7 +8,46 @@ from fastapi import FastAPI, Body
 from fastapi.responses import StreamingResponse
 from fastapi.middleware.cors import CORSMiddleware
 import asyncio
+import atexit
 import json
+import os
+import subprocess
+
+
+def _cleanup_online_stack() -> None:
+    """兜底清理:主栈退出时连带关闭 skyengine-online 栈 (engine/mapf/fjsp),释放 GPU。
+
+    触发机制:uvicorn 收到 SIGTERM(docker compose down) / SIGINT(Ctrl+C)做
+    graceful shutdown,Python 解释器随后正常退出,atexit 钩子按 LIFO 跑到这里。
+
+    幂等 —— online 栈没起时 `docker compose down` 是 no-op,不会报错。
+    """
+    compose_file = os.getenv("SKYENGINE_COMPOSE_PATH")
+    project_dir = os.getenv("SKYENGINE_PROJECT_DIR")
+    if not compose_file or not os.path.exists(compose_file):
+        return  # 没配 / 文件不存在,跳过(不阻塞 backend 退出)
+
+    cmd = ["docker", "compose", "-p", "skyengine-online"]
+    if project_dir:
+        cmd += ["--project-directory", project_dir]
+    cmd += ["-f", compose_file, "down", "--remove-orphans", "--timeout", "8"]
+
+    try:
+        # 用 print 而非 logger:解释器关闭阶段 logging handler 可能已拆卸,
+        # print 直达 stdout,docker logs 可靠捕获
+        print(f"[atexit] 清理 skyengine-online 栈: {' '.join(cmd)}", flush=True)
+        result = subprocess.run(cmd, capture_output=True, timeout=15)
+        if result.returncode == 0:
+            print("[atexit] skyengine-online 栈已清理", flush=True)
+        else:
+            print(f"[atexit] online 栈清理非零退出(rc={result.returncode}): "
+                  f"{result.stderr.decode().strip()}", flush=True)
+    except Exception as e:
+        # 任何失败都不能阻塞 backend 自身退出
+        print(f"[atexit] online 栈清理失败(忽略): {e}", flush=True)
+
+
+atexit.register(_cleanup_online_stack)
 
 # Import factory proxies (must import all to ensure registration)
 from application.backend.core.BaseFactoryProxy import (
@@ -17,6 +56,10 @@ from application.backend.core.BaseFactoryProxy import (
 )
 from application.backend.core.ProxyFactory import ProxyFactory
 from application.backend.core.RouteRegistry import RouteRegistry
+
+# History 模块
+from application.backend.history.routes import router as history_router
+from application.backend.history.manager import HistoryManager
 
 
 app = FastAPI()
@@ -29,6 +72,15 @@ current_factory_proxy: FactoryProxyProtocol = None
 
 # 存储当前的工厂类型
 current_factory_type: str = "base_factory"
+
+# 当前运行 ID（由 history 模块分配）
+current_run_id: str = None
+
+# History 管理器
+history_manager = HistoryManager()
+
+# 注册 history 路由
+app.include_router(history_router)
 
 # 添加CORS中间件，支持前端跨域请求
 app.add_middleware(
@@ -53,28 +105,32 @@ async def stream_state():
     """
     工厂状态流 SSE 端点
     """
+
     async def generate():
         while True:
             try:
                 if current_factory_proxy is None:
-                    # ✅ 不要 return，继续循环等待工厂加载
                     yield format_sse_message("state", {"status": "no_factory"})
                     await asyncio.sleep(2.0)
                     continue
-                # 只在工厂运行时发送数据
-                if current_factory_proxy.is_running():
-                    # 从工厂代理获取事件列表（支持多事件类型）
-                    events = await current_factory_proxy.get_state_events()
+
+                # DockerProxy 等支持透传的代理：逐事件流式传输
+                if hasattr(current_factory_proxy, "state_stream") and current_factory_proxy.is_running():
+                    async for event_type, data in current_factory_proxy.state_stream():
+                        yield format_sse_message(event_type, data)
+                    continue
+
+                # 其他代理：轮询 get_state_events()
+                events = await current_factory_proxy.get_state_events()
+                if events:
                     for event_type, data in events:
                         yield format_sse_message(event_type, data)
                 else:
-                    # 工厂未运行时，发送空闲状态
                     yield format_sse_message(
                         "state", {"status": "idle", "message": "Factory is not running"}
                     )
                     await asyncio.sleep(2.0)
-
-                await asyncio.sleep(0.1)  # 减少轮询间隔，避免状态丢失
+                await asyncio.sleep(0.1)
             except Exception as e:
                 yield format_sse_message(
                     "state", {"status": "error", "message": str(e)}
@@ -101,8 +157,34 @@ async def stream_metrics():
 
     async def generate():
         while True:
-            yield format_sse_message("state", {"status": "idle"})
-            await asyncio.sleep(1.5)  # 确保是 asyncio.sleep 不是 time.sleep
+            try:
+                if current_factory_proxy is None:
+                    yield format_sse_message("metrics", {"status": "no_factory"})
+                    await asyncio.sleep(2.0)
+                    continue
+
+                # DockerProxy 等支持透传的代理
+                if hasattr(current_factory_proxy, "metrics_stream") and current_factory_proxy.is_running():
+                    async for event_type, data in current_factory_proxy.metrics_stream():
+                        yield format_sse_message(event_type, data)
+                    continue
+
+                # 其他代理：轮询
+                if current_factory_proxy.is_running():
+                    events = await current_factory_proxy.get_metrics_events()
+                    for event_type, data in events:
+                        yield format_sse_message(event_type, data)
+                else:
+                    yield format_sse_message(
+                        "metrics",
+                        {"status": "idle", "message": "Factory is not running"},
+                    )
+                    await asyncio.sleep(2.0)
+            except Exception as e:
+                yield format_sse_message(
+                    "metrics", {"status": "error", "message": str(e)}
+                )
+                break
 
     return StreamingResponse(
         generate(),
@@ -113,43 +195,50 @@ async def stream_metrics():
             "Connection": "keep-alive",
         },
     )
-    # async def generate():
-    #     while True:
-    #         try:
-    #             if current_factory_proxy is None:
-    #                 # ✅ 不要 return，继续循环等待工厂加载
-    #                 yield format_sse_message("state", {"status": "no_factory"})
-    #                 await asyncio.sleep(2.0)
-    #                 continue
-    #             # 只在工厂运行时发送数据
-    #             if current_factory_proxy.is_running():
-    #                 # 从工厂代理获取事件列表（支持多事件类型）
-    #                 events = await current_factory_proxy.get_metrics_events()
-    #                 for event_type, data in events:
-    #                     yield format_sse_message(event_type, data)
-    #             else:
-    #                 # 工厂未运行时，发送空闲状态
-    #                 yield format_sse_message(
-    #                     "metrics",
-    #                     {"status": "idle", "message": "Factory is not running"},
-    #                 )
-    #                 await asyncio.sleep(2.0)
 
-    #         except Exception as e:
-    #             yield format_sse_message(
-    #                 "metrics", {"status": "error", "message": str(e)}
-    #             )
-    #             break
 
-    # return StreamingResponse(
-    #     generate(),
-    #     media_type="text/event-stream",
-    #     headers={
-    #         "Cache-Control": "no-cache",
-    #         "X-Accel-Buffering": "no",
-    #         "Connection": "keep-alive",
-    #     },
-    # )
+# 工厂事件流（简化路由，不使用 factory_id）
+@app.get("/stream/events")
+async def stream_events():
+    """
+    工厂事件流 SSE 端点（sim_server 业务事件: machine_start_op / transfer_started 等）
+    """
+
+    async def generate():
+        while True:
+            try:
+                if current_factory_proxy is None:
+                    yield format_sse_message("event", {"status": "no_factory"})
+                    await asyncio.sleep(2.0)
+                    continue
+
+                # DockerProxy 透传
+                if hasattr(current_factory_proxy, "events_stream") and current_factory_proxy.is_running():
+                    async for event_type, data in current_factory_proxy.events_stream():
+                        yield format_sse_message(event_type, data)
+                    continue
+
+                # 其他代理暂无事件源
+                yield format_sse_message(
+                    "event",
+                    {"status": "idle", "message": "No event source"},
+                )
+                await asyncio.sleep(2.0)
+            except Exception as e:
+                yield format_sse_message(
+                    "event", {"status": "error", "message": str(e)}
+                )
+                break
+
+    return StreamingResponse(
+        generate(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "X-Accel-Buffering": "no",
+            "Connection": "keep-alive",
+        },
+    )
 
 
 # 工厂控制流（简化路由，不使用 factory_id）
@@ -161,8 +250,21 @@ async def stream_control():
 
     async def generate():
         while True:
-            yield format_sse_message("control", {"status": "idle"})
-            await asyncio.sleep(2.0)
+            try:
+                if current_factory_proxy is None:
+                    yield format_sse_message("control", {"status": "no_factory"})
+                    await asyncio.sleep(2.0)
+                    continue
+
+                events = await current_factory_proxy.get_control_events()
+                for event_type, data in events:
+                    yield format_sse_message(event_type, data)
+                await asyncio.sleep(2.0)
+            except Exception as e:
+                yield format_sse_message(
+                    "control", {"status": "error", "message": str(e)}
+                )
+                break
 
     return StreamingResponse(
         generate(),
@@ -173,35 +275,6 @@ async def stream_control():
             "Connection": "keep-alive",
         },
     )
-    # async def generate():
-    #     while True:
-    #         try:
-    #             if current_factory_proxy is None:
-    #                 # ✅ 不要 return，继续循环等待工厂加载
-    #                 yield format_sse_message("state", {"status": "no_factory"})
-    #                 await asyncio.sleep(2.0)
-    #                 continue
-    #             # 控制流始终发送状态（包括 idle/running/paused）
-    #             events = await current_factory_proxy.get_control_events()
-    #             for event_type, data in events:
-    #                 yield format_sse_message(event_type, data)
-
-    #             await asyncio.sleep(2.0)  # 控制状态更新频率较低
-    #         except Exception as e:
-    #             yield format_sse_message(
-    #                 "control", {"status": "error", "message": str(e)}
-    #             )
-    #             break
-
-    # return StreamingResponse(
-    #     generate(),
-    #     media_type="text/event-stream",
-    #     headers={
-    #         "Cache-Control": "no-cache",
-    #         "X-Accel-Buffering": "no",
-    #         "Connection": "keep-alive",
-    #     },
-    # )
 
 
 @app.get("/factory")
@@ -285,7 +358,6 @@ async def upload_factory_config(filename: str = None, config: dict = None):
 
         # 初始化工厂
         current_factory_proxy.set_config(config)
-        print(config)
 
         return {
             "status": "ok",
@@ -305,22 +377,36 @@ async def upload_factory_config(filename: str = None, config: dict = None):
 @app.post("/factory/control/reset")
 async def reset_factory_control():
     """重置工厂控制端点"""
+    global current_factory_proxy, current_run_id
 
-    global current_factory_proxy
-    print("开始执行初始化逻辑0")
+    print(f"[Reset] 收到请求, 代理: {type(current_factory_proxy).__name__ if current_factory_proxy else 'None'}")
+    print(f"[Reset] initialized={current_factory_proxy.get_initialized() if current_factory_proxy else 'N/A'}")
+
     if current_factory_proxy is None:
         return {"status": "error", "message": "No factory loaded"}
-    print("开始执行初始化逻辑1")
     try:
+        # 完成当前历史运行
+        if current_run_id:
+            try:
+                history_manager.complete_run(current_run_id)
+                print(f"[Reset] 历史记录已完成: {current_run_id}")
+            except Exception as e:
+                print(f"[Reset] 完成历史记录失败: {e}")
+            current_run_id = None
+
         # 如果没有初始化，先初始化
-        if (
-            current_factory_proxy.status == ExecutionStatus.IDLE
-            and current_factory_proxy.current_step == 0
-        ):
+        if not current_factory_proxy.get_initialized():
             await current_factory_proxy.initialize()
             print("[Reset] Factory initialized")
 
-        await current_factory_proxy.reset()
+        try:
+            await current_factory_proxy.reset()
+        except AttributeError as e:
+            print(f"[Reset] Factory not initialized, initializing...")
+            await current_factory_proxy.initialize()
+            await current_factory_proxy.reset()
+
+
         print(f"[Reset] Factory reset, status: {current_factory_proxy.status.value}")
         return {
             "status": "ok",
@@ -345,7 +431,10 @@ async def switch_factory_proxy(factory_id: str = Body(..., embed=True)):
     """
     global current_factory_proxy, current_factory_type, current_config
 
-    print(f"Switching factory proxy to {factory_id}...")
+    print(f"===============================")
+    print(f"[Switch] 切换工厂代理: {factory_id}")
+    print(f"[Switch] 当前代理类型: {current_factory_type}")
+    print(f"[Switch] 当前代理实例: {type(current_factory_proxy).__name__ if current_factory_proxy else 'None'}")
     try:
         if not factory_id:
             return {"status": "error", "message": "工厂ID不能为空"}
@@ -376,6 +465,7 @@ async def switch_factory_proxy(factory_id: str = Body(..., embed=True)):
         # Create factory proxy using ProxyFactory registry
         try:
             current_factory_proxy = ProxyFactory.create(factory_type)
+            print(f"[Switch] 创建成功: {type(current_factory_proxy).__name__}")
 
             if factory_type == "packet_factory":
                 await current_factory_proxy.initialize()
@@ -386,9 +476,12 @@ async def switch_factory_proxy(factory_id: str = Body(..., embed=True)):
                 # 注册后端路由（仅首次注册，后续切换仅更新 BackendCore 引用）
                 RouteRegistry.register_to_app(app)
                 print(f"✅ 已注册 {len(RouteRegistry.get_routes())} 条后端路由")
-                
-                print("✅ PacketFactoryProxy 已初始化并注册所有路由")
-                print(f"📋 可用路由列表：{list(RouteRegistry.get_routes().keys())}")
+
+            elif factory_type == "grid_factory_new":
+                # DockerProxy: 进页面时立即启动 engine 容器预热
+                print("[Switch] DockerProxy: 启动 engine 容器预热...")
+                await current_factory_proxy.initialize()
+                print("[Switch] DockerProxy: engine 就绪")
         except ValueError as e:
             return {"status": "error", "message": str(e)}
 
@@ -411,23 +504,46 @@ async def switch_factory_proxy(factory_id: str = Body(..., embed=True)):
 @app.post("/factory/control/play")
 async def play_factory_control():
     """播放/启动工厂控制端点"""
-    global current_factory_proxy
+    global current_factory_proxy, current_run_id
+
+    print(f"[Play] 收到请求, 代理: {type(current_factory_proxy).__name__ if current_factory_proxy else 'None'}")
+    print(f"[Play] initialized={current_factory_proxy.get_initialized() if current_factory_proxy else 'N/A'}")
 
     if current_factory_proxy is None:
         return {"status": "error", "message": "No factory loaded"}
 
     try:
         # 如果还没初始化，先初始化
-        if current_factory_proxy._state_queue is None:
+        if not current_factory_proxy.get_initialized():
             await current_factory_proxy.initialize()
             print("[Play] Factory initialized before starting")
-
-        await current_factory_proxy.start()
+        try:
+            await current_factory_proxy.start()
+        except AttributeError as e:
+            print(f"[Play] Factory not initialized, initializing...")
+            await current_factory_proxy.initialize()
+            await current_factory_proxy.reset()
+            await current_factory_proxy.start()
         print(f"[Play] Factory started, status: {current_factory_proxy.status.value}")
+
+        # 创建历史运行记录
+        algorithm = ''
+        try:
+            algorithm = current_factory_proxy.get_algorithm()
+        except Exception:
+            pass
+        run_record = history_manager.create_run(
+            factory_type=current_factory_type,
+            algorithm=algorithm or '',
+        )
+        current_run_id = run_record.id
+        print(f"[Play] 创建历史记录: {current_run_id}")
+
         return {
             "status": "ok",
             "message": "Factory control started successfully",
             "current_status": current_factory_proxy.status.value,
+            "run_id": current_run_id,
         }
     except Exception as e:
         print(f"❌ 启动失败: {str(e)}")
@@ -457,16 +573,14 @@ async def pause_factory_control():
 async def set_algorithm(algorithm: str = Body(..., embed=True)):
     """
     设置当前工厂的调度算法
-
-    Args:
-        algorithm: 算法标识符 (如 'default', 'greedy', 'ortools', 'rl' 等)
-
-    Returns:
-        设置结果
     """
     global current_factory_proxy
 
+    print(f"[Algorithm] 收到请求: algorithm={algorithm}")
+    print(f"[Algorithm] 当前代理: {type(current_factory_proxy).__name__ if current_factory_proxy else 'None'}")
+
     if current_factory_proxy is None:
+        print(f"[Algorithm] 错误: 无工厂代理")
         return {"status": "error", "message": "No factory loaded"}
 
     try:
@@ -518,6 +632,119 @@ async def get_factory_control_state():
         return {"status": "ok", "data": status}
     except Exception as e:
         print(f"❌ 获取状态失败: {str(e)}")
+        return {"status": "error", "message": str(e)}
+
+
+@app.post("/factory/control/disconnect")
+async def disconnect_factory():
+    """断开工厂连接，清理代理资源"""
+    global current_factory_proxy, current_factory_type, current_config, current_run_id
+
+    print(f"[Disconnect] 清理工厂代理: {current_factory_type}")
+
+    # 完成历史运行记录
+    if current_run_id:
+        try:
+            history_manager.complete_run(current_run_id)
+            print(f"[Disconnect] 历史记录已完成: {current_run_id}")
+        except Exception as e:
+            print(f"[Disconnect] 完成历史记录失败: {e}")
+        current_run_id = None
+
+    if current_factory_proxy is not None:
+        try:
+            await current_factory_proxy.cleanup()
+        except Exception as e:
+            print(f"[Disconnect] cleanup 失败: {e}")
+        current_factory_proxy = None
+
+    current_factory_type = "base_factory"
+    current_config = None
+    print("[Disconnect] 工厂代理已清理")
+    return {"status": "ok", "message": "Factory disconnected"}
+
+
+@app.get("/dataset/list")
+async def list_datasets():
+    """列出所有可用的 FJSP 实例和 MAPF 地图"""
+    from dataset.helper import list_available_datasets
+    import yaml
+    from pathlib import Path
+
+    # FJSP: 使用 helper 原生方法（只从 fjsp-instances/ 读取）
+    datasets = list_available_datasets(data_dir="./dataset")
+
+    # MAPF: 从 map_dataset/gpt_eval_config/ 读取（本项目实际路径）
+    mapf_maps = {}
+    map_base = Path("./dataset/map_dataset/gpt_eval_config")
+    if map_base.exists():
+        for cat_dir in sorted(map_base.iterdir()):
+            if not cat_dir.is_dir():
+                continue
+            maps_yaml = cat_dir / "maps.yaml"
+            if maps_yaml.exists():
+                try:
+                    with open(maps_yaml) as f:
+                        maps = yaml.safe_load(f)
+                    mapf_maps[cat_dir.name] = list(maps.keys())
+                except Exception:
+                    pass
+
+    # 合并 fjsp_benchmarks 的 key 已含子目录路径（如 hurink/edata），
+    # 直接作为前端 category 使用
+    result = {
+        "fjsp_instances": datasets.get("fjsp_benchmarks", {}),
+        "mapf_maps": mapf_maps,
+    }
+    return result
+
+
+@app.post("/dataset/generate")
+async def generate_dataset_config(body: dict = Body(...)):
+    """根据选择的 FJSP + MAPF 生成工厂配置"""
+    from dataset.helper import (
+        _find_fjsp, load_fjsp_json, load_fjsp_benchmark,
+        load_mapf_yaml, convert_to_grid_factory,
+    )
+    from pathlib import Path
+
+    fjsp_category = body.get("fjsp_category", "")
+    fjsp_instance = body.get("fjsp_instance", "")
+    map_category = body.get("map_category", "")
+    map_name = body.get("map_name", "")
+
+    try:
+        data_dir = Path("./dataset")
+
+        # --- 解析 FJSP ---
+        fjsp_name = f"{fjsp_category}/{fjsp_instance}" if fjsp_category else fjsp_instance
+        fjsp_path = _find_fjsp(data_dir, fjsp_name)
+        if fjsp_path is None:
+            return {"status": "error", "message": f"FJSP 实例未找到: {fjsp_name}"}
+
+        if fjsp_path.suffix == ".json":
+            fjsp_data = load_fjsp_json(str(fjsp_path))
+        else:
+            fjsp_data = load_fjsp_benchmark(str(fjsp_path))
+
+        # --- 解析 MAPF 地图 ---
+        map_yaml = data_dir / f"map_dataset/gpt_eval_config/{map_category}/maps.yaml"
+        if not map_yaml.exists():
+            return {"status": "error", "message": f"地图类别不存在: {map_category}"}
+        map_data = load_mapf_yaml(str(map_yaml), map_name or None)
+
+        # --- 转换 ---
+        config = convert_to_grid_factory(
+            fjsp_data=fjsp_data,
+            map_data=map_data,
+            num_agvs=body.get("num_agvs", 4),
+            agv_velocity=body.get("agv_velocity", 1.0),
+            seed=body.get("seed", 42),
+        )
+        return {"status": "ok", "config": config}
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
         return {"status": "error", "message": str(e)}
 
 

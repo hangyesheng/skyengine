@@ -1,11 +1,11 @@
 <template>
   <div class="factory-manage-container">
     <div class="left-panel">
-      <ControlPanel />
+      <ControlPanel :disabled="isEditMode" />
     </div>
 
     <div class="middle-panel">
-      <FactoryPlayerSSE :hide-control-panel="true" />
+      <FactoryPlayerSSE :hide-control-panel="true" :edit-mode="isEditMode" />
 
       <div class="floating-toolbar-wrapper">
         <div class="floating-toolbar">
@@ -62,6 +62,7 @@
       config-panel-title="⚙️ 仿真配置"
       :show-chart="true"
       event-panel-title="📋 系统日志"
+      @edit-mode-change="isEditMode = $event"
     />
   </div>
 </template>
@@ -83,6 +84,7 @@ const store = useFactoryStore();
 const monitorStore = useMonitorStore();
 
 const isRunningTest = ref(false);
+const isEditMode = ref(false);
 const selectedEnvironment = ref("simulation");
 const selectedAlgorithm = ref("default");
 const connectionStatus = ref({
@@ -97,8 +99,8 @@ let eventSource = null;
 let connectionManager = null;
 
 onMounted(() => {
-  // 工厂初始化生命周期：
-  console.log("✅ FactoryManage 已挂载");
+  // 工厂初始化生命周期：清除上次残留状态
+  store.reset();
 
   // 初始化多连接管理器
   const factoryId = store.selectedFactoryId;
@@ -106,14 +108,12 @@ onMounted(() => {
 
   connectionManager.init({
     onStateUpdate: (data) => {
-      console.log("[Factory] 状态更新:", data);
       // 可以在这里更新 store 的状态
       if (data.snapshot) {
         store.pushSnapshot(data.snapshot);
       }
     },
     onMetricsUpdate: (data) => {
-      console.log("[Factory] 指标更新:", data);
       // 更新监控数据
       if (data.metrics) {
         monitorStore.pushMetrics(data.metrics);
@@ -144,7 +144,6 @@ const handleExecutePlan = async () => {
   const environment = selectedEnvironment.value;
   const algorithm = selectedAlgorithm.value;
 
-  console.log(`执行方案: 环境=${environment}, 算法=${algorithm}`);
 
   // 如果选择真实环境，检查场景连接
   if (environment === "real") {
@@ -187,10 +186,10 @@ const handleExecutePlan = async () => {
 
 onUnmounted(() => {
   // 清理连接和测试
-  console.log("🛑 FactoryManage 卸载，清理连接和测试");
   if (stopTest) stopTest();
   if (eventSource) sseManager.disconnect(eventSource);
   if (connectionManager) connectionManager.disconnect();
+  store.clearAll();
 });
 </script>
 <style scoped>
