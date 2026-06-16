@@ -1028,7 +1028,7 @@ onUnmounted(() => {
 
 .gantt-chart-container {
   flex: 1;
-  overflow: hidden;
+  overflow: auto;
   min-height: 0;
 }
 
@@ -1041,6 +1041,6 @@ onUnmounted(() => {
 .gantt-half {
   flex: 1;
   min-width: 0;
-  overflow: hidden;
+  overflow: auto;
 }
 </style>
