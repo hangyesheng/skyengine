@@ -23,6 +23,7 @@ from torch_geometric.data import Data
 from torch_geometric.nn import SAGEConv
 
 from .BaseAgent import BaseAgent, DEFAULT_STEP_TIME, FRONTEND, BACKEND, TRAINING, INFERENCE
+from .device_utils import resolve_device, log_device
 from executor.packet_factory.packet_factory.packet_factory_env.Job.Operation import Operation
 from executor.packet_factory.packet_factory.packet_factory_env.Machine.Machine import Machine
 from executor.packet_factory.packet_factory.packet_factory_env.Agv.AGV import AGV
@@ -557,15 +558,8 @@ class GraphDPAgent(BaseAgent):
         self.allow_agv_reassignment = allow_agv_reassignment
 
         # Device
-        if device is None or device == 'auto':
-            self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-        else:
-            self.device = torch.device(device)
-
-        if self.device.type == 'cuda':
-            LOGGER.info(f"[GraphDPAgent] Using CUDA: {torch.cuda.get_device_name(0)}")
-        else:
-            LOGGER.info(f"[GraphDPAgent] Using CPU")
+        self.device = resolve_device(device, tag="GraphDPAgent")
+        log_device(self.device, tag="GraphDPAgent")
 
         # Graph builder
         self.graph_builder = FactoryGraphBuilder(device=str(self.device))
