@@ -10,6 +10,7 @@ Sequencing Agent: 负责从队列中选择作业执行（排序决策）
 """
 
 from .BaseAgent import BaseAgent, DEFAULT_STEP_TIME, FRONTEND, BACKEND, TRAINING, INFERENCE
+from .device_utils import resolve_device, log_device
 from executor.packet_factory.packet_factory.packet_factory_env.Job.Operation import Operation
 from executor.packet_factory.packet_factory.packet_factory_env.Machine.Machine import Machine
 from executor.packet_factory.packet_factory.packet_factory_env.Agv.AGV import AGV
@@ -196,7 +197,8 @@ class DualDRLAgent(BaseAgent):
         super().__init__(name, agent_id, context, ui_mode, task_mode, model_path)
 
         # ========== 设备 ==========
-        self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+        self.device = resolve_device(None, tag="DualDRLAgent")
+        log_device(self.device, tag="DualDRLAgent")
 
         # ========== 网络配置 ==========
         self.routing_input_dim = 20
