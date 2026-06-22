@@ -28,13 +28,24 @@ def initialize_env(config, agent):
 
     callback_config = config.get(env_type).get('callback').get('map_callback')
 
+    # headless 模式（如 auto_train_loop.py 直接训练）：跳过可视化器注册，
+    # 避免每步 render() 触发 pygame 渲染 + PNG 编码 + clock.tick(fps) 帧率限速（实质是 sleep）
+    is_headless = bool(config.get(env_type).get('headless', False))
+
     # ---------- 创建回调管理器 ----------
     callback_manager = CallbackManager()  # 调用对应的构造函数，使用时直接加括号就能使用
     callback_manager.register("load_graph", create_component_by_id(callback_config.get('graph_loader').get('name'),
                                                                    *callback_config.get('graph_loader').get('args')))
-    callback_manager.register("initialize_visualizer",
-                              create_component_by_id(callback_config.get('visualizer').get('name'),
-                                                     *callback_config.get('visualizer').get('args')))
+
+    if is_headless:
+        # CallbackManager 构造时已预置默认 EnvVisualizer 占位，headless 下需显式移除，
+        # 否则 refresh_status() 仍会安装它并每步触发渲染/帧率限速
+        callback_manager.unregister("initialize_visualizer")
+        LOGGER.info("[Env] headless 模式：跳过可视化器注册")
+    else:
+        callback_manager.register("initialize_visualizer",
+                                  create_component_by_id(callback_config.get('visualizer').get('name'),
+                                                         *callback_config.get('visualizer').get('args')))
 
     # ---------- 创建事件管理器 ----------
     event_manager = initialize_event_manager(config)

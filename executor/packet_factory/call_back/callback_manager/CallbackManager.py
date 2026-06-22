@@ -22,6 +22,10 @@ class CallbackManager:
 
         self._callbacks[name] = callback
 
+    def unregister(self, name: str):
+        """移除一个回调（用于 headless 等场景禁用某些回调，如可视化器）"""
+        self._callbacks.pop(name, None)
+
     def get(self, name: str) -> EnvCallback:
         """获取回调对象 有时候需要当场调用 有的时候不需要"""
         if name not in self._callbacks:
