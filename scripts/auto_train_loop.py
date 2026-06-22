@@ -615,6 +615,9 @@ def build_config(agent_key: str, instance_config: dict,
     config["simulation"]["ui_mode"] = "backend"
     config["simulation"]["task_mode"] = "training"
 
+    # headless：禁用可视化器，避免每步 pygame 渲染 + PNG 编码 + clock.tick 帧率限速拖慢训练
+    config["simulation"]["headless"] = True
+
     # 注入实例数据
     config["simulation"]["job_config"] = instance_config["job_config"]
     config["simulation"]["map_config"] = instance_config["map_config"]
@@ -797,10 +800,9 @@ def create_env_for_instance(agent: object, instance_config: dict,
     # 设置 Agent 对环境的引用
     agent.context = env
 
-    # Headless 模式
+    # Headless 模式：config 已设置 headless=True，initialize_env 不会注册可视化器，
+    # 因此 env.env_visualizer 始终为 None（不会在 reset()/refresh_status() 中被重新安装）
     env.status = EnvStatus.RUNNING
-    if env.env_visualizer is not None:
-        env.env_visualizer = None
 
     # 重置环境（加载实例数据，调用 agent.new_episode()，重置 agent.alive=True）
     env.reset()

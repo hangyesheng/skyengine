@@ -1,5 +1,6 @@
 from typing import List, Tuple, Optional, Dict, Any, Union
 import copy
+import logging
 
 from pettingzoo import ParallelEnv
 
@@ -250,18 +251,19 @@ class PacketFactoryEnv(ParallelEnv):
         :param actions: 动作字典，包含 decisions 和 step_time
         :return: obs, rewards, terminations, truncations, infos
         """
-        LOGGER.info(f"--------- 当前循环步为{self.env_timeline} (模式：{self.mode}) ---------")
+        # 每步日志仅在 INFO 级别开启时输出，避免 WARNING 及以上时仍构造 f-string 拖慢训练
+        if LOGGER.isEnabledFor(logging.INFO):
+            LOGGER.info(f"--------- 当前循环步为{self.env_timeline} (模式：{self.mode}) ---------")
 
         # === 0. Agent 决策动作 ===
         decisions = actions['decisions']
         step_time = actions.get('step_time', DEFAULT_STEP_TIME)
 
         # 记录决策统计信息
-        if hasattr(self.agent, 'get_decision_stats'):
+        if LOGGER.isEnabledFor(logging.INFO) and hasattr(self.agent, 'get_decision_stats'):
             stats = self.agent.get_decision_stats()
             LOGGER.info(f"Agent 决策统计：{stats}")
-
-        LOGGER.info(f"step_time: {step_time}, decisions_count: {len(decisions)}")
+            LOGGER.info(f"step_time: {step_time}, decisions_count: {len(decisions)}")
 
         # === 1. 执行直到发生事件或完成 ===
         while True:
@@ -293,7 +295,8 @@ class PacketFactoryEnv(ParallelEnv):
         # ---------- 更新可视化（支持为空）----------
         self.render()
 
-        LOGGER.info(f"--------- 结束当前循环步 ---------")
+        if LOGGER.isEnabledFor(logging.INFO):
+            LOGGER.info(f"--------- 结束当前循环步 ---------")
 
         return obs, rewards_dict, {}, {}, {}
 
@@ -335,6 +338,9 @@ class PacketFactoryEnv(ParallelEnv):
     # ---------- 渲染函数 ----------
     def render_observation(self):
         # 展示作业、机器、AGV和Operation概况
+        # 该方法构造大量字符串列表，仅在 INFO 级别开启时执行，避免训练时无谓的开销
+        if not LOGGER.isEnabledFor(logging.INFO):
+            return
 
         job_status = [f"Job {job.id}: {'Finished' if job.is_finished() else 'In Progress'}" for job in self.jobs]
         machine_status = [f"Machine {machine.id}: Timer={machine.get_timer()}" for machine in self.machines]
