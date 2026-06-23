@@ -31,6 +31,7 @@
     再次运行相同命令即可，已完成的 epoch 会自动跳过
 """
 import copy
+import gc
 import random
 import time
 import yaml
@@ -83,13 +84,20 @@ DRL_AGENTS = {
 EPOCH_SIZE = 10           # 每个 epoch 的训练 episode 数（mini-batch 大小）
 VAL_RATIO = 0.2           # 验证集比例
 SPLIT_SEED = 42           # 数据集划分种子
-VAL_INTERVAL = 1          # 每 N 个 epoch 验证一次
+VAL_INTERVAL = 5          # 每 N 个 epoch 验证一次（验证阶段耗时远大于训练，降低频率以提升训练效率）
 EARLY_STOP_PATIENCE = 5   # 早停耐心度
 RELATIVE_TOLERANCE = 0.01 # 相对容差阈值（1%）
 MIN_EPOCHS = 10           # 最小 epoch 数（防止假收敛）
 MAX_EPOCHS = 100          # 最大 epoch 数
 TRAIN_INTERVAL = 20       # 训练间隔：每隔多少步调用一次 agent.train()
-EPISODE_TIMEOUT = 7200    # 单次 episode 超时（秒）= 2小时
+EPISODE_TIMEOUT = 7200    # 单次训练 episode 超时（秒）= 2小时
+
+# === 验证阶段优化参数 ===
+# 验证为纯推理，单实例耗时长；用更短超时 + 固定随机子集 + 死锁检测控制成本
+VAL_EPISODE_TIMEOUT = 600  # 单次验证 episode 超时（秒）= 10分钟（验证只看 makespan，卡住即止损）
+VAL_SAMPLE_SIZE = 10       # 每次验证随机抽取的实例数（0 = 用全部验证集）
+VAL_SAMPLE_SEED = 42       # 验证子集随机种子（固定 → 跨 epoch 指标可比，早停信号稳定）
+NO_PROGRESS_LIMIT = 50     # 连续 N 步 env_timeline 无推进视为死锁，立即终止该 episode
 
 # === 旧版收敛条件默认值（仅 --legacy-convergence 时使用）===
 REWARD_THRESHOLD = 1000.0
@@ -210,7 +218,14 @@ def parse_args():
         '--episode-timeout',
         type=int,
         default=EPISODE_TIMEOUT,
-        help=f'单次 episode 超时（秒）(默认: {EPISODE_TIMEOUT})'
+        help=f'单次训练 episode 超时（秒）(默认: {EPISODE_TIMEOUT})'
+    )
+
+    parser.add_argument(
+        '--val-episode-timeout',
+        type=int,
+        default=VAL_EPISODE_TIMEOUT,
+        help=f'单次验证 episode 超时（秒），验证为纯推理故默认更短 (默认: {VAL_EPISODE_TIMEOUT})'
     )
 
     # === 验证集划分 ===
@@ -235,6 +250,27 @@ def parse_args():
         help=f'每 N 个 epoch 进行一次验证 (默认: {VAL_INTERVAL})'
     )
 
+    parser.add_argument(
+        '--val-sample-size',
+        type=int,
+        default=VAL_SAMPLE_SIZE,
+        help=f'每次验证随机抽取的实例数，0 表示用全部验证集 (默认: {VAL_SAMPLE_SIZE})'
+    )
+
+    parser.add_argument(
+        '--val-sample-seed',
+        type=int,
+        default=VAL_SAMPLE_SEED,
+        help=f'验证子集随机种子，固定以保证跨 epoch 指标可比 (默认: {VAL_SAMPLE_SEED})'
+    )
+
+    parser.add_argument(
+        '--no-progress-limit',
+        type=int,
+        default=NO_PROGRESS_LIMIT,
+        help=f'连续 N 步 env_timeline 无推进视为死锁并终止 episode (默认: {NO_PROGRESS_LIMIT})'
+    )
+
     # === 早停参数 ===
     parser.add_argument(
         '--relative-tolerance',
@@ -247,7 +283,7 @@ def parse_args():
         '--early-stop-patience',
         type=int,
         default=EARLY_STOP_PATIENCE,
-        help=f'早停耐心度：连续无显著改善的 epoch 数 (默认: {EARLY_STOP_PATIENCE})'
+        help=f'早停耐心度：连续无显著改善的验证 epoch 数 (默认: {EARLY_STOP_PATIENCE})'
     )
 
     parser.add_argument(
@@ -815,7 +851,8 @@ def create_env_for_instance(agent: object, instance_config: dict,
 def run_episode_with_env(agent: object, env: object,
                          train_interval: int = TRAIN_INTERVAL,
                          timeout: int = EPISODE_TIMEOUT,
-                         is_training: bool = True) -> dict:
+                         is_training: bool = True,
+                         no_progress_limit: int = NO_PROGRESS_LIMIT) -> dict:
     """使用已有的 agent+env 运行一次完整 episode
 
     与旧版 run_training_episode() 不同，此函数不调用 bootstrap()，
@@ -844,6 +881,10 @@ def run_episode_with_env(agent: object, env: object,
 
     start_time = time.time()
     step_count = 0
+    # 死锁检测：env_timeline 连续无推进则提前终止，避免推理策略把实例推入
+    # 无法完成的死局后空转到 wall-clock 超时（验证默认 600s、训练默认 7200s）
+    last_timeline = env.env_timeline
+    no_progress_steps = 0
 
     try:
         while not env.env_is_finished():
@@ -866,6 +907,27 @@ def run_episode_with_env(agent: object, env: object,
 
             # 执行动作
             observations, rewards, terminations, truncations, infos = env.step(actions)
+
+            # 死锁检测：timeline 未推进则累计，连续超过阈值即视为死局止损
+            if env.env_timeline == last_timeline:
+                no_progress_steps += 1
+                if no_progress_steps >= no_progress_limit:
+                    logger.warning(
+                        f"Episode 死锁（连续 {no_progress_steps} 步 timeline 无推进，"
+                        f"timeline={env.env_timeline}，已执行 {step_count} 步）"
+                    )
+                    metrics = agent.get_training_metrics() if hasattr(agent, 'get_training_metrics') else {}
+                    return {
+                        "status": "stuck",
+                        "makespan": env.env_timeline,
+                        "metrics": metrics,
+                        "decision_stats": agent.get_decision_stats() if hasattr(agent, 'get_decision_stats') else {},
+                        "steps": step_count,
+                        "elapsed": time.time() - start_time,
+                    }
+            else:
+                last_timeline = env.env_timeline
+                no_progress_steps = 0
 
             # 训练更新（仅训练模式，每 train_interval 步）
             if is_training and step_count % train_interval == 0:
@@ -1400,6 +1462,16 @@ def main():
     # 划分数据集
     train_files, val_files = split_dataset(DATA_DIR, args.val_ratio, args.split_seed)
 
+    # 验证子集：固定随机抽样一份子集，跨 epoch 复用 → 早停指标可比且单次验证耗时可控
+    val_files_full = val_files
+    if args.val_sample_size > 0 and len(val_files) > args.val_sample_size:
+        rng = random.Random(args.val_sample_seed)
+        val_files = rng.sample(val_files, args.val_sample_size)
+        logger.info(f"验证子集: 从 {len(val_files_full)} 个验证实例中固定抽取 {len(val_files)} 个 "
+                    f"(seed={args.val_sample_seed})，跨 epoch 复用")
+    else:
+        val_files_full = val_files
+
     logger.info("=" * 60)
     logger.info("自动化训练循环脚本（Epoch 级别，Mini-Batch 训练）")
     logger.info(f"训练 Agent: {args.agent}")
@@ -1411,8 +1483,10 @@ def main():
     logger.info(f"早停相对容差: {args.relative_tolerance:.1%}")
     logger.info(f"早停耐心度: {args.early_stop_patience}")
     logger.info(f"训练间隔: 每 {args.train_interval} 步")
-    logger.info(f"Episode 超时: {args.episode_timeout}s")
-    logger.info(f"数据集: {len(train_files)} 训练, {len(val_files)} 验证")
+    logger.info(f"训练 episode 超时: {args.episode_timeout}s，验证 episode 超时: {args.val_episode_timeout}s")
+    logger.info(f"死锁检测: 连续 {args.no_progress_limit} 步 timeline 无推进即终止 episode")
+    logger.info(f"数据集: {len(train_files)} 训练, {len(val_files)} 验证"
+                f"{'（子集，全集 ' + str(len(val_files_full)) + '）' if val_files is not val_files_full else ''}")
     if args.legacy_convergence:
         logger.info(f"旧版收敛: reward阈值={args.reward_threshold}, "
                     f"loss阈值={args.loss_threshold}, "
@@ -1434,6 +1508,10 @@ def main():
         "early_stop_patience": args.early_stop_patience,
         "train_interval": args.train_interval,
         "episode_timeout": args.episode_timeout,
+        "val_episode_timeout": args.val_episode_timeout,
+        "no_progress_limit": args.no_progress_limit,
+        "val_sample_size": args.val_sample_size,
+        "val_sample_seed": args.val_sample_seed,
         "config_yaml": args.config_yaml,
         "legacy_convergence": args.legacy_convergence,
         "reward_threshold": args.reward_threshold if args.legacy_convergence else None,
@@ -1532,6 +1610,7 @@ def main():
                         train_interval=args.train_interval,
                         timeout=args.episode_timeout,
                         is_training=True,
+                        no_progress_limit=args.no_progress_limit,
                     )
                 except KeyboardInterrupt:
                     logger.info("\n训练 episode 被中断，保存当前 epoch 结果...")
@@ -1543,6 +1622,9 @@ def main():
                 result['makespan_lower_bound'] = lower_bound
                 result['data_file'] = str(relative_path)
                 train_results.append(result)
+
+                # 释放本 episode 的 env（同验证分支，避免循环引用导致的内存累积）
+                del env
 
                 # 打印本次 episode 的关键指标
                 ep_reward = result.get('metrics', {}).get('episode_reward', 0.0)
@@ -1598,12 +1680,13 @@ def main():
                         logger.error(f"创建验证环境失败 {relative_path}: {e}")
                         continue
 
-                    # 验证模式：推理（不训练）
+                    # 验证模式：推理（不训练）；用更短的验证超时 + 死锁检测控制单实例成本
                     try:
                         result = run_episode_with_env(
                             agent, env,
-                            timeout=args.episode_timeout,
+                            timeout=args.val_episode_timeout,
                             is_training=False,
+                            no_progress_limit=args.no_progress_limit,
                         )
                     except KeyboardInterrupt:
                         logger.info("\n验证 episode 被中断，保存当前 epoch 结果...")
@@ -1616,37 +1699,64 @@ def main():
                     result['data_file'] = str(relative_path)
                     val_results.append(result)
 
+                    # 验证每 episode 输出指标（与训练分支对齐，否则验证阶段只能看到 [Callback] 行）
+                    v_status = result.get('status', 'unknown')
+                    v_makespan = result.get('makespan', 0.0)
+                    v_gap = result.get('makespan_gap', float('inf'))
+                    v_steps = result.get('steps', 0)
+                    v_elapsed = result.get('elapsed', 0.0)
+                    logger.info(f"  [Epoch {epoch} / 验证 {len(val_results)}/{len(val_files)}] "
+                                f"文件={relative_path}, 状态={v_status}, "
+                                f"makespan={v_makespan:.2f}, gap={v_gap:.1%}, "
+                                f"steps={v_steps}, elapsed={v_elapsed:.2f}s")
+
+                    # 释放本 episode 的 env（env↔event_queue↔agent.context 存在循环引用，
+                    # 显式断开 + 触发回收，避免单 epoch 累积数十个 env 导致内存持续上涨）
+                    del env
+
             # ========== 计算 Epoch 指标 ==========
             epoch_metrics = compute_epoch_metrics(
                 train_results, val_results, epoch, agent=agent
             )
 
             # ========== 早停检测 ==========
-            current_val_gap = epoch_metrics.get('val_makespan_gap', float('inf'))
-            best_val_gap = early_stopping_state['best_val_gap']
+            # 仅在真正执行了验证的 epoch 更新早停状态。非验证 epoch 的
+            # val_makespan_gap 为 inf，若参与计数会把"跳过验证"误判为"无改善"，
+            # 在 val_interval>1 时导致 patience 被 4 个跳过 epoch 空耗 → 假早停。
+            # 因此 patience 现在按"验证 epoch"计数（而非所有 epoch）。
+            did_validate = bool(val_results)
+            if did_validate:
+                current_val_gap = epoch_metrics.get('val_makespan_gap', float('inf'))
+                best_val_gap = early_stopping_state['best_val_gap']
 
-            stop, reason = should_early_stop(
-                early_stopping_state, current_val_gap,
-                tolerance=args.relative_tolerance,
-                patience=args.early_stop_patience,
-                min_epochs=args.min_epochs,
-                current_epoch=epoch,
-            )
+                stop, reason = should_early_stop(
+                    early_stopping_state, current_val_gap,
+                    tolerance=args.relative_tolerance,
+                    patience=args.early_stop_patience,
+                    min_epochs=args.min_epochs,
+                    current_epoch=epoch,
+                )
 
-            # 日志输出
-            if current_val_gap < best_val_gap:
-                relative_improvement = (best_val_gap - current_val_gap) / max(abs(best_val_gap), 1e-8)
-                if relative_improvement > args.relative_tolerance:
-                    logger.info(f"  验证指标显著改善: {best_val_gap:.4f} → {current_val_gap:.4f} "
-                                f"(改善 {relative_improvement:.1%})")
+                # 日志输出
+                if current_val_gap < best_val_gap:
+                    relative_improvement = (best_val_gap - current_val_gap) / max(abs(best_val_gap), 1e-8)
+                    if relative_improvement > args.relative_tolerance:
+                        logger.info(f"  验证指标显著改善: {best_val_gap:.4f} → {current_val_gap:.4f} "
+                                    f"(改善 {relative_improvement:.1%})")
+                    else:
+                        logger.info(f"  验证指标边际改善: {best_val_gap:.4f} → {current_val_gap:.4f} "
+                                    f"(改善 {relative_improvement:.1%} < 容差 {args.relative_tolerance:.1%})")
+                    # 保存最佳模型检查点
+                    save_best_checkpoint(agent, experiment_dir, epoch, epoch_metrics)
                 else:
-                    logger.info(f"  验证指标边际改善: {best_val_gap:.4f} → {current_val_gap:.4f} "
-                                f"(改善 {relative_improvement:.1%} < 容差 {args.relative_tolerance:.1%})")
-                # 保存最佳模型检查点
-                save_best_checkpoint(agent, experiment_dir, epoch, epoch_metrics)
+                    logger.info(f"  验证指标无改善: {current_val_gap:.4f} >= 最佳 {best_val_gap:.4f} "
+                                f"(耐心度 {early_stopping_state['patience_counter']}"
+                                f"/{args.early_stop_patience})")
             else:
-                logger.info(f"  验证指标无改善: {current_val_gap:.4f} >= 最佳 {best_val_gap:.4f} "
-                            f"(耐心度 {early_stopping_state['patience_counter']}"
+                current_val_gap = epoch_metrics.get('val_makespan_gap', float('inf'))
+                stop, reason = False, ""
+                logger.info(f"  本 epoch 跳过验证（val_interval={args.val_interval}），"
+                            f"早停状态保持 (耐心度 {early_stopping_state['patience_counter']}"
                             f"/{args.early_stop_patience})")
 
             epoch_metrics['best_val_gap'] = early_stopping_state['best_val_gap']
@@ -1711,6 +1821,9 @@ def main():
                         f"最佳验证 gap={early_stopping_state['best_val_gap']:.4f}, "
                         f"epsilon={epsilon}, "
                         f"耗时={epoch_elapsed:.1f}s")
+
+            # Epoch 边界回收本 epoch 累积的 env 循环引用（del env 断开强引用后触发分代回收）
+            gc.collect()
 
         # ========== 最终统计 ==========
         if epoch_metrics_list:
