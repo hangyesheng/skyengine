@@ -6,6 +6,7 @@
 2. 在 agv-instances 各数据集族上运行实验
 3. 实时保存结果到 JSONL（支持中断续跑）
 4. 自动构建配置（支持 --config-yaml 覆盖基础模板）
+5. 多进程/多线程并行运行，充分利用多核 CPU（-j/--workers、--parallel-mode）
 
 用法：
     uv run python scripts/run_benchmark.py --agents ORToolsAgent --families kacem --runs-opt 1
@@ -14,6 +15,8 @@
     uv run python scripts/run_benchmark.py --log-level DEBUG --backend-log-level INFO
     uv run python scripts/run_benchmark.py --small-only                           # 只运行小规模数据集
     uv run python scripts/run_benchmark.py --small-only --small-max-jobs 10       # 自定义小规模阈值
+    uv run python scripts/run_benchmark.py -j 8                                   # 8 进程并行
+    uv run python scripts/run_benchmark.py --parallel-mode thread -j 8            # 多线程模式
 
 中断后续跑：
     再次运行相同命令即可，已完成的 trial 会自动跳过
@@ -21,16 +24,26 @@
 日志级别控制：
     --log-level: 控制前端脚本的日志输出级别 (默认: INFO)
     --backend-log-level: 控制后端 logger 的日志输出级别 (默认: WARNING)
+
+并行控制：
+    -j/--workers: 并行 worker 数 (默认 CPU 核数)
+    --parallel-mode: process(默认,多进程真多核) | thread(多线程,受 GIL 限制)
+    --ortools-workers: OR-Tools 每 solver 内部线程数 (默认 auto=cpu_count//workers, 避免 4×N 超额订阅)
+    注意: DRL agent 使用 device: cuda 时，多进程会各自创建 CUDA context，
+          显存吃紧可降低 -j 或在 agent yaml 中设置 device: cpu。
 """
 
 import argparse
 import copy
 import json
 import logging
+import multiprocessing
 import os
 import signal
 import sys
+import threading
 import time
+from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor, wait, FIRST_COMPLETED
 from pathlib import Path
 from typing import Dict, List, Optional, Set, Tuple
 
@@ -99,8 +112,14 @@ DRL_AGENTS = {
     "GraphPPOAgent", "GraphGRPOAgent",
 }
 
+# OR-Tools 优化 agent 集合：这些 agent 的每次 solve 会启动 num_workers 个内部线程，
+# 并行 benchmark 时需要按 cpu_count // workers 调整 num_workers 以避免超额订阅 CPU。
+OR_TOOLS_AGENTS = {"ORToolsAgent", "ORToolsBatchAgent"}
+
 # === 全局中断标记 ===
 _shutdown_requested = False
+# 进程模式下由 _init_worker 在每个 worker 进程设置；线程模式下主进程共享（置 None 即不检查）。
+_worker_shutdown_event = None
 
 
 def setup_logging(log_level: str = "INFO", backend_log_level: str = "WARNING"):
@@ -118,6 +137,24 @@ def setup_logging(log_level: str = "INFO", backend_log_level: str = "WARNING"):
     # 设置后端日志级别环境变量，供 executor 层的 Logger 读取
     os.environ['BACKEND_LOG_LEVEL'] = backend_log_level.upper()
     logger.debug(f"后端日志级别已设置为: {backend_log_level.upper()}")
+
+
+def _is_shutdown() -> bool:
+    """统一的关闭判定：主进程信号标记 或 worker 进程的 shutdown 事件被置位。"""
+    return _shutdown_requested or (
+        _worker_shutdown_event is not None and _worker_shutdown_event.is_set()
+    )
+
+
+def _init_worker(log_level: str, backend_log_level: str, shutdown_event):
+    """ProcessPoolExecutor 的 worker 初始化函数。
+
+    - 在每个 worker 进程中重新配置日志（spawn 子进程不继承父进程的 logging 配置）；
+    - 将主进程传入的 multiprocessing.Event 绑定到 worker 全局，供 run_episode 轮询实现快速中断。
+    """
+    global _worker_shutdown_event
+    setup_logging(log_level, backend_log_level)
+    _worker_shutdown_event = shutdown_event
 
 
 def load_agent_config(agent_name: str) -> dict:
@@ -334,7 +371,7 @@ def load_uncertain_events_for_instance(instance_path: Path, scenario: str) -> Op
     return data.get("event_timeline", [])
 
 
-def build_config(agent_key: str, instance_config: dict, base_yaml_path: Optional[str] = None, time_limit: int = 30) -> dict:
+def build_config(agent_key: str, instance_config: dict, base_yaml_path: Optional[str] = None, time_limit: int = 30, num_workers: Optional[int] = None) -> dict:
     """构建完整的 bootstrap 配置
 
     从 config/agents/{agent_key}.yaml 加载 Agent 超参数，
@@ -345,6 +382,8 @@ def build_config(agent_key: str, instance_config: dict, base_yaml_path: Optional
         instance_config: generate_instance_config() 的输出
         base_yaml_path: 可选的自定义基础 YAML 路径
         time_limit: OR-Tools 求解时间限制
+        num_workers: OR-Tools 每次求解的内部线程数；仅对 OR_TOOLS_AGENTS 生效，
+            通过 agent_initializer 的 extra_kwargs 机制透传到 ORToolsOptimizer。
     """
     yaml_path = base_yaml_path or str(DEFAULT_CONFIG_PATH)
     with open(yaml_path, "r", encoding="utf-8") as f:
@@ -369,6 +408,10 @@ def build_config(agent_key: str, instance_config: dict, base_yaml_path: Optional
     if "model_path" in agent_cfg:
         config["simulation"]["agent"]["model_path"] = agent_cfg["model_path"]
 
+    # OR-Tools 内部线程数：仅对 OR_TOOLS_AGENTS 注入，避免超额订阅 CPU（并行数×num_workers≈核数）
+    if num_workers is not None and agent_key in OR_TOOLS_AGENTS:
+        config["simulation"]["agent"]["num_workers"] = num_workers
+
     # 注入实例数据
     config["simulation"]["job_config"] = instance_config["job_config"]
     config["simulation"]["map_config"] = instance_config["map_config"]
@@ -379,15 +422,28 @@ def build_config(agent_key: str, instance_config: dict, base_yaml_path: Optional
 
 # ==================== Episode 运行 ====================
 
-def run_episode(config: dict, timeout: int = 600) -> dict:
+def run_episode(config: dict, timeout: int = 600, bootstrap_lock: Optional[threading.Lock] = None) -> dict:
     """运行一次完整 episode 并返回结果
 
     直接调用 executor 层，不走 HTTP。
+
+    Args:
+        config: 完整的 bootstrap 配置字典
+        timeout: 单次 episode 超时秒数
+        bootstrap_lock: 线程模式下用于串行化 bootstrap() 的锁（进程模式传 None）。
+            bootstrap() 会读写进程级全局 component_registry['config']（BackendMapLoader
+            在 create_context 阶段读取并缓存），多线程并发调用会竞态；env.reset() 使用缓存
+            后的实例属性，可放锁外以保留更多并行度。
     """
     from executor.packet_factory.lifecycle.bootstrap import bootstrap
     from executor.packet_factory.packet_factory.packet_factory_env.Utils.util import EnvStatus
 
-    env, agent = bootstrap(config)
+    # 线程模式下串行化 bootstrap（保护全局配置）；进程模式无需锁
+    if bootstrap_lock is not None:
+        with bootstrap_lock:
+            env, agent = bootstrap(config)
+    else:
+        env, agent = bootstrap(config)
 
     # 重置环境（加载实例数据，初始化 jobs/machines/agvs）
     env.reset()
@@ -402,7 +458,7 @@ def run_episode(config: dict, timeout: int = 600) -> dict:
 
     try:
         while not env.env_is_finished():
-            if _shutdown_requested:
+            if _is_shutdown():
                 logger.info("收到中断信号，正在停止当前 episode...")
                 return {"status": "interrupted", "makespan": None, "decision_stats": {}, "steps": step_count, "elapsed": time.time() - start_time}
 
@@ -429,6 +485,48 @@ def run_episode(config: dict, timeout: int = 600) -> dict:
         import traceback
         traceback.print_exc()
         return {"status": "error", "makespan": None, "decision_stats": {}, "steps": step_count, "elapsed": time.time() - start_time, "error": str(e)}
+
+
+def run_trial(task: dict) -> dict:
+    """并行 worker 的入口函数（ProcessPoolExecutor / ThreadPoolExecutor 的 target）。
+
+    接收一个 task 字典，运行一次 episode，返回可直接写入 JSONL 的 record。
+    顶层函数便于 spawn 子进程作为 __main__.run_trial pickle 引用。
+
+    Args:
+        task: {config, timeout, agent, family, instance, run, num_runs, bootstrap_lock}
+    """
+    agent_key = task["agent"]
+    family = task["family"]
+    instance_name = task["instance"]
+    run = task["run"]
+    num_runs = task["num_runs"]
+    logger.info(f"[worker] {agent_key} | {family}/{instance_name} | run {run}/{num_runs} 开始")
+
+    try:
+        result = run_episode(task["config"], timeout=task["timeout"], bootstrap_lock=task.get("bootstrap_lock"))
+    except Exception as e:
+        # 兜底 bootstrap 期或其它未捕获异常，避免单个 worker 崩溃终止整个调度
+        logger.error(f"[worker] {agent_key} | {family}/{instance_name} | run {run} 异常: {e}")
+        import traceback
+        traceback.print_exc()
+        result = {"status": "error", "makespan": None, "decision_stats": {}, "steps": 0, "elapsed": 0.0, "error": str(e)}
+
+    record = {
+        "agent": agent_key,
+        "family": family,
+        "instance": instance_name,
+        "run": run,
+        "status": result["status"],
+        "makespan": result.get("makespan"),
+        "decision_stats": result.get("decision_stats", {}),
+        "steps": result.get("steps", 0),
+        "elapsed": result.get("elapsed", 0),
+        "timestamp": time.strftime("%Y-%m-%d %H:%M:%S"),
+    }
+    if "error" in result:
+        record["error"] = result["error"]
+    return record
 
 
 # ==================== 结果管理 ====================
@@ -528,6 +626,9 @@ def run_benchmark(args):
         "small_only": args.small_only,
         "small_max_jobs": args.small_max_jobs,
         "small_max_machines": args.small_max_machines,
+        "workers": args.workers,
+        "parallel_mode": args.parallel_mode,
+        "ortools_workers": args.ortools_workers,
         "created_at": time.strftime("%Y-%m-%d %H:%M:%S"),
     }
     with open(exp_dir / "experiment_config.json", "w", encoding="utf-8") as f:
@@ -549,115 +650,187 @@ def run_benchmark(args):
         logger.error("未找到任何实例文件")
         return
 
-    # 统计总 trial 数
-    total_trials = 0
+    # ---- OR-Tools 内部线程数（避免并行时超额订阅 CPU）----
+    # 使 并行数(workers) × 每解线程数(num_workers) ≈ CPU 核数
+    if args.ortools_workers is not None:
+        ortools_nw = args.ortools_workers
+    elif args.workers > 1:
+        ortools_nw = max(1, (os.cpu_count() or 1) // args.workers)
+    else:
+        ortools_nw = 4
+    logger.info(f"并行配置: workers={args.workers}, mode={args.parallel_mode}, OR-Tools num_workers={ortools_nw}")
+
+    # ---- 预解析 + 缓存每个实例的 instance_config（同一实例的多个 run 复用）----
+    instance_config_cache: Dict[str, dict] = {}
+
+    def get_instance_config(instance_file: Path) -> Optional[dict]:
+        key = str(instance_file)
+        if key in instance_config_cache:
+            return instance_config_cache[key]
+        try:
+            parsed = parse_agv_instance(instance_file)
+        except Exception as e:
+            logger.error(f"解析失败 {instance_file}: {e}")
+            return None
+        instance_config = generate_instance_config(parsed)
+        if args.uncertain_scenario:
+            uncertain_events = load_uncertain_events_for_instance(instance_file, args.uncertain_scenario)
+            if uncertain_events:
+                instance_config = generate_instance_config(parsed, uncertain_events=uncertain_events)
+        instance_config_cache[key] = instance_config
+        return instance_config
+
+    # ---- 构建 task 列表（跳过已完成）----
+    tasks: List[dict] = []
+    skipped = 0
     for agent_key in args.agents:
         num_runs = args.runs_drl if agent_key in DRL_AGENTS else args.runs_opt
         for family, instances in family_instances.items():
             for instance_file in instances:
                 instance_name = instance_file.stem.replace("_agv", "")
+                instance_config = get_instance_config(instance_file)
+                if instance_config is None:
+                    continue
                 for run in range(1, num_runs + 1):
-                    if (agent_key, family, instance_name, run) not in completed:
-                        total_trials += 1
+                    if (agent_key, family, instance_name, run) in completed:
+                        skipped += 1
+                        continue
+                    config = build_config(
+                        agent_key, instance_config,
+                        base_yaml_path=args.config_yaml,
+                        time_limit=args.time_limit,
+                        num_workers=(ortools_nw if agent_key in OR_TOOLS_AGENTS else None),
+                    )
+                    tasks.append({
+                        "config": config,
+                        "timeout": args.timeout,
+                        "agent": agent_key,
+                        "family": family,
+                        "instance": instance_name,
+                        "run": run,
+                        "num_runs": num_runs,
+                        "bootstrap_lock": None,  # 稍后按并行模式注入
+                    })
 
-    logger.info(f"待运行 trial 数: {total_trials}")
+    total_trials = len(tasks)
+    logger.info(f"待运行 trial 数: {total_trials}（跳过 {skipped} 个已完成）")
 
     if total_trials == 0:
         logger.info("所有 trial 均已完成，无需运行")
         return
 
-    # 注册信号处理器
+    # ---- 创建 pool + shutdown_event ----
+    if args.parallel_mode == "process":
+        shutdown_event = multiprocessing.Event()
+        bootstrap_lock = None  # 进程模式各进程独立全局，无需锁；且 threading.Lock 不可 pickle
+        pool = ProcessPoolExecutor(
+            max_workers=args.workers,
+            initializer=_init_worker,
+            initargs=(args.log_level, args.backend_log_level, shutdown_event),
+            mp_context=multiprocessing.get_context("spawn"),
+        )
+    else:  # thread
+        shutdown_event = threading.Event()
+        bootstrap_lock = threading.Lock()  # 串行化 bootstrap()，保护全局 component_registry['config']
+        pool = ThreadPoolExecutor(max_workers=args.workers)
+        for t in tasks:
+            t["bootstrap_lock"] = bootstrap_lock
+
+    # ---- 注册信号处理器（闭包捕获 shutdown_event，通知 worker 进程快速退出）----
     def signal_handler(sig, frame):
         global _shutdown_requested
         _shutdown_requested = True
-        logger.info("\n收到中断信号，等待当前 episode 完成后退出...")
+        shutdown_event.set()
+        logger.info("\n收到中断信号，停止派发新 trial，等待运行中的 episode 退出...")
 
     signal.signal(signal.SIGINT, signal_handler)
     signal.signal(signal.SIGTERM, signal_handler)
 
-    # 运行实验
+    # ---- 滚动窗口并行调度 ----
     trial_count = 0
-    skipped = 0
+    cap = max(args.workers * 4, args.workers)  # 在途 future 上限，控制内存
+    task_iter = iter(tasks)
+    pending: set = set()
+    fut_to_task: dict = {}
+    drain_cancelled = False
 
-    for agent_key in args.agents:
-        if _shutdown_requested:
-            break
+    def submit_one() -> bool:
+        try:
+            t = next(task_iter)
+        except StopIteration:
+            return False
+        fut = pool.submit(run_trial, t)
+        pending.add(fut)
+        fut_to_task[fut] = t
+        return True
 
-        num_runs = args.runs_drl if agent_key in DRL_AGENTS else args.runs_opt
-        agent_cfg = AGENT_CONFIGS[agent_key]
+    # 预先派发到 cap
+    for _ in range(min(cap, len(tasks))):
+        submit_one()
 
-        for family, instances in family_instances.items():
-            if _shutdown_requested:
-                break
+    try:
+        while pending:
+            done, _ = wait(pending, return_when=FIRST_COMPLETED)
+            for fut in done:
+                pending.discard(fut)
+                t = fut_to_task.pop(fut)
+                trial_count += 1
+                agent_key = t["agent"]
+                family = t["family"]
+                instance_name = t["instance"]
+                run = t["run"]
+                num_runs = t["num_runs"]
 
-            logger.info(f"\n{'='*60}")
-            logger.info(f"Agent: {agent_key} | Family: {family} | Runs: {num_runs}")
-            logger.info(f"{'='*60}")
-
-            for instance_file in instances:
-                if _shutdown_requested:
-                    break
-
-                instance_name = instance_file.stem.replace("_agv", "")
-
-                # 解析实例
                 try:
-                    parsed = parse_agv_instance(instance_file)
+                    record = fut.result()
                 except Exception as e:
-                    logger.error(f"解析失败 {instance_file}: {e}")
-                    continue
-
-                instance_config = generate_instance_config(parsed)
-
-                # 加载不确定性事件（如果指定了场景）
-                if args.uncertain_scenario:
-                    uncertain_events = load_uncertain_events_for_instance(instance_file, args.uncertain_scenario)
-                    if uncertain_events:
-                        instance_config = generate_instance_config(parsed, uncertain_events=uncertain_events)
-
-                for run in range(1, num_runs + 1):
-                    if _shutdown_requested:
-                        break
-
-                    # 检查是否已完成
-                    if (agent_key, family, instance_name, run) in completed:
-                        skipped += 1
-                        continue
-
-                    # 构建配置
-                    config = build_config(agent_key, instance_config, base_yaml_path=args.config_yaml, time_limit=args.time_limit)
-
-                    # 运行 episode
-                    trial_count += 1
-                    logger.info(f"[{trial_count}/{total_trials}] {agent_key} | {family}/{instance_name} | run {run}/{num_runs}")
-
-                    result = run_episode(config, timeout=args.timeout)
-
-                    # 记录结果
+                    logger.error(f"[{trial_count}/{total_trials}] {agent_key} | {family}/{instance_name} | run {run}/{num_runs} 调度异常: {e}")
                     record = {
-                        "agent": agent_key,
-                        "family": family,
-                        "instance": instance_name,
-                        "run": run,
-                        "status": result["status"],
-                        "makespan": result.get("makespan"),
-                        "decision_stats": result.get("decision_stats", {}),
-                        "steps": result.get("steps", 0),
-                        "elapsed": result.get("elapsed", 0),
-                        "timestamp": time.strftime("%Y-%m-%d %H:%M:%S"),
+                        "agent": agent_key, "family": family, "instance": instance_name, "run": run,
+                        "status": "error", "makespan": None, "decision_stats": {}, "steps": 0, "elapsed": 0.0,
+                        "timestamp": time.strftime("%Y-%m-%d %H:%M:%S"), "error": str(e),
                     }
-                    if "error" in result:
-                        record["error"] = result["error"]
 
-                    append_result(results_path, record)
+                append_result(results_path, record)
 
-                    # 日志输出
-                    if result["status"] == "completed":
-                        makespan = result["makespan"]
-                        avg_dt = result.get("decision_stats", {}).get("average_decision_time", 0)
-                        logger.info(f"  -> makespan={makespan:.2f}, avg_decision_time={avg_dt:.4f}s, steps={result['steps']}, elapsed={result['elapsed']:.2f}s")
-                    else:
-                        logger.warning(f"  -> {result['status']}")
+                # 日志输出
+                if record["status"] == "completed" and record.get("makespan") is not None:
+                    makespan = record["makespan"]
+                    avg_dt = record.get("decision_stats", {}).get("average_decision_time", 0)
+                    logger.info(f"[{trial_count}/{total_trials}] {agent_key} | {family}/{instance_name} | run {run}/{num_runs} -> makespan={makespan:.2f}, avg_decision_time={avg_dt:.4f}s, steps={record['steps']}, elapsed={record['elapsed']:.2f}s")
+                else:
+                    logger.warning(f"[{trial_count}/{total_trials}] {agent_key} | {family}/{instance_name} | run {run}/{num_runs} -> {record['status']}")
+
+                # 未中断则补充派发一个，维持在途数量
+                if not _shutdown_requested:
+                    submit_one()
+
+            # 中断后：通知 worker 退出、取消尚未开始的 future 并记录 cancelled，继续 drain 运行中的
+            if _shutdown_requested and not drain_cancelled:
+                drain_cancelled = True
+                shutdown_event.set()
+                for fut in list(pending):
+                    if fut.cancel():
+                        pending.discard(fut)
+                        ct = fut_to_task.pop(fut, None)
+                        if ct is not None:
+                            trial_count += 1
+                            append_result(results_path, {
+                                "agent": ct["agent"], "family": ct["family"], "instance": ct["instance"], "run": ct["run"],
+                                "status": "cancelled", "makespan": None, "decision_stats": {}, "steps": 0, "elapsed": 0.0,
+                                "timestamp": time.strftime("%Y-%m-%d %H:%M:%S"),
+                            })
+                            logger.warning(f"[{trial_count}/{total_trials}] {ct['agent']} | {ct['family']}/{ct['instance']} | run {ct['run']}/{ct['num_runs']} -> cancelled")
+    except KeyboardInterrupt:
+        # 二次中断兜底：取消未开始的任务并直接关闭（运行中的结果可能丢失）
+        _shutdown_requested = True
+        shutdown_event.set()
+        logger.info("KeyboardInterrupt: 取消未开始的 trial 并退出...")
+        for fut in list(pending):
+            fut.cancel()
+    finally:
+        pool.shutdown(cancel_futures=True, wait=True)
+
 
     # 总结
     logger.info(f"\n{'='*60}")
@@ -694,6 +867,15 @@ def parse_args():
 
   # 自定义小规模阈值
   uv run python scripts/run_benchmark.py --small-only --small-max-jobs 10 --small-max-machines 8
+
+  # 多进程并行加速（默认使用全部 CPU 核）
+  uv run python scripts/run_benchmark.py --agents ORToolsAgent --families kacem -j 8
+
+  # 多线程模式（轻量，OR-Tools 求解释放 GIL 时收益明显）
+  uv run python scripts/run_benchmark.py --parallel-mode thread -j 8
+
+  # 显式控制 OR-Tools 每 solver 线程数，避免超额订阅
+  uv run python scripts/run_benchmark.py -j 8 --ortools-workers 2
         """,
     )
 
@@ -717,6 +899,12 @@ def parse_args():
     parser.add_argument("--experiment-id", type=str, default=None, help="实验标识（默认自动生成时间戳）")
     parser.add_argument("--timeout", type=int, default=600, help="单次 episode 超时秒数 (默认: 600)")
     parser.add_argument("--time-limit", type=int, default=30, help="OR-Tools 求解时间限制秒数 (默认: 30)")
+    parser.add_argument("-j", "--workers", type=int, default=os.cpu_count(),
+                        help="并行 worker 数 (默认: CPU 核数)。process 模式下每个 trial 在独立进程运行；thread 模式下在独立线程运行")
+    parser.add_argument("--parallel-mode", type=str, choices=["process", "thread"], default="process",
+                        help="并行模式 (默认: process)。process=多进程(真多核,绕过GIL); thread=多线程(轻量,但受GIL限制,且 bootstrap 会被锁串行化)")
+    parser.add_argument("--ortools-workers", type=int, default=None,
+                        help="OR-Tools 每个 solver 的内部线程数 (默认: 自动=cpu_count//workers, workers=1 时为 4)。显式指定时可配合 --workers 精确控制总线程数")
     parser.add_argument("--log-level", type=str, default="INFO", choices=["DEBUG", "INFO", "WARNING", "ERROR"], help="前端脚本日志级别")
     parser.add_argument("--backend-log-level", type=str, default="WARNING", choices=["DEBUG", "INFO", "WARNING", "ERROR"],
                         help="后端 logger 日志级别 (默认: WARNING)")
@@ -743,6 +931,7 @@ if __name__ == "__main__":
     logger.info(f"Runs (DRL): {args.runs_drl}, Runs (Opt): {args.runs_opt}")
     logger.info(f"Timeout: {args.timeout}s, Time Limit: {args.time_limit}s")
     logger.info(f"Backend Log Level: {args.backend_log_level.upper()}")
+    logger.info(f"Workers: {args.workers}, Parallel Mode: {args.parallel_mode}, OR-Tools workers: {args.ortools_workers if args.ortools_workers is not None else 'auto(cpu_count//workers)'}")
     if args.small_only:
         logger.info(f"Small-only mode: max_jobs={args.small_max_jobs}, max_machines={args.small_max_machines}")
     if args.uncertain_scenario:

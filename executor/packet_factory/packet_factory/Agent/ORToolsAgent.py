@@ -47,7 +47,9 @@ class ORToolsAgent(BaseAgent):
         """
         super().__init__(name, agent_id, context, ui_mode, task_mode, model_path)
 
-        self.optimizer = ORToolsOptimizer(time_limit_seconds=time_limit_seconds)
+        # num_workers 通过 agent 配置的 extra_kwargs 传入（默认 4），便于并行 benchmark 时控制 OR-Tools 内部线程数
+        num_workers = kwargs.pop('num_workers', 4)
+        self.optimizer = ORToolsOptimizer(time_limit_seconds=time_limit_seconds, num_workers=num_workers)
         self.fallback_enabled = fallback_enabled
         self.fallback_agent = GreedyAgent(name=f"{name}_Fallback" if name else "GreedyFallback")
         self.last_result: Optional[ScheduleResult] = None
@@ -123,5 +125,5 @@ class ORToolsAgent(BaseAgent):
 
     def set_time_limit(self, seconds: int):
         """Update the solver time limit."""
-        self.optimizer = ORToolsOptimizer(time_limit_seconds=seconds)
+        self.optimizer = ORToolsOptimizer(time_limit_seconds=seconds, num_workers=self.optimizer.num_workers)
         LOGGER.info(f"ORToolsAgent: Time limit updated to {seconds}s")
