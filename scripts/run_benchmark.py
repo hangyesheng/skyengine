@@ -721,13 +721,18 @@ def run_benchmark(args):
 
     # ---- 创建 pool + shutdown_event ----
     if args.parallel_mode == "process":
-        shutdown_event = multiprocessing.Event()
+        # 显式使用 spawn 上下文，并让 Event 与 pool 共用同一上下文；
+        # 否则 Linux 默认 fork 上下文的 Event 传入 spawn pool 会触发
+        # "A SemLock created in a fork context is being shared with a process in a spawn context"。
+        # spawn 还能避免 fork + CUDA/线程导入导致的死锁。
+        ctx = multiprocessing.get_context("spawn")
+        shutdown_event = ctx.Event()
         bootstrap_lock = None  # 进程模式各进程独立全局，无需锁；且 threading.Lock 不可 pickle
         pool = ProcessPoolExecutor(
             max_workers=args.workers,
             initializer=_init_worker,
             initargs=(args.log_level, args.backend_log_level, shutdown_event),
-            mp_context=multiprocessing.get_context("spawn"),
+            mp_context=ctx,
         )
     else:  # thread
         shutdown_event = threading.Event()
