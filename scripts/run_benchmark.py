@@ -20,6 +20,7 @@
 
 中断后续跑：
     再次运行相同命令即可，已完成的 trial 会自动跳过
+    （status=error 的记录会被删除并重跑）
 
 日志级别控制：
     --log-level: 控制前端脚本的日志输出级别 (默认: INFO)
@@ -532,19 +533,41 @@ def run_trial(task: dict) -> dict:
 # ==================== 结果管理 ====================
 
 def load_completed_trials(results_path: Path) -> Set[Tuple[str, str, str, int]]:
-    """读取已有结果，返回 (agent, family, instance, run) 的集合"""
-    completed = set()
-    if results_path.exists():
-        with open(results_path, "r", encoding="utf-8") as f:
-            for line in f:
-                line = line.strip()
-                if not line:
-                    continue
-                try:
-                    r = json.loads(line)
-                    completed.add((r["agent"], r["family"], r["instance"], r["run"]))
-                except json.JSONDecodeError:
-                    continue
+    """读取已有结果，返回 (agent, family, instance, run) 的集合。
+
+    status 为 "error" 的记录视为未完成：不计入 completed 集合（重跑时会重新运行），
+    并从 results.jsonl 中物理删除这些行，避免错误记录堆积。
+    """
+    completed: Set[Tuple[str, str, str, int]] = set()
+    if not results_path.exists():
+        return completed
+
+    kept_lines: List[str] = []
+    error_count = 0
+    with open(results_path, "r", encoding="utf-8") as f:
+        for line in f:
+            raw = line.strip()
+            if not raw:
+                continue
+            try:
+                r = json.loads(raw)
+            except json.JSONDecodeError:
+                # 无法解析的行原样保留，不影响其余流程
+                kept_lines.append(raw)
+                continue
+            if r.get("status") == "error":
+                error_count += 1
+                continue
+            completed.add((r["agent"], r["family"], r["instance"], r["run"]))
+            kept_lines.append(raw)
+
+    # 若存在 error 记录，重写 JSONL（删除 error 行）
+    if error_count > 0:
+        with open(results_path, "w", encoding="utf-8") as f:
+            for raw in kept_lines:
+                f.write(raw + "\n")
+        logger.info(f"已删除 {error_count} 条 error 记录，将重跑对应 trial")
+
     return completed
 
 
