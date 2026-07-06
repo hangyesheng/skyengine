@@ -26,6 +26,7 @@
     python scripts/auto_train_loop.py --early-stop-patience 3 --min-epochs 5
     python scripts/auto_train_loop.py --resume-from training_logs/results/train_xxx
     python scripts/auto_train_loop.py --legacy-convergence --reward-threshold 500
+    python scripts/auto_train_loop.py --device cpu                   # 强制使用 CPU 训练（覆盖 YAML 中的 device: cuda）
 
 中断后续跑：
     再次运行相同命令即可，已完成的 epoch 会自动跳过
@@ -163,6 +164,7 @@ def parse_args():
   python scripts/auto_train_loop.py --early-stop-patience 3 --min-epochs 5
   python scripts/auto_train_loop.py --resume-from training_logs/results/train_xxx
   python scripts/auto_train_loop.py --legacy-convergence --reward-threshold 500
+  python scripts/auto_train_loop.py --device cpu
         """
     )
 
@@ -173,6 +175,16 @@ def parse_args():
         default='GraphPPOAgent',
         choices=AVAILABLE_AGENTS,
         help=f'训练使用的 Agent 类型 (默认: GraphPPOAgent)，可选: {", ".join(AVAILABLE_AGENTS)}'
+    )
+
+    # === 计算设备 ===
+    parser.add_argument(
+        '--device',
+        type=str,
+        default=None,
+        choices=['auto', 'cpu', 'cuda'],
+        help='计算设备覆盖：强制指定 Agent 的 device，优先于 agent YAML 中的 device 配置 '
+             '(默认: None=使用 YAML 配置；cpu=强制 CPU；cuda=强制 GPU 不可用时回退 CPU；auto=自动选择)'
     )
 
     # === 日志级别 ===
@@ -618,7 +630,8 @@ def generate_instance_config(parsed_data: dict, uncertain_events: Optional[List[
 
 
 def build_config(agent_key: str, instance_config: dict,
-                 base_yaml_path: Optional[str] = None) -> dict:
+                 base_yaml_path: Optional[str] = None,
+                 device: Optional[str] = None) -> dict:
     """构建完整的 bootstrap 配置（带缓存）
 
     从 config/agents/{agent_key}.yaml 加载 Agent 超参数，
@@ -629,6 +642,8 @@ def build_config(agent_key: str, instance_config: dict,
         agent_key: Agent 标识键
         instance_config: generate_instance_config() 的输出
         base_yaml_path: 可选的自定义基础 YAML 路径
+        device: 可选的计算设备覆盖（'auto'/'cpu'/'cuda'），优先于 agent YAML 中的 device 配置；
+            None 表示不覆盖，沿用 YAML 中的 device
     """
     global _cached_base_template
 
@@ -646,6 +661,10 @@ def build_config(agent_key: str, instance_config: dict,
 
     # 填充 agent 段
     config["simulation"]["agent"].update(agent_full_config)
+
+    # 计算设备覆盖：CLI --device 优先于 agent YAML 中的 device 配置
+    if device is not None:
+        config["simulation"]["agent"]["device"] = device
 
     # 训练模式：始终使用 backend + training
     config["simulation"]["ui_mode"] = "backend"
@@ -753,7 +772,8 @@ def split_dataset(data_dir: Path, val_ratio: float = 0.2,
 
 def initialize_training(agent_key: str,
                         base_yaml_path: Optional[str] = None,
-                        uncertain_scenario: Optional[str] = None) -> object:
+                        uncertain_scenario: Optional[str] = None,
+                        device: Optional[str] = None) -> object:
     """一次性初始化：加载配置、扫描组件、创建 Agent
 
     与 bootstrap() 不同，此函数只创建 Agent 而不创建 env。
@@ -763,6 +783,7 @@ def initialize_training(agent_key: str,
         agent_key: Agent 类名
         base_yaml_path: 可选的自定义基础 YAML 路径
         uncertain_scenario: 可选的不确定性事件场景名
+        device: 可选的计算设备覆盖（'auto'/'cpu'/'cuda'），优先于 agent YAML 中的 device 配置
 
     Returns:
         Agent 实例（持久化）
@@ -786,7 +807,8 @@ def initialize_training(agent_key: str,
         if uncertain_events:
             logger.info(f"已加载不确定性事件: 场景={uncertain_scenario}, {len(uncertain_events)} 个事件")
     instance_config = generate_instance_config(parsed_data, uncertain_events=uncertain_events)
-    config = build_config(agent_key, instance_config, base_yaml_path=base_yaml_path)
+    config = build_config(agent_key, instance_config, base_yaml_path=base_yaml_path,
+                          device=device)
 
     # 存储配置到全局注册表
     load_config(config)
@@ -805,7 +827,8 @@ def initialize_training(agent_key: str,
 
 def create_env_for_instance(agent: object, instance_config: dict,
                             agent_key: str,
-                            base_yaml_path: Optional[str] = None) -> object:
+                            base_yaml_path: Optional[str] = None,
+                            device: Optional[str] = None) -> object:
     """为特定实例创建新的 env，复用已有的 Agent
 
     每次调用会创建一个全新的 env（不同实例有不同的工厂布局），
@@ -816,6 +839,8 @@ def create_env_for_instance(agent: object, instance_config: dict,
         instance_config: generate_instance_config() 的输出
         agent_key: Agent 类名
         base_yaml_path: 可选的自定义基础 YAML 路径
+        device: 可选的计算设备覆盖（'auto'/'cpu'/'cuda'），优先于 agent YAML 中的 device 配置；
+            Agent 的 device 在 initialize_training 时已固化，此处仅保持全局配置一致
 
     Returns:
         新创建的环境实例
@@ -825,7 +850,8 @@ def create_env_for_instance(agent: object, instance_config: dict,
     from executor.packet_factory.packet_factory.packet_factory_env.Utils.util import EnvStatus
 
     # 构建新实例的配置
-    config = build_config(agent_key, instance_config, base_yaml_path=base_yaml_path)
+    config = build_config(agent_key, instance_config, base_yaml_path=base_yaml_path,
+                          device=device)
 
     # 更新全局注册表中的配置
     load_config(config)
@@ -1475,6 +1501,7 @@ def main():
     logger.info("=" * 60)
     logger.info("自动化训练循环脚本（Epoch 级别，Mini-Batch 训练）")
     logger.info(f"训练 Agent: {args.agent}")
+    logger.info(f"计算设备: {args.device if args.device else 'YAML 默认（DRL agent 通常为 cuda）'}")
     logger.info(f"Epoch 大小: {args.epoch_size} 个训练 episode/epoch")
     logger.info(f"最大 Epoch 数: {args.max_epochs}")
     logger.info(f"最小 Epoch 数: {args.min_epochs}")
@@ -1513,6 +1540,7 @@ def main():
         "val_sample_size": args.val_sample_size,
         "val_sample_seed": args.val_sample_seed,
         "config_yaml": args.config_yaml,
+        "device": args.device,
         "legacy_convergence": args.legacy_convergence,
         "reward_threshold": args.reward_threshold if args.legacy_convergence else None,
         "loss_threshold": args.loss_threshold if args.legacy_convergence else None,
@@ -1530,7 +1558,8 @@ def main():
 
     # === 一次性 Agent 初始化 ===
     agent = initialize_training(args.agent, base_yaml_path=args.config_yaml,
-                               uncertain_scenario=args.uncertain_scenario)
+                               uncertain_scenario=args.uncertain_scenario,
+                               device=args.device)
 
     # === 加载已完成的 epoch（续跑支持）===
     start_epoch, early_stopping_state = load_completed_epochs(experiment_dir)
@@ -1589,7 +1618,8 @@ def main():
                 try:
                     env = create_env_for_instance(
                         agent, instance_config, args.agent,
-                        base_yaml_path=args.config_yaml
+                        base_yaml_path=args.config_yaml,
+                        device=args.device,
                     )
                 except Exception as e:
                     logger.error(f"创建环境失败 {relative_path}: {e}")
@@ -1674,7 +1704,8 @@ def main():
                     try:
                         env = create_env_for_instance(
                             agent, instance_config, args.agent,
-                            base_yaml_path=args.config_yaml
+                            base_yaml_path=args.config_yaml,
+                            device=args.device,
                         )
                     except Exception as e:
                         logger.error(f"创建验证环境失败 {relative_path}: {e}")

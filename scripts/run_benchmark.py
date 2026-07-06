@@ -17,6 +17,7 @@
     uv run python scripts/run_benchmark.py --small-only --small-max-jobs 10       # 自定义小规模阈值
     uv run python scripts/run_benchmark.py -j 8                                   # 8 进程并行
     uv run python scripts/run_benchmark.py --parallel-mode thread -j 8            # 多线程模式
+    uv run python scripts/run_benchmark.py --agents DualDRLAgent --device cpu      # 强制 DRL agent 用 CPU（覆盖 YAML device: cuda）
 
 中断后续跑：
     再次运行相同命令即可，已完成的 trial 会自动跳过
@@ -372,7 +373,7 @@ def load_uncertain_events_for_instance(instance_path: Path, scenario: str) -> Op
     return data.get("event_timeline", [])
 
 
-def build_config(agent_key: str, instance_config: dict, base_yaml_path: Optional[str] = None, time_limit: int = 30, num_workers: Optional[int] = None) -> dict:
+def build_config(agent_key: str, instance_config: dict, base_yaml_path: Optional[str] = None, time_limit: int = 30, num_workers: Optional[int] = None, device: Optional[str] = None) -> dict:
     """构建完整的 bootstrap 配置
 
     从 config/agents/{agent_key}.yaml 加载 Agent 超参数，
@@ -385,6 +386,8 @@ def build_config(agent_key: str, instance_config: dict, base_yaml_path: Optional
         time_limit: OR-Tools 求解时间限制
         num_workers: OR-Tools 每次求解的内部线程数；仅对 OR_TOOLS_AGENTS 生效，
             通过 agent_initializer 的 extra_kwargs 机制透传到 ORToolsOptimizer。
+        device: 可选的计算设备覆盖（'auto'/'cpu'/'cuda'），优先于 agent YAML 中的 device 配置；
+            None 表示不覆盖，沿用 YAML 中的 device。仅对 DRL agent 有意义（OR-Tools 始终 CPU）。
     """
     yaml_path = base_yaml_path or str(DEFAULT_CONFIG_PATH)
     with open(yaml_path, "r", encoding="utf-8") as f:
@@ -408,6 +411,10 @@ def build_config(agent_key: str, instance_config: dict, base_yaml_path: Optional
         config["simulation"]["agent"]["time_limit_seconds"] = time_limit
     if "model_path" in agent_cfg:
         config["simulation"]["agent"]["model_path"] = agent_cfg["model_path"]
+
+    # 计算设备覆盖：CLI --device 优先于 agent YAML 中的 device 配置
+    if device is not None:
+        config["simulation"]["agent"]["device"] = device
 
     # OR-Tools 内部线程数：仅对 OR_TOOLS_AGENTS 注入，避免超额订阅 CPU（并行数×num_workers≈核数）
     if num_workers is not None and agent_key in OR_TOOLS_AGENTS:
@@ -652,6 +659,7 @@ def run_benchmark(args):
         "workers": args.workers,
         "parallel_mode": args.parallel_mode,
         "ortools_workers": args.ortools_workers,
+        "device": args.device,
         "created_at": time.strftime("%Y-%m-%d %H:%M:%S"),
     }
     with open(exp_dir / "experiment_config.json", "w", encoding="utf-8") as f:
@@ -723,6 +731,7 @@ def run_benchmark(args):
                         base_yaml_path=args.config_yaml,
                         time_limit=args.time_limit,
                         num_workers=(ortools_nw if agent_key in OR_TOOLS_AGENTS else None),
+                        device=args.device,
                     )
                     tasks.append({
                         "config": config,
@@ -904,6 +913,9 @@ def parse_args():
 
   # 显式控制 OR-Tools 每 solver 线程数，避免超额订阅
   uv run python scripts/run_benchmark.py -j 8 --ortools-workers 2
+
+  # 强制 DRL agent 使用 CPU（覆盖 YAML 中的 device: cuda，免改配置文件）
+  uv run python scripts/run_benchmark.py --agents DualDRLAgent --device cpu
         """,
     )
 
@@ -927,8 +939,8 @@ def parse_args():
     parser.add_argument("--experiment-id", type=str, default=None, help="实验标识（默认自动生成时间戳）")
     parser.add_argument("--timeout", type=int, default=600, help="单次 episode 超时秒数 (默认: 600)")
     parser.add_argument("--time-limit", type=int, default=30, help="OR-Tools 求解时间限制秒数 (默认: 30)")
-    parser.add_argument("-j", "--workers", type=int, default=os.cpu_count(),
-                        help="并行 worker 数 (默认: CPU 核数)。process 模式下每个 trial 在独立进程运行；thread 模式下在独立线程运行")
+    parser.add_argument("-j", "--workers", type=int, default=8,
+                        help="并行 worker 数 (默认: 8)。process 模式下每个 trial 在独立进程运行；thread 模式下在独立线程运行")
     parser.add_argument("--parallel-mode", type=str, choices=["process", "thread"], default="process",
                         help="并行模式 (默认: process)。process=多进程(真多核,绕过GIL); thread=多线程(轻量,但受GIL限制,且 bootstrap 会被锁串行化)")
     parser.add_argument("--ortools-workers", type=int, default=None,
@@ -944,6 +956,10 @@ def parse_args():
                         help="小规模实例的最大机器数阈值 (默认: 10)")
     parser.add_argument("--uncertain-scenario", type=str, default=None,
                         help="不确定性事件场景名（如 default, heavy），加载 dataset/uncertain-events/<scenario>/ 下的预生成事件数据")
+    parser.add_argument("--device", type=str, default=None, choices=["auto", "cpu", "cuda"],
+                        help="计算设备覆盖：强制指定 DRL agent 的 device，优先于 agent YAML 中的 device 配置 "
+                             "(默认: None=使用 YAML；cpu=强制 CPU；cuda=强制 GPU 不可用时回退 CPU；auto=自动选择)。"
+                             "OR-Tools agent 始终 CPU，此参数对其无影响")
 
     return parser.parse_args()
 
@@ -966,6 +982,8 @@ if __name__ == "__main__":
         logger.info(f"Uncertain scenario: {args.uncertain_scenario}")
     if args.config_yaml:
         logger.info(f"Base YAML: {args.config_yaml}")
+    if args.device:
+        logger.info(f"Device override: {args.device} (覆盖 DRL agent YAML 中的 device 配置)")
     logger.info("=" * 60)
 
     run_benchmark(args)
