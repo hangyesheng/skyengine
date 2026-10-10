@@ -1,0 +1,1266 @@
+{
+  "manifest_version": "formal_artifact_manifest_v1",
+  "generated_at_utc": "2026-10-10T09:33:15.569609+00:00",
+  "git_revision": "9b9c158ece4926ceaa701a12d4ff2fd9760e2022",
+  "git_worktree": {
+    "dirty": true,
+    "status_sha256": "718501108511a65b7d0dfdaeef798d5d27986f17202c9e4ae37b8b12e1fd8ed4"
+  },
+  "protocol": "config/thesis_formal_split_v1.json",
+  "training_experiments": [
+    {
+      "experiment_id": "graphgrpo_ablation_fixedgnn_strict2_seed101_v3_20261010",
+      "experiment_config": "training_logs/results/graphgrpo_ablation_fixedgnn_strict2_seed101_v3_20261010/experiment_config.json",
+      "best_checkpoint": "training_logs/results/graphgrpo_ablation_fixedgnn_strict2_seed101_v3_20261010/checkpoints/best.pt",
+      "best_checkpoint_sha256": "be5a0ab97158a397a139a61ccaa475a74dbd1fc7dd21c6810ca86e9bf16acb0d",
+      "best_checkpoint_meta": {
+        "epoch": 0,
+        "val_makespan_gap": 12.797018920016468,
+        "train_mean_reward": -16351.797878533065,
+        "train_mean_makespan_gap": 14.667013797318974,
+        "epsilon": null,
+        "checkpoint_path": "/Users/hangyesheng/workspace/研三上/柔性制造模拟/skyengine/training_logs/results/graphgrpo_ablation_fixedgnn_strict2_seed101_v3_20261010/checkpoints/best.pt",
+        "checkpoint_sha256": "be5a0ab97158a397a139a61ccaa475a74dbd1fc7dd21c6810ca86e9bf16acb0d",
+        "timestamp": "2026-10-10 16:34:12"
+      }
+    },
+    {
+      "experiment_id": "graphgrpo_ablation_fixedgnn_strict2_seed102_v3_20261010",
+      "experiment_config": "training_logs/results/graphgrpo_ablation_fixedgnn_strict2_seed102_v3_20261010/experiment_config.json",
+      "best_checkpoint": "training_logs/results/graphgrpo_ablation_fixedgnn_strict2_seed102_v3_20261010/checkpoints/best.pt",
+      "best_checkpoint_sha256": "5aa8a515d43d465f2239077b71bc1e69b4e9d16cb860ca46df6ce437d723ff75",
+      "best_checkpoint_meta": {
+        "epoch": 0,
+        "val_makespan_gap": 13.977618568146928,
+        "train_mean_reward": -16801.74890188359,
+        "train_mean_makespan_gap": 14.927363358796432,
+        "epsilon": null,
+        "checkpoint_path": "/Users/hangyesheng/workspace/研三上/柔性制造模拟/skyengine/training_logs/results/graphgrpo_ablation_fixedgnn_strict2_seed102_v3_20261010/checkpoints/best.pt",
+        "checkpoint_sha256": "5aa8a515d43d465f2239077b71bc1e69b4e9d16cb860ca46df6ce437d723ff75",
+        "timestamp": "2026-10-10 16:37:09"
+      }
+    },
+    {
+      "experiment_id": "graphgrpo_ablation_fixedgnn_strict2_seed103_v3_20261010",
+      "experiment_config": "training_logs/results/graphgrpo_ablation_fixedgnn_strict2_seed103_v3_20261010/experiment_config.json",
+      "best_checkpoint": "training_logs/results/graphgrpo_ablation_fixedgnn_strict2_seed103_v3_20261010/checkpoints/best.pt",
+      "best_checkpoint_sha256": "13cc9fb4bd934dc5500059a99ac127333b489306534a234c8ccb7cb58951e5bd",
+      "best_checkpoint_meta": {
+        "epoch": 0,
+        "val_makespan_gap": 11.637327639397768,
+        "train_mean_reward": -16275.179218464149,
+        "train_mean_makespan_gap": 14.352416034106447,
+        "epsilon": null,
+        "checkpoint_path": "/Users/hangyesheng/workspace/研三上/柔性制造模拟/skyengine/training_logs/results/graphgrpo_ablation_fixedgnn_strict2_seed103_v3_20261010/checkpoints/best.pt",
+        "checkpoint_sha256": "13cc9fb4bd934dc5500059a99ac127333b489306534a234c8ccb7cb58951e5bd",
+        "timestamp": "2026-10-10 16:40:10"
+      }
+    },
+    {
+      "experiment_id": "graphgrpo_ablation_flat_strict2_seed101_v3_20261010",
+      "experiment_config": "training_logs/results/graphgrpo_ablation_flat_strict2_seed101_v3_20261010/experiment_config.json",
+      "best_checkpoint": "training_logs/results/graphgrpo_ablation_flat_strict2_seed101_v3_20261010/checkpoints/best.pt",
+      "best_checkpoint_sha256": "bef97bd09ddd0068fcfb59c337fc65b4c6a852e3d479c69ac8da28ab4afb5170",
+      "best_checkpoint_meta": {
+        "epoch": 0,
+        "val_makespan_gap": 13.314258509201025,
+        "train_mean_reward": -16865.112314127276,
+        "train_mean_makespan_gap": 14.38925759764574,
+        "epsilon": null,
+        "checkpoint_path": "/Users/hangyesheng/workspace/研三上/柔性制造模拟/skyengine/training_logs/results/graphgrpo_ablation_flat_strict2_seed101_v3_20261010/checkpoints/best.pt",
+        "checkpoint_sha256": "bef97bd09ddd0068fcfb59c337fc65b4c6a852e3d479c69ac8da28ab4afb5170",
+        "timestamp": "2026-10-10 16:42:54"
+      }
+    },
+    {
+      "experiment_id": "graphgrpo_ablation_flat_strict2_seed102_v3_20261010",
+      "experiment_config": "training_logs/results/graphgrpo_ablation_flat_strict2_seed102_v3_20261010/experiment_config.json",
+      "best_checkpoint": "training_logs/results/graphgrpo_ablation_flat_strict2_seed102_v3_20261010/checkpoints/best.pt",
+      "best_checkpoint_sha256": "2a6d0d423a52c29980af94f7b7a4030228400084a2432b342ccba05def25b67e",
+      "best_checkpoint_meta": {
+        "epoch": 0,
+        "val_makespan_gap": 12.289510631623438,
+        "train_mean_reward": -15770.896255675638,
+        "train_mean_makespan_gap": 14.673935258765361,
+        "epsilon": null,
+        "checkpoint_path": "/Users/hangyesheng/workspace/研三上/柔性制造模拟/skyengine/training_logs/results/graphgrpo_ablation_flat_strict2_seed102_v3_20261010/checkpoints/best.pt",
+        "checkpoint_sha256": "2a6d0d423a52c29980af94f7b7a4030228400084a2432b342ccba05def25b67e",
+        "timestamp": "2026-10-10 16:45:17"
+      }
+    },
+    {
+      "experiment_id": "graphgrpo_ablation_flat_strict2_seed103_v3_20261010",
+      "experiment_config": "training_logs/results/graphgrpo_ablation_flat_strict2_seed103_v3_20261010/experiment_config.json",
+      "best_checkpoint": "training_logs/results/graphgrpo_ablation_flat_strict2_seed103_v3_20261010/checkpoints/best.pt",
+      "best_checkpoint_sha256": "9a94c3ccb6fb2918489bb0e4445129864a8b20e6e7d7ee41427ee655763ad79d",
+      "best_checkpoint_meta": {
+        "epoch": 0,
+        "val_makespan_gap": 14.883837788165954,
+        "train_mean_reward": -16808.499609204868,
+        "train_mean_makespan_gap": 13.762239314812394,
+        "epsilon": null,
+        "checkpoint_path": "/Users/hangyesheng/workspace/研三上/柔性制造模拟/skyengine/training_logs/results/graphgrpo_ablation_flat_strict2_seed103_v3_20261010/checkpoints/best.pt",
+        "checkpoint_sha256": "9a94c3ccb6fb2918489bb0e4445129864a8b20e6e7d7ee41427ee655763ad79d",
+        "timestamp": "2026-10-10 16:47:41"
+      }
+    },
+    {
+      "experiment_id": "graphgrpo_ablation_timeonly_strict2_seed101_v3_20261010",
+      "experiment_config": "training_logs/results/graphgrpo_ablation_timeonly_strict2_seed101_v3_20261010/experiment_config.json",
+      "best_checkpoint": "training_logs/results/graphgrpo_ablation_timeonly_strict2_seed101_v3_20261010/checkpoints/best.pt",
+      "best_checkpoint_sha256": "dfe8b52b11c3cf7a2ed082fac170edb6a06ca9153995081e5735dc5e7fc4eb48",
+      "best_checkpoint_meta": {
+        "epoch": 0,
+        "val_makespan_gap": 12.237100012634265,
+        "train_mean_reward": -2814.5630555555554,
+        "train_mean_makespan_gap": 14.582437102112985,
+        "epsilon": null,
+        "checkpoint_path": "/Users/hangyesheng/workspace/研三上/柔性制造模拟/skyengine/training_logs/results/graphgrpo_ablation_timeonly_strict2_seed101_v3_20261010/checkpoints/best.pt",
+        "checkpoint_sha256": "dfe8b52b11c3cf7a2ed082fac170edb6a06ca9153995081e5735dc5e7fc4eb48",
+        "timestamp": "2026-10-10 16:50:34"
+      }
+    },
+    {
+      "experiment_id": "graphgrpo_ablation_timeonly_strict2_seed102_v3_20261010",
+      "experiment_config": "training_logs/results/graphgrpo_ablation_timeonly_strict2_seed102_v3_20261010/experiment_config.json",
+      "best_checkpoint": "training_logs/results/graphgrpo_ablation_timeonly_strict2_seed102_v3_20261010/checkpoints/best.pt",
+      "best_checkpoint_sha256": "385129e8b8c07d329d74efbe280e0a1a61fc5ad4d438c72152a672f27be31d01",
+      "best_checkpoint_meta": {
+        "epoch": 0,
+        "val_makespan_gap": 14.513274903064385,
+        "train_mean_reward": -2657.5741666666668,
+        "train_mean_makespan_gap": 14.689681808249283,
+        "epsilon": null,
+        "checkpoint_path": "/Users/hangyesheng/workspace/研三上/柔性制造模拟/skyengine/training_logs/results/graphgrpo_ablation_timeonly_strict2_seed102_v3_20261010/checkpoints/best.pt",
+        "checkpoint_sha256": "385129e8b8c07d329d74efbe280e0a1a61fc5ad4d438c72152a672f27be31d01",
+        "timestamp": "2026-10-10 16:54:33"
+      }
+    },
+    {
+      "experiment_id": "graphgrpo_ablation_timeonly_strict2_seed103_v3_20261010",
+      "experiment_config": "training_logs/results/graphgrpo_ablation_timeonly_strict2_seed103_v3_20261010/experiment_config.json",
+      "best_checkpoint": "training_logs/results/graphgrpo_ablation_timeonly_strict2_seed103_v3_20261010/checkpoints/best.pt",
+      "best_checkpoint_sha256": "ab330b86d335590834ccc2cba17abe185e758306c1ddd126ec71e28020629356",
+      "best_checkpoint_meta": {
+        "epoch": 0,
+        "val_makespan_gap": 12.497024414696952,
+        "train_mean_reward": -2691.4463888888886,
+        "train_mean_makespan_gap": 14.696443031607076,
+        "epsilon": null,
+        "checkpoint_path": "/Users/hangyesheng/workspace/研三上/柔性制造模拟/skyengine/training_logs/results/graphgrpo_ablation_timeonly_strict2_seed103_v3_20261010/checkpoints/best.pt",
+        "checkpoint_sha256": "ab330b86d335590834ccc2cba17abe185e758306c1ddd126ec71e28020629356",
+        "timestamp": "2026-10-10 16:58:00"
+      }
+    },
+    {
+      "experiment_id": "graphgrpo_ablation_firstagv_strict2_seed101_v3_20261010",
+      "experiment_config": "training_logs/results/graphgrpo_ablation_firstagv_strict2_seed101_v3_20261010/experiment_config.json",
+      "best_checkpoint": "training_logs/results/graphgrpo_ablation_firstagv_strict2_seed101_v3_20261010/checkpoints/best.pt",
+      "best_checkpoint_sha256": "2659a85167a5ede805508d346521b69df682bb44ac9b26d8cb4b21608388ea2e",
+      "best_checkpoint_meta": {
+        "epoch": 0,
+        "val_makespan_gap": 14.003717950467847,
+        "train_mean_reward": -16884.26204637214,
+        "train_mean_makespan_gap": 14.091723263323388,
+        "epsilon": null,
+        "checkpoint_path": "/Users/hangyesheng/workspace/研三上/柔性制造模拟/skyengine/training_logs/results/graphgrpo_ablation_firstagv_strict2_seed101_v3_20261010/checkpoints/best.pt",
+        "checkpoint_sha256": "2659a85167a5ede805508d346521b69df682bb44ac9b26d8cb4b21608388ea2e",
+        "timestamp": "2026-10-10 17:01:17"
+      }
+    },
+    {
+      "experiment_id": "graphgrpo_ablation_firstagv_strict2_seed102_v3_20261010",
+      "experiment_config": "training_logs/results/graphgrpo_ablation_firstagv_strict2_seed102_v3_20261010/experiment_config.json",
+      "best_checkpoint": "training_logs/results/graphgrpo_ablation_firstagv_strict2_seed102_v3_20261010/checkpoints/best.pt",
+      "best_checkpoint_sha256": "dad8883d20454db420728bbf83b4e57eb54b198a8eb71b7b8b9b63d17dbcd460",
+      "best_checkpoint_meta": {
+        "epoch": 0,
+        "val_makespan_gap": 10.283755449620605,
+        "train_mean_reward": -17635.27993531323,
+        "train_mean_makespan_gap": 14.10784368860351,
+        "epsilon": null,
+        "checkpoint_path": "/Users/hangyesheng/workspace/研三上/柔性制造模拟/skyengine/training_logs/results/graphgrpo_ablation_firstagv_strict2_seed102_v3_20261010/checkpoints/best.pt",
+        "checkpoint_sha256": "dad8883d20454db420728bbf83b4e57eb54b198a8eb71b7b8b9b63d17dbcd460",
+        "timestamp": "2026-10-10 17:04:28"
+      }
+    },
+    {
+      "experiment_id": "graphgrpo_ablation_firstagv_strict2_seed103_v3_20261010",
+      "experiment_config": "training_logs/results/graphgrpo_ablation_firstagv_strict2_seed103_v3_20261010/experiment_config.json",
+      "best_checkpoint": "training_logs/results/graphgrpo_ablation_firstagv_strict2_seed103_v3_20261010/checkpoints/best.pt",
+      "best_checkpoint_sha256": "2a26ba76893c7f557ba54517271c9f053add469bc82a8c129c596a832ff90880",
+      "best_checkpoint_meta": {
+        "epoch": 0,
+        "val_makespan_gap": 13.77524096973761,
+        "train_mean_reward": -16506.06454287558,
+        "train_mean_makespan_gap": 14.287079330350785,
+        "epsilon": null,
+        "checkpoint_path": "/Users/hangyesheng/workspace/研三上/柔性制造模拟/skyengine/training_logs/results/graphgrpo_ablation_firstagv_strict2_seed103_v3_20261010/checkpoints/best.pt",
+        "checkpoint_sha256": "2a26ba76893c7f557ba54517271c9f053add469bc82a8c129c596a832ff90880",
+        "timestamp": "2026-10-10 17:07:44"
+      }
+    },
+    {
+      "experiment_id": "graphgrpo_formal_strict2_seed101_v3_20261010",
+      "experiment_config": "training_logs/results/graphgrpo_formal_strict2_seed101_v3_20261010/experiment_config.json",
+      "best_checkpoint": "training_logs/results/graphgrpo_formal_strict2_seed101_v3_20261010/checkpoints/best.pt",
+      "best_checkpoint_sha256": "44e09df4e6a734ebc008c485bb36cf5d371449291aecb088995786a0074ec68d",
+      "best_checkpoint_meta": {
+        "epoch": 0,
+        "val_makespan_gap": 11.975071649583578,
+        "train_mean_reward": -16459.520143076486,
+        "train_mean_makespan_gap": 15.098497556978616,
+        "epsilon": null,
+        "checkpoint_path": "/Users/hangyesheng/workspace/研三上/柔性制造模拟/skyengine/training_logs/results/graphgrpo_formal_strict2_seed101_v3_20261010/checkpoints/best.pt",
+        "checkpoint_sha256": "44e09df4e6a734ebc008c485bb36cf5d371449291aecb088995786a0074ec68d",
+        "timestamp": "2026-10-10 16:08:21"
+      }
+    },
+    {
+      "experiment_id": "graphgrpo_formal_strict2_seed102_v3_20261010",
+      "experiment_config": "training_logs/results/graphgrpo_formal_strict2_seed102_v3_20261010/experiment_config.json",
+      "best_checkpoint": "training_logs/results/graphgrpo_formal_strict2_seed102_v3_20261010/checkpoints/best.pt",
+      "best_checkpoint_sha256": "9ad0653495a1a8e88fa7294673543a6ac738be50c76a68ee81960439d8e25df2",
+      "best_checkpoint_meta": {
+        "epoch": 0,
+        "val_makespan_gap": 11.328138118768393,
+        "train_mean_reward": -16954.82037960905,
+        "train_mean_makespan_gap": 14.717741903263251,
+        "epsilon": null,
+        "checkpoint_path": "/Users/hangyesheng/workspace/研三上/柔性制造模拟/skyengine/training_logs/results/graphgrpo_formal_strict2_seed102_v3_20261010/checkpoints/best.pt",
+        "checkpoint_sha256": "9ad0653495a1a8e88fa7294673543a6ac738be50c76a68ee81960439d8e25df2",
+        "timestamp": "2026-10-10 16:12:57"
+      }
+    },
+    {
+      "experiment_id": "graphgrpo_formal_strict2_seed103_v3_20261010",
+      "experiment_config": "training_logs/results/graphgrpo_formal_strict2_seed103_v3_20261010/experiment_config.json",
+      "best_checkpoint": "training_logs/results/graphgrpo_formal_strict2_seed103_v3_20261010/checkpoints/best.pt",
+      "best_checkpoint_sha256": "c54f3d938f38d7fa7f3bbb9dc130121d8beca2c8dbc981d5c5d9eba0fda1923a",
+      "best_checkpoint_meta": {
+        "epoch": 0,
+        "val_makespan_gap": 15.666039853115876,
+        "train_mean_reward": -16851.751498649683,
+        "train_mean_makespan_gap": 14.265833532001109,
+        "epsilon": null,
+        "checkpoint_path": "/Users/hangyesheng/workspace/研三上/柔性制造模拟/skyengine/training_logs/results/graphgrpo_formal_strict2_seed103_v3_20261010/checkpoints/best.pt",
+        "checkpoint_sha256": "c54f3d938f38d7fa7f3bbb9dc130121d8beca2c8dbc981d5c5d9eba0fda1923a",
+        "timestamp": "2026-10-10 16:17:48"
+      }
+    },
+    {
+      "experiment_id": "graphgrpo_formal_default_seed101_v3_20261010",
+      "experiment_config": "training_logs/results/graphgrpo_formal_default_seed101_v3_20261010/experiment_config.json",
+      "best_checkpoint": "training_logs/results/graphgrpo_formal_default_seed101_v3_20261010/checkpoints/best.pt",
+      "best_checkpoint_sha256": "eeb43d844da0249720e8a4270a3af0972716f0963a68709b8363b948112b5df8",
+      "best_checkpoint_meta": {
+        "epoch": 0,
+        "val_makespan_gap": 11.863105693737245,
+        "train_mean_reward": -15396.256667937476,
+        "train_mean_makespan_gap": 14.25984713604931,
+        "epsilon": null,
+        "checkpoint_path": "/Users/hangyesheng/workspace/研三上/柔性制造模拟/skyengine/training_logs/results/graphgrpo_formal_default_seed101_v3_20261010/checkpoints/best.pt",
+        "checkpoint_sha256": "eeb43d844da0249720e8a4270a3af0972716f0963a68709b8363b948112b5df8",
+        "timestamp": "2026-10-10 15:42:14"
+      }
+    },
+    {
+      "experiment_id": "graphgrpo_formal_default_seed102_v3_20261010",
+      "experiment_config": "training_logs/results/graphgrpo_formal_default_seed102_v3_20261010/experiment_config.json",
+      "best_checkpoint": "training_logs/results/graphgrpo_formal_default_seed102_v3_20261010/checkpoints/best.pt",
+      "best_checkpoint_sha256": "485f64e8860746c329f8f2359e1368c3026a6537f2c11e56c3cfed77d1e98c41",
+      "best_checkpoint_meta": {
+        "epoch": 0,
+        "val_makespan_gap": 11.650812355261541,
+        "train_mean_reward": -16543.43981476159,
+        "train_mean_makespan_gap": 14.062648898516203,
+        "epsilon": null,
+        "checkpoint_path": "/Users/hangyesheng/workspace/研三上/柔性制造模拟/skyengine/training_logs/results/graphgrpo_formal_default_seed102_v3_20261010/checkpoints/best.pt",
+        "checkpoint_sha256": "485f64e8860746c329f8f2359e1368c3026a6537f2c11e56c3cfed77d1e98c41",
+        "timestamp": "2026-10-10 15:44:51"
+      }
+    },
+    {
+      "experiment_id": "graphgrpo_formal_default_seed103_v3_20261010",
+      "experiment_config": "training_logs/results/graphgrpo_formal_default_seed103_v3_20261010/experiment_config.json",
+      "best_checkpoint": "training_logs/results/graphgrpo_formal_default_seed103_v3_20261010/checkpoints/best.pt",
+      "best_checkpoint_sha256": "09641d40c60a1e9eaeabd6dcd69a8d54661bc85a86f2b732bb941fc019c3ea76",
+      "best_checkpoint_meta": {
+        "epoch": 0,
+        "val_makespan_gap": 13.34092614181152,
+        "train_mean_reward": -16376.365692914373,
+        "train_mean_makespan_gap": 14.451201341131094,
+        "epsilon": null,
+        "checkpoint_path": "/Users/hangyesheng/workspace/研三上/柔性制造模拟/skyengine/training_logs/results/graphgrpo_formal_default_seed103_v3_20261010/checkpoints/best.pt",
+        "checkpoint_sha256": "09641d40c60a1e9eaeabd6dcd69a8d54661bc85a86f2b732bb941fc019c3ea76",
+        "timestamp": "2026-10-10 15:47:26"
+      }
+    },
+    {
+      "experiment_id": "graphgrpo_formal_default_seed101_v2_20261010",
+      "experiment_config": "training_logs/results/graphgrpo_formal_default_seed101_v2_20261010/experiment_config.json",
+      "best_checkpoint": "training_logs/results/graphgrpo_formal_default_seed101_v2_20261010/checkpoints/best.pt",
+      "best_checkpoint_sha256": "a1602694075c5fdea3a1c45dc8260b9fe8b21ee7bb97ce7d299be5ab64dbfb8c",
+      "best_checkpoint_meta": {
+        "epoch": 2,
+        "val_makespan_gap": 11.554837669522849,
+        "train_mean_reward": -11936.532033658366,
+        "train_mean_makespan_gap": 15.427101309553892,
+        "epsilon": null,
+        "checkpoint_path": "/Users/hangyesheng/workspace/研三上/柔性制造模拟/skyengine/training_logs/results/graphgrpo_formal_default_seed101_v2_20261010/checkpoints/best.pt",
+        "checkpoint_sha256": "a1602694075c5fdea3a1c45dc8260b9fe8b21ee7bb97ce7d299be5ab64dbfb8c",
+        "timestamp": "2026-10-10 09:42:16"
+      }
+    },
+    {
+      "experiment_id": "graphgrpo_formal_default_seed102_v1_20261010",
+      "experiment_config": "training_logs/results/graphgrpo_formal_default_seed102_v1_20261010/experiment_config.json",
+      "best_checkpoint": "training_logs/results/graphgrpo_formal_default_seed102_v1_20261010/checkpoints/best.pt",
+      "best_checkpoint_sha256": "0e9e47b48fa923f44af03efeb1f66cce3ccdedff64d95b818b2439896fd8402e",
+      "best_checkpoint_meta": {
+        "epoch": 0,
+        "val_makespan_gap": 11.861832584435215,
+        "train_mean_reward": -13485.346351140193,
+        "train_mean_makespan_gap": 14.843840457720667,
+        "epsilon": null,
+        "checkpoint_path": "/Users/hangyesheng/workspace/研三上/柔性制造模拟/skyengine/training_logs/results/graphgrpo_formal_default_seed102_v1_20261010/checkpoints/best.pt",
+        "checkpoint_sha256": "0e9e47b48fa923f44af03efeb1f66cce3ccdedff64d95b818b2439896fd8402e",
+        "timestamp": "2026-10-10 11:32:37"
+      }
+    },
+    {
+      "experiment_id": "graphgrpo_formal_default_seed103_v1_20261010",
+      "experiment_config": "training_logs/results/graphgrpo_formal_default_seed103_v1_20261010/experiment_config.json",
+      "best_checkpoint": "training_logs/results/graphgrpo_formal_default_seed103_v1_20261010/checkpoints/best.pt",
+      "best_checkpoint_sha256": "91c86c3ab5c080edede474af414a55a78d32a63dc9bbdda8186a8e1a9cab3f14",
+      "best_checkpoint_meta": {
+        "epoch": 2,
+        "val_makespan_gap": 10.198812822367712,
+        "train_mean_reward": -11398.200843730407,
+        "train_mean_makespan_gap": 14.758999702494147,
+        "epsilon": null,
+        "checkpoint_path": "/Users/hangyesheng/workspace/研三上/柔性制造模拟/skyengine/training_logs/results/graphgrpo_formal_default_seed103_v1_20261010/checkpoints/best.pt",
+        "checkpoint_sha256": "91c86c3ab5c080edede474af414a55a78d32a63dc9bbdda8186a8e1a9cab3f14",
+        "timestamp": "2026-10-10 11:37:16"
+      }
+    },
+    {
+      "experiment_id": "graphgrpo_formal_strict2_seed101_v2_20261010",
+      "experiment_config": "training_logs/results/graphgrpo_formal_strict2_seed101_v2_20261010/experiment_config.json",
+      "best_checkpoint": "training_logs/results/graphgrpo_formal_strict2_seed101_v2_20261010/checkpoints/best.pt",
+      "best_checkpoint_sha256": "00f849a0f705318a6f561b0af1efeb0a0d04557f18a6224a1c6414919f43343b",
+      "best_checkpoint_meta": {
+        "epoch": 1,
+        "val_makespan_gap": 11.55307062227665,
+        "train_mean_reward": -13617.429379286677,
+        "train_mean_makespan_gap": 14.588952048136017,
+        "epsilon": null,
+        "checkpoint_path": "/Users/hangyesheng/workspace/研三上/柔性制造模拟/skyengine/training_logs/results/graphgrpo_formal_strict2_seed101_v2_20261010/checkpoints/best.pt",
+        "checkpoint_sha256": "00f849a0f705318a6f561b0af1efeb0a0d04557f18a6224a1c6414919f43343b",
+        "timestamp": "2026-10-10 09:45:24"
+      }
+    },
+    {
+      "experiment_id": "graphgrpo_formal_strict2_seed102_v1_20261010",
+      "experiment_config": "training_logs/results/graphgrpo_formal_strict2_seed102_v1_20261010/experiment_config.json",
+      "best_checkpoint": "training_logs/results/graphgrpo_formal_strict2_seed102_v1_20261010/checkpoints/best.pt",
+      "best_checkpoint_sha256": "8dea967d19f7788747da9c2f72b08510c022b63cb9191c90f3c98b34f4cf9a36",
+      "best_checkpoint_meta": {
+        "epoch": 0,
+        "val_makespan_gap": 12.088124058919306,
+        "train_mean_reward": -13516.607157604652,
+        "train_mean_makespan_gap": 14.910441821881571,
+        "epsilon": null,
+        "checkpoint_path": "/Users/hangyesheng/workspace/研三上/柔性制造模拟/skyengine/training_logs/results/graphgrpo_formal_strict2_seed102_v1_20261010/checkpoints/best.pt",
+        "checkpoint_sha256": "8dea967d19f7788747da9c2f72b08510c022b63cb9191c90f3c98b34f4cf9a36",
+        "timestamp": "2026-10-10 10:08:08"
+      }
+    },
+    {
+      "experiment_id": "graphgrpo_formal_strict2_seed103_v1_20261010",
+      "experiment_config": "training_logs/results/graphgrpo_formal_strict2_seed103_v1_20261010/experiment_config.json",
+      "best_checkpoint": "training_logs/results/graphgrpo_formal_strict2_seed103_v1_20261010/checkpoints/best.pt",
+      "best_checkpoint_sha256": "9a3a9e124e2a221e7c119f9bda0379d9cfb1b2e4e5011b019e3952499a67f304",
+      "best_checkpoint_meta": {
+        "epoch": 1,
+        "val_makespan_gap": 13.369970719535992,
+        "train_mean_reward": -13099.519761256943,
+        "train_mean_makespan_gap": 15.962226950071154,
+        "epsilon": null,
+        "checkpoint_path": "/Users/hangyesheng/workspace/研三上/柔性制造模拟/skyengine/training_logs/results/graphgrpo_formal_strict2_seed103_v1_20261010/checkpoints/best.pt",
+        "checkpoint_sha256": "9a3a9e124e2a221e7c119f9bda0379d9cfb1b2e4e5011b019e3952499a67f304",
+        "timestamp": "2026-10-10 10:18:34"
+      }
+    },
+    {
+      "experiment_id": "hgs_formal_seed101_v1_20261010",
+      "experiment_config": "training_logs/results/hgs_formal_seed101_v1_20261010/experiment_config.json",
+      "best_checkpoint": "training_logs/results/hgs_formal_seed101_v1_20261010/checkpoints/best.pt",
+      "best_checkpoint_sha256": "899a56de002f7891830498fdc52f2c96c5dd2b90605a05d0d5480d6ff0cb0fe9",
+      "best_checkpoint_meta": {
+        "epoch": 1,
+        "val_makespan_gap": 13.273652820421825,
+        "train_mean_reward": -858.5555555555555,
+        "train_mean_makespan_gap": 14.883105403894326,
+        "epsilon": null,
+        "checkpoint_path": "/Users/hangyesheng/workspace/研三上/柔性制造模拟/skyengine/training_logs/results/hgs_formal_seed101_v1_20261010/checkpoints/best.pt",
+        "checkpoint_sha256": "899a56de002f7891830498fdc52f2c96c5dd2b90605a05d0d5480d6ff0cb0fe9",
+        "timestamp": "2026-10-10 09:53:04"
+      }
+    },
+    {
+      "experiment_id": "hgs_formal_seed102_v1_20261010",
+      "experiment_config": "training_logs/results/hgs_formal_seed102_v1_20261010/experiment_config.json",
+      "best_checkpoint": "training_logs/results/hgs_formal_seed102_v1_20261010/checkpoints/best.pt",
+      "best_checkpoint_sha256": "04722109824f615d0ace33b090a647f30eb4a42d34bea20c792117d1049f1601",
+      "best_checkpoint_meta": {
+        "epoch": 0,
+        "val_makespan_gap": 10.777567867761823,
+        "train_mean_reward": -847.0,
+        "train_mean_makespan_gap": 14.849574662326383,
+        "epsilon": null,
+        "checkpoint_path": "/Users/hangyesheng/workspace/研三上/柔性制造模拟/skyengine/training_logs/results/hgs_formal_seed102_v1_20261010/checkpoints/best.pt",
+        "checkpoint_sha256": "04722109824f615d0ace33b090a647f30eb4a42d34bea20c792117d1049f1601",
+        "timestamp": "2026-10-10 10:25:24"
+      }
+    },
+    {
+      "experiment_id": "hgs_formal_seed103_v1_20261010",
+      "experiment_config": "training_logs/results/hgs_formal_seed103_v1_20261010/experiment_config.json",
+      "best_checkpoint": "training_logs/results/hgs_formal_seed103_v1_20261010/checkpoints/best.pt",
+      "best_checkpoint_sha256": "d0d771b1961b38f5a00b3e07b61e3a0c3e7213812193a236661ce639bf28acf2",
+      "best_checkpoint_meta": {
+        "epoch": 0,
+        "val_makespan_gap": 8.523934933183634,
+        "train_mean_reward": -838.7777777777778,
+        "train_mean_makespan_gap": 14.514993476563022,
+        "epsilon": null,
+        "checkpoint_path": "/Users/hangyesheng/workspace/研三上/柔性制造模拟/skyengine/training_logs/results/hgs_formal_seed103_v1_20261010/checkpoints/best.pt",
+        "checkpoint_sha256": "d0d771b1961b38f5a00b3e07b61e3a0c3e7213812193a236661ce639bf28acf2",
+        "timestamp": "2026-10-10 10:29:33"
+      }
+    },
+    {
+      "experiment_id": "graphgrpo_ablation_fixedgnn_strict2_seed101_v1_20261010",
+      "experiment_config": "training_logs/results/graphgrpo_ablation_fixedgnn_strict2_seed101_v1_20261010/experiment_config.json",
+      "best_checkpoint": "training_logs/results/graphgrpo_ablation_fixedgnn_strict2_seed101_v1_20261010/checkpoints/best.pt",
+      "best_checkpoint_sha256": "4f9aa3ac6504a60b4b3b70cbd904b887db5d671fd5fce722c1e90640584622ad",
+      "best_checkpoint_meta": {
+        "epoch": 2,
+        "val_makespan_gap": 9.002377995052921,
+        "train_mean_reward": -12777.45613362896,
+        "train_mean_makespan_gap": 15.519308159843092,
+        "epsilon": null,
+        "checkpoint_path": "/Users/hangyesheng/workspace/研三上/柔性制造模拟/skyengine/training_logs/results/graphgrpo_ablation_fixedgnn_strict2_seed101_v1_20261010/checkpoints/best.pt",
+        "checkpoint_sha256": "4f9aa3ac6504a60b4b3b70cbd904b887db5d671fd5fce722c1e90640584622ad",
+        "timestamp": "2026-10-10 10:49:07"
+      }
+    },
+    {
+      "experiment_id": "graphgrpo_ablation_fixedgnn_strict2_seed102_v1_20261010",
+      "experiment_config": "training_logs/results/graphgrpo_ablation_fixedgnn_strict2_seed102_v1_20261010/experiment_config.json",
+      "best_checkpoint": "training_logs/results/graphgrpo_ablation_fixedgnn_strict2_seed102_v1_20261010/checkpoints/best.pt",
+      "best_checkpoint_sha256": "d1ab7ad9eaa051f2cd1ecf70aa9dd8aa5ff438371931a56ee06c4dddee9e44d1",
+      "best_checkpoint_meta": {
+        "epoch": 1,
+        "val_makespan_gap": 11.43165066618043,
+        "train_mean_reward": -12033.361235041948,
+        "train_mean_makespan_gap": 15.795539940161909,
+        "epsilon": null,
+        "checkpoint_path": "/Users/hangyesheng/workspace/研三上/柔性制造模拟/skyengine/training_logs/results/graphgrpo_ablation_fixedgnn_strict2_seed102_v1_20261010/checkpoints/best.pt",
+        "checkpoint_sha256": "d1ab7ad9eaa051f2cd1ecf70aa9dd8aa5ff438371931a56ee06c4dddee9e44d1",
+        "timestamp": "2026-10-10 11:10:25"
+      }
+    },
+    {
+      "experiment_id": "graphgrpo_ablation_fixedgnn_strict2_seed103_v1_20261010",
+      "experiment_config": "training_logs/results/graphgrpo_ablation_fixedgnn_strict2_seed103_v1_20261010/experiment_config.json",
+      "best_checkpoint": "training_logs/results/graphgrpo_ablation_fixedgnn_strict2_seed103_v1_20261010/checkpoints/best.pt",
+      "best_checkpoint_sha256": "78ae8e593795c9b320aa0180733891efacab3b00b1bf4503a5dc79a1534b5a8d",
+      "best_checkpoint_meta": {
+        "epoch": 2,
+        "val_makespan_gap": 11.841315727490446,
+        "train_mean_reward": -12278.967916147754,
+        "train_mean_makespan_gap": 15.164672292317205,
+        "epsilon": null,
+        "checkpoint_path": "/Users/hangyesheng/workspace/研三上/柔性制造模拟/skyengine/training_logs/results/graphgrpo_ablation_fixedgnn_strict2_seed103_v1_20261010/checkpoints/best.pt",
+        "checkpoint_sha256": "78ae8e593795c9b320aa0180733891efacab3b00b1bf4503a5dc79a1534b5a8d",
+        "timestamp": "2026-10-10 11:17:18"
+      }
+    },
+    {
+      "experiment_id": "graphppo_ablation_seed101_v1_20261010",
+      "experiment_config": "training_logs/results/graphppo_ablation_seed101_v1_20261010/experiment_config.json",
+      "best_checkpoint": "training_logs/results/graphppo_ablation_seed101_v1_20261010/checkpoints/best.pt",
+      "best_checkpoint_sha256": "752e9b76926ba443409dd256388a3491373eee0ca7ee7bfbf3937b7e945dfe80",
+      "best_checkpoint_meta": {
+        "epoch": 0,
+        "val_makespan_gap": 11.932718862398152,
+        "train_mean_reward": -16794.878354628207,
+        "train_mean_makespan_gap": 14.698547670916971,
+        "epsilon": null,
+        "checkpoint_path": "/Users/hangyesheng/workspace/研三上/柔性制造模拟/skyengine/training_logs/results/graphppo_ablation_seed101_v1_20261010/checkpoints/best.pt",
+        "checkpoint_sha256": "752e9b76926ba443409dd256388a3491373eee0ca7ee7bfbf3937b7e945dfe80",
+        "timestamp": "2026-10-10 10:55:31"
+      }
+    },
+    {
+      "experiment_id": "graphppo_ablation_seed102_v1_20261010",
+      "experiment_config": "training_logs/results/graphppo_ablation_seed102_v1_20261010/experiment_config.json",
+      "best_checkpoint": "training_logs/results/graphppo_ablation_seed102_v1_20261010/checkpoints/best.pt",
+      "best_checkpoint_sha256": "1ac551e406996766d7006785bcfb3702a2ded23a1c90110d545d576d806c9322",
+      "best_checkpoint_meta": {
+        "epoch": 0,
+        "val_makespan_gap": 11.309753337843404,
+        "train_mean_reward": -10217.32857319266,
+        "train_mean_makespan_gap": 17.53915226078191,
+        "epsilon": null,
+        "checkpoint_path": "/Users/hangyesheng/workspace/研三上/柔性制造模拟/skyengine/training_logs/results/graphppo_ablation_seed102_v1_20261010/checkpoints/best.pt",
+        "checkpoint_sha256": "1ac551e406996766d7006785bcfb3702a2ded23a1c90110d545d576d806c9322",
+        "timestamp": "2026-10-10 11:20:45"
+      }
+    },
+    {
+      "experiment_id": "graphppo_ablation_seed103_v1_20261010",
+      "experiment_config": "training_logs/results/graphppo_ablation_seed103_v1_20261010/experiment_config.json",
+      "best_checkpoint": "training_logs/results/graphppo_ablation_seed103_v1_20261010/checkpoints/best.pt",
+      "best_checkpoint_sha256": "ef391a58200fd16f15eb99f415df0e31c89aa94e7f3eff72ccdc0fcfc5c850d0",
+      "best_checkpoint_meta": {
+        "epoch": 0,
+        "val_makespan_gap": 10.467022525973448,
+        "train_mean_reward": -15181.800522623897,
+        "train_mean_makespan_gap": 14.017191408677657,
+        "epsilon": null,
+        "checkpoint_path": "/Users/hangyesheng/workspace/研三上/柔性制造模拟/skyengine/training_logs/results/graphppo_ablation_seed103_v1_20261010/checkpoints/best.pt",
+        "checkpoint_sha256": "ef391a58200fd16f15eb99f415df0e31c89aa94e7f3eff72ccdc0fcfc5c850d0",
+        "timestamp": "2026-10-10 11:24:26"
+      }
+    },
+    {
+      "experiment_id": "graphgrpo_ablation_flat_strict2_seed101_v1_20261010",
+      "experiment_config": "training_logs/results/graphgrpo_ablation_flat_strict2_seed101_v1_20261010/experiment_config.json",
+      "best_checkpoint": "training_logs/results/graphgrpo_ablation_flat_strict2_seed101_v1_20261010/checkpoints/best.pt",
+      "best_checkpoint_sha256": "7006d358c23194706e731ceaf20c50c36c252477661f23e5cf978f2694c8923a",
+      "best_checkpoint_meta": {
+        "epoch": 0,
+        "val_makespan_gap": 13.041076644726443,
+        "train_mean_reward": -13581.933912956903,
+        "train_mean_makespan_gap": 16.12118018874256,
+        "epsilon": null,
+        "checkpoint_path": "/Users/hangyesheng/workspace/研三上/柔性制造模拟/skyengine/training_logs/results/graphgrpo_ablation_flat_strict2_seed101_v1_20261010/checkpoints/best.pt",
+        "checkpoint_sha256": "7006d358c23194706e731ceaf20c50c36c252477661f23e5cf978f2694c8923a",
+        "timestamp": "2026-10-10 12:35:17"
+      }
+    },
+    {
+      "experiment_id": "graphgrpo_ablation_flat_strict2_seed102_v1_20261010",
+      "experiment_config": "training_logs/results/graphgrpo_ablation_flat_strict2_seed102_v1_20261010/experiment_config.json",
+      "best_checkpoint": "training_logs/results/graphgrpo_ablation_flat_strict2_seed102_v1_20261010/checkpoints/best.pt",
+      "best_checkpoint_sha256": "e999f4fa62f5cba054ef60ef5ef6c176109e50fe333c96b45af7e2b52ba5e1b7",
+      "best_checkpoint_meta": {
+        "epoch": 0,
+        "val_makespan_gap": 10.39839000028815,
+        "train_mean_reward": -13930.950481936568,
+        "train_mean_makespan_gap": 15.086295938290725,
+        "epsilon": null,
+        "checkpoint_path": "/Users/hangyesheng/workspace/研三上/柔性制造模拟/skyengine/training_logs/results/graphgrpo_ablation_flat_strict2_seed102_v1_20261010/checkpoints/best.pt",
+        "checkpoint_sha256": "e999f4fa62f5cba054ef60ef5ef6c176109e50fe333c96b45af7e2b52ba5e1b7",
+        "timestamp": "2026-10-10 12:37:50"
+      }
+    },
+    {
+      "experiment_id": "graphgrpo_ablation_flat_strict2_seed103_v1_20261010",
+      "experiment_config": "training_logs/results/graphgrpo_ablation_flat_strict2_seed103_v1_20261010/experiment_config.json",
+      "best_checkpoint": "training_logs/results/graphgrpo_ablation_flat_strict2_seed103_v1_20261010/checkpoints/best.pt",
+      "best_checkpoint_sha256": "093b7282d416c4483084658f43271e7e145a16316b0712b44c1fe4de36a25a8c",
+      "best_checkpoint_meta": {
+        "epoch": 0,
+        "val_makespan_gap": 10.55005041456839,
+        "train_mean_reward": -14814.862208797138,
+        "train_mean_makespan_gap": 14.330286329582139,
+        "epsilon": null,
+        "checkpoint_path": "/Users/hangyesheng/workspace/研三上/柔性制造模拟/skyengine/training_logs/results/graphgrpo_ablation_flat_strict2_seed103_v1_20261010/checkpoints/best.pt",
+        "checkpoint_sha256": "093b7282d416c4483084658f43271e7e145a16316b0712b44c1fe4de36a25a8c",
+        "timestamp": "2026-10-10 12:40:34"
+      }
+    },
+    {
+      "experiment_id": "graphgrpo_ablation_timeonly_strict2_seed101_v1_20261010",
+      "experiment_config": "training_logs/results/graphgrpo_ablation_timeonly_strict2_seed101_v1_20261010/experiment_config.json",
+      "best_checkpoint": "training_logs/results/graphgrpo_ablation_timeonly_strict2_seed101_v1_20261010/checkpoints/best.pt",
+      "best_checkpoint_sha256": "fba96d636e44a9f79790965a0ef0502ef273274b215e178d73edd25203df654b",
+      "best_checkpoint_meta": {
+        "epoch": 1,
+        "val_makespan_gap": 12.267633870423767,
+        "train_mean_reward": -2860.047777777778,
+        "train_mean_makespan_gap": 15.473790996070099,
+        "epsilon": null,
+        "checkpoint_path": "/Users/hangyesheng/workspace/研三上/柔性制造模拟/skyengine/training_logs/results/graphgrpo_ablation_timeonly_strict2_seed101_v1_20261010/checkpoints/best.pt",
+        "checkpoint_sha256": "fba96d636e44a9f79790965a0ef0502ef273274b215e178d73edd25203df654b",
+        "timestamp": "2026-10-10 12:49:22"
+      }
+    },
+    {
+      "experiment_id": "graphgrpo_ablation_timeonly_strict2_seed102_v1_20261010",
+      "experiment_config": "training_logs/results/graphgrpo_ablation_timeonly_strict2_seed102_v1_20261010/experiment_config.json",
+      "best_checkpoint": "training_logs/results/graphgrpo_ablation_timeonly_strict2_seed102_v1_20261010/checkpoints/best.pt",
+      "best_checkpoint_sha256": "3fc07813c08ec5f743f672eafdb2ce5efacdeda38e112b9a269c260fb67ddaf0",
+      "best_checkpoint_meta": {
+        "epoch": 0,
+        "val_makespan_gap": 10.480868187514895,
+        "train_mean_reward": -2876.905833333333,
+        "train_mean_makespan_gap": 14.85093496516082,
+        "epsilon": null,
+        "checkpoint_path": "/Users/hangyesheng/workspace/研三上/柔性制造模拟/skyengine/training_logs/results/graphgrpo_ablation_timeonly_strict2_seed102_v1_20261010/checkpoints/best.pt",
+        "checkpoint_sha256": "3fc07813c08ec5f743f672eafdb2ce5efacdeda38e112b9a269c260fb67ddaf0",
+        "timestamp": "2026-10-10 12:53:41"
+      }
+    },
+    {
+      "experiment_id": "graphgrpo_ablation_timeonly_strict2_seed103_v1_20261010",
+      "experiment_config": "training_logs/results/graphgrpo_ablation_timeonly_strict2_seed103_v1_20261010/experiment_config.json",
+      "best_checkpoint": "training_logs/results/graphgrpo_ablation_timeonly_strict2_seed103_v1_20261010/checkpoints/best.pt",
+      "best_checkpoint_sha256": "e341497f44509e5477b1070d4868c90c0110a4c8d2b63a54435d0e01f7965e77",
+      "best_checkpoint_meta": {
+        "epoch": 2,
+        "val_makespan_gap": 10.008251236857243,
+        "train_mean_reward": -2922.524166666666,
+        "train_mean_makespan_gap": 15.266799577634734,
+        "epsilon": null,
+        "checkpoint_path": "/Users/hangyesheng/workspace/研三上/柔性制造模拟/skyengine/training_logs/results/graphgrpo_ablation_timeonly_strict2_seed103_v1_20261010/checkpoints/best.pt",
+        "checkpoint_sha256": "e341497f44509e5477b1070d4868c90c0110a4c8d2b63a54435d0e01f7965e77",
+        "timestamp": "2026-10-10 12:59:59"
+      }
+    },
+    {
+      "experiment_id": "graphgrpo_ablation_firstagv_strict2_seed101_v2_20261010",
+      "experiment_config": "training_logs/results/graphgrpo_ablation_firstagv_strict2_seed101_v2_20261010/experiment_config.json",
+      "best_checkpoint": "training_logs/results/graphgrpo_ablation_firstagv_strict2_seed101_v2_20261010/checkpoints/best.pt",
+      "best_checkpoint_sha256": "08a846e99d9da8cd510c5d2534c882c106fc480c66551dcef19bc3c8a8893905",
+      "best_checkpoint_meta": {
+        "epoch": 0,
+        "val_makespan_gap": 11.193958254660826,
+        "train_mean_reward": -14437.654239286278,
+        "train_mean_makespan_gap": 15.100165967123823,
+        "epsilon": null,
+        "checkpoint_path": "/Users/hangyesheng/workspace/研三上/柔性制造模拟/skyengine/training_logs/results/graphgrpo_ablation_firstagv_strict2_seed101_v2_20261010/checkpoints/best.pt",
+        "checkpoint_sha256": "08a846e99d9da8cd510c5d2534c882c106fc480c66551dcef19bc3c8a8893905",
+        "timestamp": "2026-10-10 14:10:50"
+      }
+    },
+    {
+      "experiment_id": "graphgrpo_ablation_firstagv_strict2_seed102_v2_20261010",
+      "experiment_config": "training_logs/results/graphgrpo_ablation_firstagv_strict2_seed102_v2_20261010/experiment_config.json",
+      "best_checkpoint": "training_logs/results/graphgrpo_ablation_firstagv_strict2_seed102_v2_20261010/checkpoints/best.pt",
+      "best_checkpoint_sha256": "f4851bbff86a7aa618f67e8558458b761887bd4b72c4abad5a13fc9a4e9849c6",
+      "best_checkpoint_meta": {
+        "epoch": 0,
+        "val_makespan_gap": 11.448704357841592,
+        "train_mean_reward": -15317.96936597095,
+        "train_mean_makespan_gap": 14.599386133616532,
+        "epsilon": null,
+        "checkpoint_path": "/Users/hangyesheng/workspace/研三上/柔性制造模拟/skyengine/training_logs/results/graphgrpo_ablation_firstagv_strict2_seed102_v2_20261010/checkpoints/best.pt",
+        "checkpoint_sha256": "f4851bbff86a7aa618f67e8558458b761887bd4b72c4abad5a13fc9a4e9849c6",
+        "timestamp": "2026-10-10 14:16:08"
+      }
+    },
+    {
+      "experiment_id": "graphgrpo_ablation_firstagv_strict2_seed103_v2_20261010",
+      "experiment_config": "training_logs/results/graphgrpo_ablation_firstagv_strict2_seed103_v2_20261010/experiment_config.json",
+      "best_checkpoint": "training_logs/results/graphgrpo_ablation_firstagv_strict2_seed103_v2_20261010/checkpoints/best.pt",
+      "best_checkpoint_sha256": "02317e429030ffa78b6dc686228f8d008824c8cc56141abd536c85ddb1f2c311",
+      "best_checkpoint_meta": {
+        "epoch": 2,
+        "val_makespan_gap": 10.787299168553348,
+        "train_mean_reward": -11704.333363306547,
+        "train_mean_makespan_gap": 15.86120629106901,
+        "epsilon": null,
+        "checkpoint_path": "/Users/hangyesheng/workspace/研三上/柔性制造模拟/skyengine/training_logs/results/graphgrpo_ablation_firstagv_strict2_seed103_v2_20261010/checkpoints/best.pt",
+        "checkpoint_sha256": "02317e429030ffa78b6dc686228f8d008824c8cc56141abd536c85ddb1f2c311",
+        "timestamp": "2026-10-10 14:24:02"
+      }
+    }
+  ],
+  "benchmark_experiments": [
+    {
+      "experiment_id": "graphgrpo_ablation_fixedgnn_seed101_test_clean_v3_20261010",
+      "experiment_config": "benchmark_results/graphgrpo_ablation_fixedgnn_seed101_test_clean_v3_20261010/experiment_config.json",
+      "results": "benchmark_results/graphgrpo_ablation_fixedgnn_seed101_test_clean_v3_20261010/results.jsonl",
+      "results_sha256": "98e81f6583015e295328288fb8bda6e3e81a03bf598790577aea8b4ff11b47e6"
+    },
+    {
+      "experiment_id": "graphgrpo_ablation_fixedgnn_seed101_test_uncertain_v3_20261010",
+      "experiment_config": "benchmark_results/graphgrpo_ablation_fixedgnn_seed101_test_uncertain_v3_20261010/experiment_config.json",
+      "results": "benchmark_results/graphgrpo_ablation_fixedgnn_seed101_test_uncertain_v3_20261010/results.jsonl",
+      "results_sha256": "17eb1d6cbd8d083d885fef7bee8822d9b9d5ce2a3f6fe1cb295d8ab3a63c5f07"
+    },
+    {
+      "experiment_id": "graphgrpo_ablation_fixedgnn_seed102_test_clean_v3_20261010",
+      "experiment_config": "benchmark_results/graphgrpo_ablation_fixedgnn_seed102_test_clean_v3_20261010/experiment_config.json",
+      "results": "benchmark_results/graphgrpo_ablation_fixedgnn_seed102_test_clean_v3_20261010/results.jsonl",
+      "results_sha256": "d739626d5baeccb573d017e0e99cbef3efd064e348ada029db940c13b8bbb7e9"
+    },
+    {
+      "experiment_id": "graphgrpo_ablation_fixedgnn_seed102_test_uncertain_v3_20261010",
+      "experiment_config": "benchmark_results/graphgrpo_ablation_fixedgnn_seed102_test_uncertain_v3_20261010/experiment_config.json",
+      "results": "benchmark_results/graphgrpo_ablation_fixedgnn_seed102_test_uncertain_v3_20261010/results.jsonl",
+      "results_sha256": "2a3c9382c7c0a2cf0feab4226b7d1a9cfb4603b3e05b893eca717e0decda748b"
+    },
+    {
+      "experiment_id": "graphgrpo_ablation_fixedgnn_seed103_test_clean_v3_20261010",
+      "experiment_config": "benchmark_results/graphgrpo_ablation_fixedgnn_seed103_test_clean_v3_20261010/experiment_config.json",
+      "results": "benchmark_results/graphgrpo_ablation_fixedgnn_seed103_test_clean_v3_20261010/results.jsonl",
+      "results_sha256": "9eacc664f6d7e419e141b2949b4a14680f8d8aeb84ac6568e6323e9fd7edc2a9"
+    },
+    {
+      "experiment_id": "graphgrpo_ablation_fixedgnn_seed103_test_uncertain_v3_20261010",
+      "experiment_config": "benchmark_results/graphgrpo_ablation_fixedgnn_seed103_test_uncertain_v3_20261010/experiment_config.json",
+      "results": "benchmark_results/graphgrpo_ablation_fixedgnn_seed103_test_uncertain_v3_20261010/results.jsonl",
+      "results_sha256": "9f12ad205e0d762937f7a8b2a0a237c5c234495a63db17f9d22e4423f95e9928"
+    },
+    {
+      "experiment_id": "graphgrpo_ablation_flat_seed101_test_clean_v3_20261010",
+      "experiment_config": "benchmark_results/graphgrpo_ablation_flat_seed101_test_clean_v3_20261010/experiment_config.json",
+      "results": "benchmark_results/graphgrpo_ablation_flat_seed101_test_clean_v3_20261010/results.jsonl",
+      "results_sha256": "928af9ba9cf6827c9aabd4c4f2a46ca3dbeb074dac3943672ffc4d61d30f9016"
+    },
+    {
+      "experiment_id": "graphgrpo_ablation_flat_seed101_test_uncertain_v3_20261010",
+      "experiment_config": "benchmark_results/graphgrpo_ablation_flat_seed101_test_uncertain_v3_20261010/experiment_config.json",
+      "results": "benchmark_results/graphgrpo_ablation_flat_seed101_test_uncertain_v3_20261010/results.jsonl",
+      "results_sha256": "fc6d9211e07ed10233878752235e59c785d6dbf0533284750692e8946b96caf7"
+    },
+    {
+      "experiment_id": "graphgrpo_ablation_flat_seed102_test_clean_v3_20261010",
+      "experiment_config": "benchmark_results/graphgrpo_ablation_flat_seed102_test_clean_v3_20261010/experiment_config.json",
+      "results": "benchmark_results/graphgrpo_ablation_flat_seed102_test_clean_v3_20261010/results.jsonl",
+      "results_sha256": "ea2db2f36816ea162a2319b006c23116bf1a57f06a01da4357b946329c2b1ca7"
+    },
+    {
+      "experiment_id": "graphgrpo_ablation_flat_seed102_test_uncertain_v3_20261010",
+      "experiment_config": "benchmark_results/graphgrpo_ablation_flat_seed102_test_uncertain_v3_20261010/experiment_config.json",
+      "results": "benchmark_results/graphgrpo_ablation_flat_seed102_test_uncertain_v3_20261010/results.jsonl",
+      "results_sha256": "ae9d8a1460439190e2e9dbaf0a12fec47de175236d3a18085257f77f93dcefce"
+    },
+    {
+      "experiment_id": "graphgrpo_ablation_flat_seed103_test_clean_v3_20261010",
+      "experiment_config": "benchmark_results/graphgrpo_ablation_flat_seed103_test_clean_v3_20261010/experiment_config.json",
+      "results": "benchmark_results/graphgrpo_ablation_flat_seed103_test_clean_v3_20261010/results.jsonl",
+      "results_sha256": "2add6422b3eef8f1f3bb7933c9eef5e2a96ccd5be379c5eef54aa9eea2d22754"
+    },
+    {
+      "experiment_id": "graphgrpo_ablation_flat_seed103_test_uncertain_v3_20261010",
+      "experiment_config": "benchmark_results/graphgrpo_ablation_flat_seed103_test_uncertain_v3_20261010/experiment_config.json",
+      "results": "benchmark_results/graphgrpo_ablation_flat_seed103_test_uncertain_v3_20261010/results.jsonl",
+      "results_sha256": "7db414669e0240de88d5f544a23f6afe0f12bac7aac98f4eecba675429cb71ac"
+    },
+    {
+      "experiment_id": "graphgrpo_ablation_timeonly_seed101_test_clean_v3_20261010",
+      "experiment_config": "benchmark_results/graphgrpo_ablation_timeonly_seed101_test_clean_v3_20261010/experiment_config.json",
+      "results": "benchmark_results/graphgrpo_ablation_timeonly_seed101_test_clean_v3_20261010/results.jsonl",
+      "results_sha256": "71adca6adfec871783caa9833e4970fa702e170ff7844a0d9c9d290cb4fb54dc"
+    },
+    {
+      "experiment_id": "graphgrpo_ablation_timeonly_seed101_test_uncertain_v3_20261010",
+      "experiment_config": "benchmark_results/graphgrpo_ablation_timeonly_seed101_test_uncertain_v3_20261010/experiment_config.json",
+      "results": "benchmark_results/graphgrpo_ablation_timeonly_seed101_test_uncertain_v3_20261010/results.jsonl",
+      "results_sha256": "9fbbb0fce32293730bd81039033e1224d666c9ef306d62a6a0a70ba1fbe79321"
+    },
+    {
+      "experiment_id": "graphgrpo_ablation_timeonly_seed102_test_clean_v3_20261010",
+      "experiment_config": "benchmark_results/graphgrpo_ablation_timeonly_seed102_test_clean_v3_20261010/experiment_config.json",
+      "results": "benchmark_results/graphgrpo_ablation_timeonly_seed102_test_clean_v3_20261010/results.jsonl",
+      "results_sha256": "e192ebf1cc57398f6cf6b0568213d9e328c6f922ad3b424ae5d7b692da482556"
+    },
+    {
+      "experiment_id": "graphgrpo_ablation_timeonly_seed102_test_uncertain_v3_20261010",
+      "experiment_config": "benchmark_results/graphgrpo_ablation_timeonly_seed102_test_uncertain_v3_20261010/experiment_config.json",
+      "results": "benchmark_results/graphgrpo_ablation_timeonly_seed102_test_uncertain_v3_20261010/results.jsonl",
+      "results_sha256": "ba618bad8642779512558602add7d5071698d6aaa96dea8aa3cd9bbd07796676"
+    },
+    {
+      "experiment_id": "graphgrpo_ablation_timeonly_seed103_test_clean_v3_20261010",
+      "experiment_config": "benchmark_results/graphgrpo_ablation_timeonly_seed103_test_clean_v3_20261010/experiment_config.json",
+      "results": "benchmark_results/graphgrpo_ablation_timeonly_seed103_test_clean_v3_20261010/results.jsonl",
+      "results_sha256": "880d80b906fa6b24d4d655c407f7cfc6210f1faef10c0b753d23ab34c54febbd"
+    },
+    {
+      "experiment_id": "graphgrpo_ablation_timeonly_seed103_test_uncertain_v3_20261010",
+      "experiment_config": "benchmark_results/graphgrpo_ablation_timeonly_seed103_test_uncertain_v3_20261010/experiment_config.json",
+      "results": "benchmark_results/graphgrpo_ablation_timeonly_seed103_test_uncertain_v3_20261010/results.jsonl",
+      "results_sha256": "aa8fc812ad73f5ec7d78079406dbad13d14317fc57b3b2200f46c8335219ce79"
+    },
+    {
+      "experiment_id": "graphgrpo_ablation_firstagv_seed101_test_clean_v3_20261010",
+      "experiment_config": "benchmark_results/graphgrpo_ablation_firstagv_seed101_test_clean_v3_20261010/experiment_config.json",
+      "results": "benchmark_results/graphgrpo_ablation_firstagv_seed101_test_clean_v3_20261010/results.jsonl",
+      "results_sha256": "9e07ecaf8a10f19ee9012ebdc3d64ef463f16cbcb2e75990c24b680d38456161"
+    },
+    {
+      "experiment_id": "graphgrpo_ablation_firstagv_seed101_test_uncertain_v3_20261010",
+      "experiment_config": "benchmark_results/graphgrpo_ablation_firstagv_seed101_test_uncertain_v3_20261010/experiment_config.json",
+      "results": "benchmark_results/graphgrpo_ablation_firstagv_seed101_test_uncertain_v3_20261010/results.jsonl",
+      "results_sha256": "6aad4c08258e56c5a2fb57b1f01e3e09850b49eb444a67b36261f76cc74b5924"
+    },
+    {
+      "experiment_id": "graphgrpo_ablation_firstagv_seed102_test_clean_v3_20261010",
+      "experiment_config": "benchmark_results/graphgrpo_ablation_firstagv_seed102_test_clean_v3_20261010/experiment_config.json",
+      "results": "benchmark_results/graphgrpo_ablation_firstagv_seed102_test_clean_v3_20261010/results.jsonl",
+      "results_sha256": "f7d319fcef96c2a2390a14ad0d7b3eaf14152ab8a4757a30ab4642e3e8246211"
+    },
+    {
+      "experiment_id": "graphgrpo_ablation_firstagv_seed102_test_uncertain_v3_20261010",
+      "experiment_config": "benchmark_results/graphgrpo_ablation_firstagv_seed102_test_uncertain_v3_20261010/experiment_config.json",
+      "results": "benchmark_results/graphgrpo_ablation_firstagv_seed102_test_uncertain_v3_20261010/results.jsonl",
+      "results_sha256": "f8d4d3699a7517509fd2bbc81a673f481dad42d16558f5e77009160f7619e461"
+    },
+    {
+      "experiment_id": "graphgrpo_ablation_firstagv_seed103_test_clean_v3_20261010",
+      "experiment_config": "benchmark_results/graphgrpo_ablation_firstagv_seed103_test_clean_v3_20261010/experiment_config.json",
+      "results": "benchmark_results/graphgrpo_ablation_firstagv_seed103_test_clean_v3_20261010/results.jsonl",
+      "results_sha256": "c7222d1eac1bcc6fe78a6c34083d544ee3127fc0d61a33aa014cfd4e4174ec75"
+    },
+    {
+      "experiment_id": "graphgrpo_ablation_firstagv_seed103_test_uncertain_v3_20261010",
+      "experiment_config": "benchmark_results/graphgrpo_ablation_firstagv_seed103_test_uncertain_v3_20261010/experiment_config.json",
+      "results": "benchmark_results/graphgrpo_ablation_firstagv_seed103_test_uncertain_v3_20261010/results.jsonl",
+      "results_sha256": "d7e7b160aea2dd9e243cf3abbd9cca33b51d2ff1173d75e94b7060387acd96bb"
+    },
+    {
+      "experiment_id": "graphgrpo_formal_strict2_seed101_test_clean_v3_20261010",
+      "experiment_config": "benchmark_results/graphgrpo_formal_strict2_seed101_test_clean_v3_20261010/experiment_config.json",
+      "results": "benchmark_results/graphgrpo_formal_strict2_seed101_test_clean_v3_20261010/results.jsonl",
+      "results_sha256": "b23eaf7678b29e9e583602bdd162049d94eb489fd1b2d5e6fd4e8b32e482955b"
+    },
+    {
+      "experiment_id": "graphgrpo_formal_strict2_seed101_test_uncertain_v3_20261010",
+      "experiment_config": "benchmark_results/graphgrpo_formal_strict2_seed101_test_uncertain_v3_20261010/experiment_config.json",
+      "results": "benchmark_results/graphgrpo_formal_strict2_seed101_test_uncertain_v3_20261010/results.jsonl",
+      "results_sha256": "7762dda74dd19c9dbe5dfbce9f592ca509fe9f7cc954fe685385d7d2595ef4a2"
+    },
+    {
+      "experiment_id": "graphgrpo_formal_strict2_seed102_test_clean_v3_20261010",
+      "experiment_config": "benchmark_results/graphgrpo_formal_strict2_seed102_test_clean_v3_20261010/experiment_config.json",
+      "results": "benchmark_results/graphgrpo_formal_strict2_seed102_test_clean_v3_20261010/results.jsonl",
+      "results_sha256": "37c1ab40940355381f218aec0d207302e46aa2a73d2ba8f9902d3eda13673fc6"
+    },
+    {
+      "experiment_id": "graphgrpo_formal_strict2_seed102_test_uncertain_v3_20261010",
+      "experiment_config": "benchmark_results/graphgrpo_formal_strict2_seed102_test_uncertain_v3_20261010/experiment_config.json",
+      "results": "benchmark_results/graphgrpo_formal_strict2_seed102_test_uncertain_v3_20261010/results.jsonl",
+      "results_sha256": "eb3f576006fc601f5f08dd2c4f04052655060dc7c68f1e38b39bf616fa4d4d8d"
+    },
+    {
+      "experiment_id": "graphgrpo_formal_strict2_seed103_test_clean_v3_20261010",
+      "experiment_config": "benchmark_results/graphgrpo_formal_strict2_seed103_test_clean_v3_20261010/experiment_config.json",
+      "results": "benchmark_results/graphgrpo_formal_strict2_seed103_test_clean_v3_20261010/results.jsonl",
+      "results_sha256": "6a9732974ce37366c58c7f9e8779eaed3b5dbbc294b2d596851cf1633c7897f0"
+    },
+    {
+      "experiment_id": "graphgrpo_formal_strict2_seed103_test_uncertain_v3_20261010",
+      "experiment_config": "benchmark_results/graphgrpo_formal_strict2_seed103_test_uncertain_v3_20261010/experiment_config.json",
+      "results": "benchmark_results/graphgrpo_formal_strict2_seed103_test_uncertain_v3_20261010/results.jsonl",
+      "results_sha256": "092404e379eda67ad8ed694f6f06c05e52827b7069d0cdfce4ba07dfc2a6e874"
+    },
+    {
+      "experiment_id": "graphgrpo_formal_default_seed101_test_clean_v3_20261010",
+      "experiment_config": "benchmark_results/graphgrpo_formal_default_seed101_test_clean_v3_20261010/experiment_config.json",
+      "results": "benchmark_results/graphgrpo_formal_default_seed101_test_clean_v3_20261010/results.jsonl",
+      "results_sha256": "2293114254a90733b9fdd84cfd65bb8457f8693fac2fbe88bfa570cef65a227f"
+    },
+    {
+      "experiment_id": "graphgrpo_formal_default_seed101_test_uncertain_v3_20261010",
+      "experiment_config": "benchmark_results/graphgrpo_formal_default_seed101_test_uncertain_v3_20261010/experiment_config.json",
+      "results": "benchmark_results/graphgrpo_formal_default_seed101_test_uncertain_v3_20261010/results.jsonl",
+      "results_sha256": "05b1053d4e776c4f765667b5e04b1cc86d8afa6912cbabfa1e237b81f15c9a6e"
+    },
+    {
+      "experiment_id": "graphgrpo_formal_default_seed102_test_clean_v3_20261010",
+      "experiment_config": "benchmark_results/graphgrpo_formal_default_seed102_test_clean_v3_20261010/experiment_config.json",
+      "results": "benchmark_results/graphgrpo_formal_default_seed102_test_clean_v3_20261010/results.jsonl",
+      "results_sha256": "a9497a71584017b20945ac970dec3970392d57dfb1a16abe0923f4a6a1804d2e"
+    },
+    {
+      "experiment_id": "graphgrpo_formal_default_seed102_test_uncertain_v3_20261010",
+      "experiment_config": "benchmark_results/graphgrpo_formal_default_seed102_test_uncertain_v3_20261010/experiment_config.json",
+      "results": "benchmark_results/graphgrpo_formal_default_seed102_test_uncertain_v3_20261010/results.jsonl",
+      "results_sha256": "5ab6480ec2c54e2ddce011faddd26a9766d5336f641ef33903724aada8305a8b"
+    },
+    {
+      "experiment_id": "graphgrpo_formal_default_seed103_test_clean_v3_20261010",
+      "experiment_config": "benchmark_results/graphgrpo_formal_default_seed103_test_clean_v3_20261010/experiment_config.json",
+      "results": "benchmark_results/graphgrpo_formal_default_seed103_test_clean_v3_20261010/results.jsonl",
+      "results_sha256": "b7fca5b41097c7e88e70b01a6379d67b9a24fdf7fb973501f841f5070b04bd07"
+    },
+    {
+      "experiment_id": "graphgrpo_formal_default_seed103_test_uncertain_v3_20261010",
+      "experiment_config": "benchmark_results/graphgrpo_formal_default_seed103_test_uncertain_v3_20261010/experiment_config.json",
+      "results": "benchmark_results/graphgrpo_formal_default_seed103_test_uncertain_v3_20261010/results.jsonl",
+      "results_sha256": "78eebf930915003ad1bb9bd0a27351f392d84655c134d30b98af4065a0e227ce"
+    },
+    {
+      "experiment_id": "graphgrpo_formal_default_seed101_test_clean_v2_20261010",
+      "experiment_config": "benchmark_results/graphgrpo_formal_default_seed101_test_clean_v2_20261010/experiment_config.json",
+      "results": "benchmark_results/graphgrpo_formal_default_seed101_test_clean_v2_20261010/results.jsonl",
+      "results_sha256": "bc686a9a7c21f497402fff23729bf7eaf59b3d72f3a7ba0a0afb939f14811304"
+    },
+    {
+      "experiment_id": "graphgrpo_formal_default_seed101_test_uncertain_v2_20261010",
+      "experiment_config": "benchmark_results/graphgrpo_formal_default_seed101_test_uncertain_v2_20261010/experiment_config.json",
+      "results": "benchmark_results/graphgrpo_formal_default_seed101_test_uncertain_v2_20261010/results.jsonl",
+      "results_sha256": "60ce189a956c51c489a4d4d36686dad928679e8476f3d519b8a593b26b2bbd22"
+    },
+    {
+      "experiment_id": "graphgrpo_formal_default_seed102_test_clean_v2_20261010",
+      "experiment_config": "benchmark_results/graphgrpo_formal_default_seed102_test_clean_v2_20261010/experiment_config.json",
+      "results": "benchmark_results/graphgrpo_formal_default_seed102_test_clean_v2_20261010/results.jsonl",
+      "results_sha256": "0b1b78d184e32b154a974a79a0d3124710aa6392a48dab08a90e0ebfeb8b61a7"
+    },
+    {
+      "experiment_id": "graphgrpo_formal_default_seed102_test_uncertain_v2_20261010",
+      "experiment_config": "benchmark_results/graphgrpo_formal_default_seed102_test_uncertain_v2_20261010/experiment_config.json",
+      "results": "benchmark_results/graphgrpo_formal_default_seed102_test_uncertain_v2_20261010/results.jsonl",
+      "results_sha256": "f2b2084af42942b0310d2f578c34e7248a0227479672eae1c967217bd0e6138a"
+    },
+    {
+      "experiment_id": "graphgrpo_formal_default_seed103_test_clean_v2_20261010",
+      "experiment_config": "benchmark_results/graphgrpo_formal_default_seed103_test_clean_v2_20261010/experiment_config.json",
+      "results": "benchmark_results/graphgrpo_formal_default_seed103_test_clean_v2_20261010/results.jsonl",
+      "results_sha256": "df4f257c3f790b4354a7720c46a4345144a300a099b6ad5a036f1a47309460c5"
+    },
+    {
+      "experiment_id": "graphgrpo_formal_default_seed103_test_uncertain_v2_20261010",
+      "experiment_config": "benchmark_results/graphgrpo_formal_default_seed103_test_uncertain_v2_20261010/experiment_config.json",
+      "results": "benchmark_results/graphgrpo_formal_default_seed103_test_uncertain_v2_20261010/results.jsonl",
+      "results_sha256": "06887cb5b6dc4a97c7195c22c7670440ee404afc099366c601f45c32cea7b4ce"
+    },
+    {
+      "experiment_id": "graphgrpo_formal_strict2_seed101_test_clean_v2_20261010",
+      "experiment_config": "benchmark_results/graphgrpo_formal_strict2_seed101_test_clean_v2_20261010/experiment_config.json",
+      "results": "benchmark_results/graphgrpo_formal_strict2_seed101_test_clean_v2_20261010/results.jsonl",
+      "results_sha256": "6eb872f23ea9ab7fcc0972fc26ea5c1106f49d48263b333aff53dcfe2490316f"
+    },
+    {
+      "experiment_id": "graphgrpo_formal_strict2_seed101_test_uncertain_v2_20261010",
+      "experiment_config": "benchmark_results/graphgrpo_formal_strict2_seed101_test_uncertain_v2_20261010/experiment_config.json",
+      "results": "benchmark_results/graphgrpo_formal_strict2_seed101_test_uncertain_v2_20261010/results.jsonl",
+      "results_sha256": "1a967470981203bcda77176ae658c79e2b4a7be3635b73ffe1c693290461978c"
+    },
+    {
+      "experiment_id": "graphgrpo_formal_strict2_seed102_test_clean_v1_20261010",
+      "experiment_config": "benchmark_results/graphgrpo_formal_strict2_seed102_test_clean_v1_20261010/experiment_config.json",
+      "results": "benchmark_results/graphgrpo_formal_strict2_seed102_test_clean_v1_20261010/results.jsonl",
+      "results_sha256": "8417fc8b54632805beeb47f1381f39613b109ef6c1f0ca1d3374c0015285e332"
+    },
+    {
+      "experiment_id": "graphgrpo_formal_strict2_seed102_test_uncertain_v1_20261010",
+      "experiment_config": "benchmark_results/graphgrpo_formal_strict2_seed102_test_uncertain_v1_20261010/experiment_config.json",
+      "results": "benchmark_results/graphgrpo_formal_strict2_seed102_test_uncertain_v1_20261010/results.jsonl",
+      "results_sha256": "56ceddf2a6a04f5c9494d6a313a85bb2f7840f84b0a0c8e6270b361539b97396"
+    },
+    {
+      "experiment_id": "graphgrpo_formal_strict2_seed103_test_clean_v1_20261010",
+      "experiment_config": "benchmark_results/graphgrpo_formal_strict2_seed103_test_clean_v1_20261010/experiment_config.json",
+      "results": "benchmark_results/graphgrpo_formal_strict2_seed103_test_clean_v1_20261010/results.jsonl",
+      "results_sha256": "de5fdfe21856abe63a64cbccd3c811d29be0bd8a1bea7d8fbc41c1c5bdf2a73a"
+    },
+    {
+      "experiment_id": "graphgrpo_formal_strict2_seed103_test_uncertain_v1_20261010",
+      "experiment_config": "benchmark_results/graphgrpo_formal_strict2_seed103_test_uncertain_v1_20261010/experiment_config.json",
+      "results": "benchmark_results/graphgrpo_formal_strict2_seed103_test_uncertain_v1_20261010/results.jsonl",
+      "results_sha256": "2ea2f8ccce0c322a69a077841905dcf870cbce56866cc3b7b03697e67f34fe0d"
+    },
+    {
+      "experiment_id": "hgs_formal_seed101_test_clean_v1_20261010",
+      "experiment_config": "benchmark_results/hgs_formal_seed101_test_clean_v1_20261010/experiment_config.json",
+      "results": "benchmark_results/hgs_formal_seed101_test_clean_v1_20261010/results.jsonl",
+      "results_sha256": "230f8f1bdafead920f999bb4af9af9657b54e141a86a3538e031c578db01137b"
+    },
+    {
+      "experiment_id": "hgs_formal_seed101_test_uncertain_v1_20261010",
+      "experiment_config": "benchmark_results/hgs_formal_seed101_test_uncertain_v1_20261010/experiment_config.json",
+      "results": "benchmark_results/hgs_formal_seed101_test_uncertain_v1_20261010/results.jsonl",
+      "results_sha256": "fd6fb29dccdbd4457313735b471f57019d3a2a78b8b594e51920407bfbe9c710"
+    },
+    {
+      "experiment_id": "hgs_formal_seed102_test_clean_v1_20261010",
+      "experiment_config": "benchmark_results/hgs_formal_seed102_test_clean_v1_20261010/experiment_config.json",
+      "results": "benchmark_results/hgs_formal_seed102_test_clean_v1_20261010/results.jsonl",
+      "results_sha256": "6044fab09eec809cf7d2a9393ae6bd9e31992780b4f89637902ba09ff7fc5372"
+    },
+    {
+      "experiment_id": "hgs_formal_seed102_test_uncertain_v1_20261010",
+      "experiment_config": "benchmark_results/hgs_formal_seed102_test_uncertain_v1_20261010/experiment_config.json",
+      "results": "benchmark_results/hgs_formal_seed102_test_uncertain_v1_20261010/results.jsonl",
+      "results_sha256": "70516c1cd7fc646c9702e1ba3ba27d1475bc062b5ed8b9ae6eb2c78969bd4257"
+    },
+    {
+      "experiment_id": "hgs_formal_seed103_test_clean_v1_20261010",
+      "experiment_config": "benchmark_results/hgs_formal_seed103_test_clean_v1_20261010/experiment_config.json",
+      "results": "benchmark_results/hgs_formal_seed103_test_clean_v1_20261010/results.jsonl",
+      "results_sha256": "cf12b0ec415763ca6601f1cc4e8af298a410d358766ff8aed9d30c2b54e761ce"
+    },
+    {
+      "experiment_id": "hgs_formal_seed103_test_uncertain_v1_20261010",
+      "experiment_config": "benchmark_results/hgs_formal_seed103_test_uncertain_v1_20261010/experiment_config.json",
+      "results": "benchmark_results/hgs_formal_seed103_test_uncertain_v1_20261010/results.jsonl",
+      "results_sha256": "2f516d70b7773b1eab0d1d6bc434165cd794b432fb73b88c432503a220dcbc60"
+    },
+    {
+      "experiment_id": "graphgrpo_ablation_fixedgnn_seed101_test_clean_v1_20261010",
+      "experiment_config": "benchmark_results/graphgrpo_ablation_fixedgnn_seed101_test_clean_v1_20261010/experiment_config.json",
+      "results": "benchmark_results/graphgrpo_ablation_fixedgnn_seed101_test_clean_v1_20261010/results.jsonl",
+      "results_sha256": "b5503a6a1011ec2dc75861ee2e339c098511e22fec1b7af02a817ceb3c273456"
+    },
+    {
+      "experiment_id": "graphgrpo_ablation_fixedgnn_seed101_test_uncertain_v1_20261010",
+      "experiment_config": "benchmark_results/graphgrpo_ablation_fixedgnn_seed101_test_uncertain_v1_20261010/experiment_config.json",
+      "results": "benchmark_results/graphgrpo_ablation_fixedgnn_seed101_test_uncertain_v1_20261010/results.jsonl",
+      "results_sha256": "2dbc0d0efbb4dee4fd2954adf72a3ba77792c2f2f41f6d08d792236283d727ae"
+    },
+    {
+      "experiment_id": "graphgrpo_ablation_fixedgnn_seed102_test_clean_v1_20261010",
+      "experiment_config": "benchmark_results/graphgrpo_ablation_fixedgnn_seed102_test_clean_v1_20261010/experiment_config.json",
+      "results": "benchmark_results/graphgrpo_ablation_fixedgnn_seed102_test_clean_v1_20261010/results.jsonl",
+      "results_sha256": "3114d98292eed82cf57460f5356fbd4cb52aa9e1b58e0ceee7d51354298c053b"
+    },
+    {
+      "experiment_id": "graphgrpo_ablation_fixedgnn_seed102_test_uncertain_v1_20261010",
+      "experiment_config": "benchmark_results/graphgrpo_ablation_fixedgnn_seed102_test_uncertain_v1_20261010/experiment_config.json",
+      "results": "benchmark_results/graphgrpo_ablation_fixedgnn_seed102_test_uncertain_v1_20261010/results.jsonl",
+      "results_sha256": "5d7b0a16de9c58c677566b3c66ab23fd0b67ca30c5b3b2dbc2fbec31cf575937"
+    },
+    {
+      "experiment_id": "graphgrpo_ablation_fixedgnn_seed103_test_clean_v1_20261010",
+      "experiment_config": "benchmark_results/graphgrpo_ablation_fixedgnn_seed103_test_clean_v1_20261010/experiment_config.json",
+      "results": "benchmark_results/graphgrpo_ablation_fixedgnn_seed103_test_clean_v1_20261010/results.jsonl",
+      "results_sha256": "8e5edc1ff1a77f7e8fa11e3bcf792cf9d9207a7c28e38eae5431591eeaf137c8"
+    },
+    {
+      "experiment_id": "graphgrpo_ablation_fixedgnn_seed103_test_uncertain_v1_20261010",
+      "experiment_config": "benchmark_results/graphgrpo_ablation_fixedgnn_seed103_test_uncertain_v1_20261010/experiment_config.json",
+      "results": "benchmark_results/graphgrpo_ablation_fixedgnn_seed103_test_uncertain_v1_20261010/results.jsonl",
+      "results_sha256": "1b03013a5c625f952758301e36a28fc5136e6819c9679b6bb9a14e54ee624bd0"
+    },
+    {
+      "experiment_id": "graphppo_ablation_seed101_test_clean_v1_20261010",
+      "experiment_config": "benchmark_results/graphppo_ablation_seed101_test_clean_v1_20261010/experiment_config.json",
+      "results": "benchmark_results/graphppo_ablation_seed101_test_clean_v1_20261010/results.jsonl",
+      "results_sha256": "8cfe92728a08db900af6ee1c5f518790d6947be3fb21d7ee0b36c5bddd767ee5"
+    },
+    {
+      "experiment_id": "graphppo_ablation_seed101_test_uncertain_v1_20261010",
+      "experiment_config": "benchmark_results/graphppo_ablation_seed101_test_uncertain_v1_20261010/experiment_config.json",
+      "results": "benchmark_results/graphppo_ablation_seed101_test_uncertain_v1_20261010/results.jsonl",
+      "results_sha256": "8bd87e22de7feb4f7b5007dc2dc8f43f78df26927547601267f9b02186d9017c"
+    },
+    {
+      "experiment_id": "graphppo_ablation_seed102_test_clean_v1_20261010",
+      "experiment_config": "benchmark_results/graphppo_ablation_seed102_test_clean_v1_20261010/experiment_config.json",
+      "results": "benchmark_results/graphppo_ablation_seed102_test_clean_v1_20261010/results.jsonl",
+      "results_sha256": "1a84f49d1a1f964af7461ef234440fce519ed6601f2dadc8019861e608bef9dc"
+    },
+    {
+      "experiment_id": "graphppo_ablation_seed102_test_uncertain_v1_20261010",
+      "experiment_config": "benchmark_results/graphppo_ablation_seed102_test_uncertain_v1_20261010/experiment_config.json",
+      "results": "benchmark_results/graphppo_ablation_seed102_test_uncertain_v1_20261010/results.jsonl",
+      "results_sha256": "b548a696ba4fbc0568581dd886883438a5af8815c47b6795012bbaaceb087722"
+    },
+    {
+      "experiment_id": "graphppo_ablation_seed103_test_clean_v1_20261010",
+      "experiment_config": "benchmark_results/graphppo_ablation_seed103_test_clean_v1_20261010/experiment_config.json",
+      "results": "benchmark_results/graphppo_ablation_seed103_test_clean_v1_20261010/results.jsonl",
+      "results_sha256": "003f755b6634d220b6a13c232a1f52580550ccafb768a040589568934318e5ff"
+    },
+    {
+      "experiment_id": "graphppo_ablation_seed103_test_uncertain_v1_20261010",
+      "experiment_config": "benchmark_results/graphppo_ablation_seed103_test_uncertain_v1_20261010/experiment_config.json",
+      "results": "benchmark_results/graphppo_ablation_seed103_test_uncertain_v1_20261010/results.jsonl",
+      "results_sha256": "2d1753a9df40c15f0e97ff7108581f70dc22d03c9453c7dc1b53f02732d6f853"
+    },
+    {
+      "experiment_id": "graphgrpo_ablation_flat_seed101_test_clean_v1_20261010",
+      "experiment_config": "benchmark_results/graphgrpo_ablation_flat_seed101_test_clean_v1_20261010/experiment_config.json",
+      "results": "benchmark_results/graphgrpo_ablation_flat_seed101_test_clean_v1_20261010/results.jsonl",
+      "results_sha256": "21f31eeb4a5d0c910b5870e962972019e63ec0527d092fc1d227ff65460dfe92"
+    },
+    {
+      "experiment_id": "graphgrpo_ablation_flat_seed101_test_uncertain_v1_20261010",
+      "experiment_config": "benchmark_results/graphgrpo_ablation_flat_seed101_test_uncertain_v1_20261010/experiment_config.json",
+      "results": "benchmark_results/graphgrpo_ablation_flat_seed101_test_uncertain_v1_20261010/results.jsonl",
+      "results_sha256": "d5d4e5d29d37c9d74b0b421d44b45c6f4583949f6b6b0e9834a17612e220263b"
+    },
+    {
+      "experiment_id": "graphgrpo_ablation_flat_seed102_test_clean_v1_20261010",
+      "experiment_config": "benchmark_results/graphgrpo_ablation_flat_seed102_test_clean_v1_20261010/experiment_config.json",
+      "results": "benchmark_results/graphgrpo_ablation_flat_seed102_test_clean_v1_20261010/results.jsonl",
+      "results_sha256": "981f869a17c374b58755aabaeb2f2fa20a5d53e1f449d555334471c0ced3bd28"
+    },
+    {
+      "experiment_id": "graphgrpo_ablation_flat_seed102_test_uncertain_v1_20261010",
+      "experiment_config": "benchmark_results/graphgrpo_ablation_flat_seed102_test_uncertain_v1_20261010/experiment_config.json",
+      "results": "benchmark_results/graphgrpo_ablation_flat_seed102_test_uncertain_v1_20261010/results.jsonl",
+      "results_sha256": "7c65dc1c2609b9edf6d8a5e343e95efbac15986903a3c127669448eabe90f14c"
+    },
+    {
+      "experiment_id": "graphgrpo_ablation_flat_seed103_test_clean_v1_20261010",
+      "experiment_config": "benchmark_results/graphgrpo_ablation_flat_seed103_test_clean_v1_20261010/experiment_config.json",
+      "results": "benchmark_results/graphgrpo_ablation_flat_seed103_test_clean_v1_20261010/results.jsonl",
+      "results_sha256": "2a8fc7da98b5a0d4ef4d9ea151c4dca4384f97ae74110a0e4c8608090b9966da"
+    },
+    {
+      "experiment_id": "graphgrpo_ablation_flat_seed103_test_uncertain_v1_20261010",
+      "experiment_config": "benchmark_results/graphgrpo_ablation_flat_seed103_test_uncertain_v1_20261010/experiment_config.json",
+      "results": "benchmark_results/graphgrpo_ablation_flat_seed103_test_uncertain_v1_20261010/results.jsonl",
+      "results_sha256": "d0b026cb03c2d21b5bad50627ea0788588fe0c48beaef226ffc147ae3e683677"
+    },
+    {
+      "experiment_id": "graphgrpo_ablation_timeonly_seed101_test_clean_v1_20261010",
+      "experiment_config": "benchmark_results/graphgrpo_ablation_timeonly_seed101_test_clean_v1_20261010/experiment_config.json",
+      "results": "benchmark_results/graphgrpo_ablation_timeonly_seed101_test_clean_v1_20261010/results.jsonl",
+      "results_sha256": "3e9f33ad589cce6288b390e81a2a3592d31534cea30ed529e70f52d8c3181852"
+    },
+    {
+      "experiment_id": "graphgrpo_ablation_timeonly_seed101_test_uncertain_v1_20261010",
+      "experiment_config": "benchmark_results/graphgrpo_ablation_timeonly_seed101_test_uncertain_v1_20261010/experiment_config.json",
+      "results": "benchmark_results/graphgrpo_ablation_timeonly_seed101_test_uncertain_v1_20261010/results.jsonl",
+      "results_sha256": "82c5b1d35716c8ec58188303239f483ef4fc7481f3c019d90b299b0fcc452e59"
+    },
+    {
+      "experiment_id": "graphgrpo_ablation_timeonly_seed102_test_clean_v1_20261010",
+      "experiment_config": "benchmark_results/graphgrpo_ablation_timeonly_seed102_test_clean_v1_20261010/experiment_config.json",
+      "results": "benchmark_results/graphgrpo_ablation_timeonly_seed102_test_clean_v1_20261010/results.jsonl",
+      "results_sha256": "7aa5ea8c88fe6fef100751a55d42bea8f6d4fd9f9656b24ee2b734b5d62c6da2"
+    },
+    {
+      "experiment_id": "graphgrpo_ablation_timeonly_seed102_test_uncertain_v1_20261010",
+      "experiment_config": "benchmark_results/graphgrpo_ablation_timeonly_seed102_test_uncertain_v1_20261010/experiment_config.json",
+      "results": "benchmark_results/graphgrpo_ablation_timeonly_seed102_test_uncertain_v1_20261010/results.jsonl",
+      "results_sha256": "7691aca636ad29c812b38aec7e81f166d74189049dde17d933ccea15b437c47b"
+    },
+    {
+      "experiment_id": "graphgrpo_ablation_timeonly_seed103_test_clean_v1_20261010",
+      "experiment_config": "benchmark_results/graphgrpo_ablation_timeonly_seed103_test_clean_v1_20261010/experiment_config.json",
+      "results": "benchmark_results/graphgrpo_ablation_timeonly_seed103_test_clean_v1_20261010/results.jsonl",
+      "results_sha256": "c556c24af0373b67bd147ef49bbdcdb77b583b23402439797fed1871722044dc"
+    },
+    {
+      "experiment_id": "graphgrpo_ablation_timeonly_seed103_test_uncertain_v1_20261010",
+      "experiment_config": "benchmark_results/graphgrpo_ablation_timeonly_seed103_test_uncertain_v1_20261010/experiment_config.json",
+      "results": "benchmark_results/graphgrpo_ablation_timeonly_seed103_test_uncertain_v1_20261010/results.jsonl",
+      "results_sha256": "610ad4dab1a70abdca01a5232ab881bd86495c7f4a349a30789f93225a8f357b"
+    },
+    {
+      "experiment_id": "graphgrpo_ablation_firstagv_seed101_test_clean_v2_20261010",
+      "experiment_config": "benchmark_results/graphgrpo_ablation_firstagv_seed101_test_clean_v2_20261010/experiment_config.json",
+      "results": "benchmark_results/graphgrpo_ablation_firstagv_seed101_test_clean_v2_20261010/results.jsonl",
+      "results_sha256": "6087ae6416155efd9264ffcdbe38cb274dd2270c3bcd8234360eb249227daa7a"
+    },
+    {
+      "experiment_id": "graphgrpo_ablation_firstagv_seed101_test_uncertain_v2_20261010",
+      "experiment_config": "benchmark_results/graphgrpo_ablation_firstagv_seed101_test_uncertain_v2_20261010/experiment_config.json",
+      "results": "benchmark_results/graphgrpo_ablation_firstagv_seed101_test_uncertain_v2_20261010/results.jsonl",
+      "results_sha256": "6eba33a435d43dd5e8daedf0cf4e535205059291d8d9771cc06cf0df56e9d4f3"
+    },
+    {
+      "experiment_id": "graphgrpo_ablation_firstagv_seed102_test_clean_v2_20261010",
+      "experiment_config": "benchmark_results/graphgrpo_ablation_firstagv_seed102_test_clean_v2_20261010/experiment_config.json",
+      "results": "benchmark_results/graphgrpo_ablation_firstagv_seed102_test_clean_v2_20261010/results.jsonl",
+      "results_sha256": "7ed72e71a9cd921524714aa099eb960611f04ef6fe0ca339e574175579a9e253"
+    },
+    {
+      "experiment_id": "graphgrpo_ablation_firstagv_seed102_test_uncertain_v2_20261010",
+      "experiment_config": "benchmark_results/graphgrpo_ablation_firstagv_seed102_test_uncertain_v2_20261010/experiment_config.json",
+      "results": "benchmark_results/graphgrpo_ablation_firstagv_seed102_test_uncertain_v2_20261010/results.jsonl",
+      "results_sha256": "eae90be3b32e79d72bf0743d36dcbfb4c88d42d6cccd2e993e644a996eeb67f8"
+    },
+    {
+      "experiment_id": "graphgrpo_ablation_firstagv_seed103_test_clean_v2_20261010",
+      "experiment_config": "benchmark_results/graphgrpo_ablation_firstagv_seed103_test_clean_v2_20261010/experiment_config.json",
+      "results": "benchmark_results/graphgrpo_ablation_firstagv_seed103_test_clean_v2_20261010/results.jsonl",
+      "results_sha256": "6ee304fba5d4f0beb610095484b26daf03e31cc79c4a8ef8cfdd0a61f99196df"
+    },
+    {
+      "experiment_id": "graphgrpo_ablation_firstagv_seed103_test_uncertain_v2_20261010",
+      "experiment_config": "benchmark_results/graphgrpo_ablation_firstagv_seed103_test_uncertain_v2_20261010/experiment_config.json",
+      "results": "benchmark_results/graphgrpo_ablation_firstagv_seed103_test_uncertain_v2_20261010/results.jsonl",
+      "results_sha256": "94e7a0ac4fe95aad0499ba1916cb65b42ade8883f67152fd50b25beea0b5c216"
+    },
+    {
+      "experiment_id": "ortools_formal_seed601_test_clean_v1_20261010",
+      "experiment_config": "benchmark_results/ortools_formal_seed601_test_clean_v1_20261010/experiment_config.json",
+      "results": "benchmark_results/ortools_formal_seed601_test_clean_v1_20261010/results.jsonl",
+      "results_sha256": "5a51ff13c323ab63cbe5f18f3dd174466c1e247902ec63af60fa5212dfbbcd12"
+    },
+    {
+      "experiment_id": "ortools_formal_seed601_test_uncertain_v1_20261010",
+      "experiment_config": "benchmark_results/ortools_formal_seed601_test_uncertain_v1_20261010/experiment_config.json",
+      "results": "benchmark_results/ortools_formal_seed601_test_uncertain_v1_20261010/results.jsonl",
+      "results_sha256": "8d1f0936f4985c3d81da3151c94672de3afe7d7c2c4d8d751f2eba03e44b6bbb"
+    }
+  ],
+  "event_files": [
+    {
+      "path": "dataset/uncertain-events/default/brandimarte/mk11_agv_events.json",
+      "sha256": "48b09a7de00b8c86812f3c23b788a5e8e186f6a7b9142769f617611ea3967b29"
+    },
+    {
+      "path": "dataset/uncertain-events/default/brandimarte/mk12_agv_events.json",
+      "sha256": "eb600f9f3a203fbe334f214178aa9fa71eb84cb0f524d0dea413f5e6570c8a6d"
+    },
+    {
+      "path": "dataset/uncertain-events/default/brandimarte/mk13_agv_events.json",
+      "sha256": "f142d5c88f90f9ff16d6308d0c5f658e54dc882356002d9881cf9b7ef47c84fb"
+    },
+    {
+      "path": "dataset/uncertain-events/default/brandimarte/mk14_agv_events.json",
+      "sha256": "53b18fb0acb9ee188ec39364a3b9227e8f3c28827622993843553c7d07a1068b"
+    },
+    {
+      "path": "dataset/uncertain-events/default/brandimarte/mk15_agv_events.json",
+      "sha256": "72cb4914d895a96c59840e08333284ec995dbd806be116617d4b6579b39879a3"
+    },
+    {
+      "path": "dataset/uncertain-events/default/kacem/k4_agv_events.json",
+      "sha256": "b633e08d394b91aa94946a28c7148a781e16ebb6de7d088a791ac80583e4f106"
+    }
+  ],
+  "source_and_dependency_hashes": [
+    {
+      "path": "config/thesis_formal_split_v1.json",
+      "sha256": "73b831a3a127aa9635cd6eb2dda145916e9b8e40383b1a9a03cbd724b2077e32"
+    },
+    {
+      "path": "scripts/auto_train_loop.py",
+      "sha256": "5186653d4512838de06118eb7417348a0f63683fce70828258e5f4f479e3a113"
+    },
+    {
+      "path": "scripts/run_benchmark.py",
+      "sha256": "2ef58daf2c7d6e1ba8d609be3347bfe00ede1e1139deb038a50bb23f777a7c0e"
+    },
+    {
+      "path": "scripts/summarize_formal_results.py",
+      "sha256": "c219e70413ab7da43feefffa433da639f27e33aa3493d318ec598a5541ac76df"
+    },
+    {
+      "path": "scripts/compare_formal_methods.py",
+      "sha256": "2613194e791eae37501298663166a066e7b88d4195d9c9f76b85bc5d7312f0f1"
+    },
+    {
+      "path": "scripts/analyze_paired_statistics.py",
+      "sha256": "94e084e6d9791b288d6db4475cc1551c11ed7c9aa32f932d143ddad27f10d4e0"
+    },
+    {
+      "path": "executor/packet_factory/packet_factory/Agent/GraphGRPOAgent.py",
+      "sha256": "65562aa803b407f7fb1ccbcd90a87483bb4f8ade261d82d2cd4718283f2fe695"
+    },
+    {
+      "path": "pyproject.toml",
+      "sha256": "237e20233d38fc885463f72919642dcd65f33f3ce340d6357c6778142ab30004"
+    },
+    {
+      "path": "uv.lock",
+      "sha256": "49792a9b7e0e8db0971fdfc02a48f63b858db54c61b7beaeaffbfc540e46cd6d"
+    }
+  ]
+}
