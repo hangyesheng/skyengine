@@ -1,0 +1,14 @@
+# HGS-adapted PacketFactory baseline
+# This is an adaptation of Moon et al. (2024), not the authors' original code.
+agent_name: packet_factory.HGSAdaptedAgent
+name: HGSAdaptedAgent
+id: 1
+mode: drl
+model_path: ./training_logs/models/HGSAdaptedAgent/agent_model.pt
+device: cuda
+hidden_dim: 64
+gamma: 1.0
+lr: 0.0003
+entropy_coeff: 0.01
+max_grad_norm: 0.5
+rollout_steps: 128

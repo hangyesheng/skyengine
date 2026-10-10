@@ -385,10 +385,17 @@ class GRPORolloutBuffer:
         self.dones = []
         self.rewards = []
         self.group_ids = []
+        self.trajectory_ids = []
+        # Graph snapshots are kept on CPU and re-encoded during policy updates.
+        # This preserves a gradient path to the shared GNN encoder without
+        # retaining the original rollout computation graph.
+        self.graph_data = []
+        self.graph_node_type_offsets = []
 
         # Sequencing
         self.seq_actions = []
         self.seq_log_probs = []
+        self.seq_candidate_counts = []
 
         # Routing — store ALL candidate features per step
         self.route_actions = []
@@ -403,14 +410,19 @@ class GRPORolloutBuffer:
         # Computed after rollout
         self.advantages = None
         self.returns = None
+        self.advantage_diagnostics = {}
 
     def __len__(self):
         return len(self.rewards)
 
     def push(self, state: np.ndarray, seq_features: np.ndarray,
              reward: float, done: bool, group_id: int,
+             trajectory_id: Optional[int] = None,
+             graph_data: Optional[Data] = None,
+             graph_node_type_offsets: Optional[Dict[str, Tuple[int, int]]] = None,
              # Sequencing
              seq_action: int = -1, seq_log_prob: float = 0.0,
+             seq_candidate_count: int = 0,
              # Routing
              route_action: int = -1, route_log_prob: float = 0.0,
              route_all_candidate_feats: Optional[np.ndarray] = None,
@@ -423,9 +435,13 @@ class GRPORolloutBuffer:
         self.dones.append(done)
         self.rewards.append(reward)
         self.group_ids.append(group_id)
+        self.trajectory_ids.append(trajectory_id)
+        self.graph_data.append(graph_data)
+        self.graph_node_type_offsets.append(graph_node_type_offsets)
 
         self.seq_actions.append(seq_action)
         self.seq_log_probs.append(seq_log_prob)
+        self.seq_candidate_counts.append(seq_candidate_count)
 
         self.route_actions.append(route_action)
         self.route_log_probs.append(route_log_prob)
@@ -461,19 +477,53 @@ class GRPORolloutBuffer:
         rewards = np.array(self.rewards, dtype=np.float32)
         dones = np.array(self.dones, dtype=np.float32)
 
-        # Compute discounted returns
+        # Compute discounted returns at the environment-decision level.
+        # Several transitions can be emitted by one environment state (the
+        # sequence, routing and AGV decisions). They share one reward and do
+        # not represent consecutive simulator time steps. Aggregating by
+        # group before discounting prevents those transitions from receiving
+        # different artificial discount factors.
         returns = np.zeros(n, dtype=np.float32)
+        group_to_indices = {}
+        ordered_groups = []
+        for idx, gid in enumerate(self.group_ids):
+            if gid not in group_to_indices:
+                group_to_indices[gid] = []
+                ordered_groups.append(gid)
+            group_to_indices[gid].append(idx)
+
+        group_rewards = []
+        group_dones = []
+        for gid in ordered_groups:
+            idx = group_to_indices[gid]
+            group_rewards.append(float(rewards[idx].sum()))
+            group_dones.append(bool(np.any(dones[idx])))
+
+        group_returns = np.zeros(len(ordered_groups), dtype=np.float32)
         running = 0.0
-        for t in reversed(range(n)):
-            if dones[t]:
+        for group_pos in reversed(range(len(ordered_groups))):
+            if group_dones[group_pos]:
                 running = 0.0
-            running = rewards[t] + gamma * running
-            returns[t] = running
+            running = group_rewards[group_pos] + gamma * running
+            group_returns[group_pos] = running
+
+        for group_pos, gid in enumerate(ordered_groups):
+            returns[group_to_indices[gid]] = group_returns[group_pos]
 
         # Compute group-relative advantages
         advantages = np.zeros(n, dtype=np.float32)
         global_mean = returns.mean()
-        global_std = returns.std() + 1e-8
+        global_std_raw = returns.std()
+        global_std = global_std_raw + 1e-8
+
+        # A decision batch may contain several three-stage actions that all
+        # receive the same shared reward. In that case the within-group
+        # return standard deviation is exactly zero, and normalizing by the
+        # group would silently turn every advantage into zero. Fall back to
+        # buffer-wide normalization for such degenerate groups.
+        normalized_group_count = 0
+        fallback_group_count = 0
+        degenerate_group_count = 0
 
         group_ids_arr = np.array(self.group_ids)
         unique_groups = np.unique(group_ids_arr)
@@ -482,18 +532,111 @@ class GRPORolloutBuffer:
             idx = np.where(group_ids_arr == gid)[0]
             group_returns = returns[idx]
 
-            if len(idx) >= min_group_size:
+            group_std_raw = group_returns.std()
+            if len(idx) >= min_group_size and group_std_raw > 1e-6:
                 mean = group_returns.mean()
-                std = group_returns.std() + 1e-8
+                std = group_std_raw + 1e-8
+                normalized_group_count += 1
             else:
-                # Fallback to global normalization
+                # This covers singleton groups and shared-reward groups with
+                # no within-group variation.
                 mean = global_mean
                 std = global_std
+                fallback_group_count += 1
+                if len(idx) >= min_group_size and group_std_raw <= 1e-6:
+                    degenerate_group_count += 1
 
             advantages[idx] = (group_returns - mean) / std
 
         self.returns = returns
         self.advantages = advantages
+        self.advantage_diagnostics = {
+            'group_count': int(len(unique_groups)),
+            'normalized_group_count': int(normalized_group_count),
+            'fallback_group_count': int(fallback_group_count),
+            'degenerate_group_count': int(degenerate_group_count),
+            'global_return_std': float(global_std_raw),
+            'nonzero_advantage_count': int(np.count_nonzero(np.abs(advantages) > 1e-8)),
+        }
+
+    def compute_strict_group_relative_advantages(self, gamma: float):
+        """Normalize complete trajectory returns within each rollout group.
+
+        Strict groups are formed by collecting multiple independent episodes
+        from the same initial state and event condition. ``group_id`` is
+        shared by those episodes while ``trajectory_id`` identifies one
+        complete rollout. The normalized trajectory return is copied to all
+        transitions in that trajectory, which matches a terminal-return
+        GRPO/REINFORCE-style update and keeps the semantics separate from the
+        decision-batch engineering variant.
+        """
+        n = len(self.rewards)
+        if n == 0:
+            return
+        if any(tid is None for tid in self.trajectory_ids):
+            raise ValueError("strict group advantages require trajectory_id for every transition")
+
+        rewards = np.asarray(self.rewards, dtype=np.float32)
+        dones = np.asarray(self.dones, dtype=np.float32)
+        trajectory_ids = np.asarray(self.trajectory_ids)
+        group_ids = np.asarray(self.group_ids)
+        unique_trajectories = list(dict.fromkeys(self.trajectory_ids))
+        trajectory_returns = {}
+
+        # Compute each trajectory's discounted return-to-go and use the first
+        # state return as its complete rollout score.
+        for tid in unique_trajectories:
+            idx = np.where(trajectory_ids == tid)[0]
+            running = 0.0
+            first_return = 0.0
+            for pos in reversed(idx.tolist()):
+                if dones[pos]:
+                    running = 0.0
+                running = float(rewards[pos]) + gamma * running
+                first_return = running
+            trajectory_returns[tid] = first_return
+
+        all_scores = np.asarray(list(trajectory_returns.values()), dtype=np.float32)
+        global_mean = float(all_scores.mean())
+        global_std_raw = float(all_scores.std())
+        global_std = global_std_raw + 1e-8
+        advantages = np.zeros(n, dtype=np.float32)
+        normalized_group_count = 0
+        fallback_group_count = 0
+        degenerate_group_count = 0
+
+        for gid in np.unique(group_ids):
+            group_tids = list(dict.fromkeys(
+                tid for tid, sample_gid in zip(self.trajectory_ids, self.group_ids)
+                if sample_gid == gid
+            ))
+            scores = np.asarray([trajectory_returns[tid] for tid in group_tids], dtype=np.float32)
+            score_std = float(scores.std())
+            if len(scores) >= 2 and score_std > 1e-6:
+                mean, std = float(scores.mean()), score_std + 1e-8
+                normalized_group_count += 1
+            else:
+                mean, std = global_mean, global_std
+                fallback_group_count += 1
+                if len(scores) >= 2 and score_std <= 1e-6:
+                    degenerate_group_count += 1
+            for tid in group_tids:
+                advantages[trajectory_ids == tid] = (trajectory_returns[tid] - mean) / std
+
+        self.returns = np.asarray(
+            [trajectory_returns[tid] for tid in self.trajectory_ids], dtype=np.float32
+        )
+        self.advantages = advantages
+        self.advantage_diagnostics = {
+            'strict': True,
+            'group_count': int(len(np.unique(group_ids))),
+            'trajectory_count': int(len(unique_trajectories)),
+            'normalized_group_count': int(normalized_group_count),
+            'fallback_group_count': int(fallback_group_count),
+            'degenerate_group_count': int(degenerate_group_count),
+            'global_return_std': global_std_raw,
+            'nonzero_advantage_count': int(np.count_nonzero(np.abs(advantages) > 1e-8)),
+        }
 
     def get_tensors(self, sub_agent: str) -> Dict[str, Any]:
         """Convert stored data to tensors for GRPO update.
@@ -512,10 +655,16 @@ class GRPORolloutBuffer:
         if sub_agent == 'seq':
             actions = torch.tensor(np.array(self.seq_actions), dtype=torch.long, device=self.device)
             old_log_probs = torch.tensor(np.array(self.seq_log_probs), dtype=torch.float32, device=self.device)
+            candidate_counts = torch.tensor(
+                np.array(self.seq_candidate_counts), dtype=torch.long, device=self.device
+            )
             return {
                 'states': states, 'seq_features': seq_feats,
                 'actions': actions, 'old_log_probs': old_log_probs,
+                'candidate_counts': candidate_counts,
                 'advantages': advantages, 'returns': returns,
+                'graph_data': self.graph_data,
+                'graph_node_type_offsets': self.graph_node_type_offsets,
             }
         elif sub_agent == 'route':
             actions = torch.tensor(np.array(self.route_actions), dtype=torch.long, device=self.device)
@@ -526,6 +675,8 @@ class GRPORolloutBuffer:
                 'actions': actions, 'old_log_probs': old_log_probs,
                 'advantages': advantages, 'returns': returns,
                 'route_all_candidate_features': self.route_all_candidate_features,
+                'graph_data': self.graph_data,
+                'graph_node_type_offsets': self.graph_node_type_offsets,
             }
         elif sub_agent == 'agv':
             actions = torch.tensor(np.array(self.agv_actions), dtype=torch.long, device=self.device)
@@ -535,6 +686,8 @@ class GRPORolloutBuffer:
                 'actions': actions, 'old_log_probs': old_log_probs,
                 'advantages': advantages, 'returns': returns,
                 'agv_all_candidate_features': self.agv_all_candidate_features,
+                'graph_data': self.graph_data,
+                'graph_node_type_offsets': self.graph_node_type_offsets,
             }
         else:
             raise ValueError(f"Unknown sub_agent: {sub_agent}")
@@ -711,6 +864,11 @@ class GraphGRPOAgent(BaseAgent):
                  agv_feature_dim: int = 12,
                  # Misc
                  allow_agv_reassignment: bool = False,
+                 train_gnn: bool = True,
+                 strict_group_sampling: bool = False,
+                 state_encoder_mode: str = 'graph',
+                 reward_mode: str = 'composite',
+                 agv_selection_mode: str = 'policy',
                  device: Optional[str] = None,
                  **kwargs):
         super().__init__(name, agent_id, context, ui_mode, task_mode, model_path)
@@ -734,6 +892,19 @@ class GraphGRPOAgent(BaseAgent):
         self.route_feature_dim = route_feature_dim
         self.agv_feature_dim = agv_feature_dim
         self.allow_agv_reassignment = allow_agv_reassignment
+        self.train_gnn = train_gnn
+        self.strict_group_sampling = strict_group_sampling
+        if state_encoder_mode not in {'graph', 'flat'}:
+            raise ValueError("state_encoder_mode must be 'graph' or 'flat'")
+        if reward_mode not in {'composite', 'time_only'}:
+            raise ValueError("reward_mode must be 'composite' or 'time_only'")
+        if agv_selection_mode not in {'policy', 'first_available'}:
+            raise ValueError("agv_selection_mode must be 'policy' or 'first_available'")
+        self.state_encoder_mode = state_encoder_mode
+        self.reward_mode = reward_mode
+        self.agv_selection_mode = agv_selection_mode
+        self._strict_group_id: Optional[int] = None
+        self._strict_trajectory_id: Optional[int] = None
 
         # Device
         self.device = resolve_device(device, tag="GraphGRPOAgent")
@@ -758,14 +929,20 @@ class GraphGRPOAgent(BaseAgent):
 
         # Rollout step counter
         self._rollout_step_count = 0
+        # Strict group collection can defer policy updates until all
+        # independent rollouts in a group have finished.
+        self.defer_updates = False
 
-        # GRPO group tracking
+        # Group tracking.  A group now corresponds to one environment
+        # decision batch (all three-stage actions emitted from one state),
+        # rather than an arbitrary slice of consecutive transitions.
         self._grpo_group_id = 0
-        self._samples_in_current_group = 0
 
         # State tracking for transition collection
         self._prev_global_state: Optional[np.ndarray] = None
         self._prev_seq_features: Optional[np.ndarray] = None
+        self._prev_graph_data: Optional[Data] = None
+        self._prev_graph_node_type_offsets: Optional[Dict[str, Tuple[int, int]]] = None
         self._prev_decisions_info: List[Dict] = []
 
         # DualDRLAgent-style queue tracking for reward
@@ -776,6 +953,7 @@ class GraphGRPOAgent(BaseAgent):
             'episodes': [], 'policy_loss': [],
             'entropy': [], 'total_loss': [], 'makespans': [],
             'kl_approx': [],
+            'advantage_diagnostics': [],
         }
         self._episode_reward = 0.0
         self._train_step = 0
@@ -823,7 +1001,7 @@ class GraphGRPOAgent(BaseAgent):
             lr=lr_actor,
         )
 
-        # Separate GNN optimizer for save/load state dict only
+        # Separate GNN optimizer for save/load state and optional standalone use.
         self.optimizer_gnn = torch.optim.Adam(
             self.gnn_encoder.parameters(), lr=lr_gnn,
         )
@@ -1177,6 +1355,41 @@ class GraphGRPOAgent(BaseAgent):
     # Core: Decision Flow (GRPO policy sampling)
     # ----------------------------------------------------------
 
+    @staticmethod
+    def _snapshot_graph(data: Data) -> Data:
+        """Copy rollout graph tensors to CPU for later re-encoding."""
+        return Data(
+            x=data.x.detach().cpu().clone(),
+            node_type=data.node_type.detach().cpu().clone(),
+            edge_index=data.edge_index.detach().cpu().clone(),
+        )
+
+    def _encode_flat_state(self, graph_data: Data) -> torch.Tensor:
+        """Encode aggregate node statistics without graph message passing.
+
+        The flat ablation keeps the actor input dimensionality unchanged while
+        removing edge-dependent message passing. It uses only permutation-
+        invariant feature means/stds and node-type proportions, then pads or
+        repeats this vector to ``state_dim``. No second learned encoder is
+        introduced, so the comparison isolates relational graph encoding.
+        """
+        x = graph_data.x.to(self.device).float()
+        node_type = graph_data.node_type.to(self.device).long()
+        if x.ndim != 2 or x.shape[0] == 0:
+            return torch.zeros(self.state_dim, device=self.device)
+        mean = x.mean(dim=0)
+        std = x.std(dim=0, unbiased=False)
+        counts = torch.stack([(node_type == kind).float().mean() for kind in range(4)])
+        flat = torch.cat([mean, std, counts], dim=0)
+        repeats = (self.state_dim + flat.numel() - 1) // flat.numel()
+        return flat.repeat(repeats)[:self.state_dim]
+
+    def _encode_state_graph(self, graph_data: Data,
+                            node_type_offsets: Dict[str, Tuple[int, int]]):
+        if self.state_encoder_mode == 'flat':
+            return self._encode_flat_state(graph_data), None
+        return self.gnn_encoder(graph_data, node_type_offsets)
+
     def sample(self, agvs: List[AGV], machines: List[Machine],
                jobs: List[Job]) -> Tuple[List[Tuple[Operation, AGV, Machine]], float]:
         """Three-phase decision: Sequence -> Route -> AGV Select.
@@ -1206,11 +1419,13 @@ class GraphGRPOAgent(BaseAgent):
         self.agv_actor.eval()
 
         with torch.no_grad():
-            global_state, node_embs = self.gnn_encoder(
+            global_state, node_embs = self._encode_state_graph(
                 graph_result.data, graph_result.node_type_offsets,
             )
 
         global_state_np = global_state.cpu().numpy()
+        graph_snapshot = self._snapshot_graph(graph_result.data)
+        graph_node_type_offsets = dict(graph_result.node_type_offsets)
 
         # 2. Collect READY operations
         ready_ops = []
@@ -1228,7 +1443,11 @@ class GraphGRPOAgent(BaseAgent):
                 self.alive = False
                 return [], 0
             # Store transition with no decisions
-            self._store_transition(global_state_np, None, None, None, None, None)
+            self._store_transition(
+                global_state_np, None, None, None, None, None,
+                graph_data=graph_snapshot,
+                graph_node_type_offsets=graph_node_type_offsets,
+            )
             return [], DEFAULT_STEP_TIME
 
         # 3. Sequencing: rank operations by policy
@@ -1256,16 +1475,21 @@ class GraphGRPOAgent(BaseAgent):
                 seq_action = torch.argmax(valid_logits)
                 seq_log_prob = 0.0
 
-        # Build priority order from the sequencing action
+        # Build a priority order that is consistent with the sequence action
+        # whose log-probability was recorded above.  Previously training
+        # sampled ``seq_action`` and then discarded it in favour of an
+        # independent random permutation, so the replayed old log-prob did not
+        # correspond to the executed action.  The sequence head now chooses
+        # the first operation; the remaining operations are ordered by their
+        # current logits.  Only that first choice is stored as a sequence
+        # transition below, while route/AGV heads still receive every O-M-V
+        # decision in the batch.
         with torch.no_grad():
             all_logits = seq_logits[:len(ready_ops)]
-            if self.task_mode == TRAINING:
-                # Stochastic priority: sample permutation weighted by softmax probabilities
-                probs = F.softmax(all_logits, dim=-1)
-                priority_order = torch.multinomial(probs, len(ready_ops), replacement=False).tolist()
-            else:
-                # Greedy: rank by logit value (descending)
-                priority_order = torch.argsort(all_logits, descending=True).tolist()
+            first_index = int(seq_action.item())
+            remaining = [i for i in range(len(ready_ops)) if i != first_index]
+            remaining.sort(key=lambda i: float(all_logits[i].item()), reverse=True)
+            priority_order = [first_index] + remaining
 
         # 4. Pre-compute shared data structures once (avoids O(n^2))
         op_to_job, competing_ops, avg_queue, job_progress = self._precompute_context(machines, jobs)
@@ -1337,37 +1561,55 @@ class GraphGRPOAgent(BaseAgent):
 
                 valid_agv_logits = agv_logits[:, 0]  # first logit per candidate
 
-                if self.task_mode == TRAINING:
+                agv_policy_enabled = self.agv_selection_mode == 'policy'
+                if self.task_mode == TRAINING and agv_policy_enabled:
                     dist = Categorical(logits=valid_agv_logits)
                     agv_action = dist.sample()
                     agv_log_prob = dist.log_prob(agv_action).item()
                 else:
                     agv_action = torch.argmax(valid_agv_logits)
+                    if self.agv_selection_mode == 'first_available':
+                        agv_action = torch.tensor(0, device=self.device)
                     agv_log_prob = 0.0
 
             selected_agv = available_agvs[agv_action.item()]
+
+            # In the fixed first-available ablation, the AGV is still used by
+            # the environment, but this is a deterministic rule rather than
+            # a sampled policy action.  Do not put a fabricated log-probability
+            # into the rollout buffer: doing so would update the AGV actor
+            # against an action that the actor did not choose.
+            stored_agv_action = agv_action.item() if agv_policy_enabled else -1
+            stored_agv_log_prob = agv_log_prob if agv_policy_enabled else 0.0
 
             decisions.append((op, selected_agv, selected_machine))
             assigned_agvs.add(selected_agv.id)
 
             current_decisions_info.append({
-                'seq_action': rank_idx,
+                # The sequencing policy made one categorical choice for the
+                # first priority position.  Subsequent positions are a
+                # deterministic completion of that choice and must not be
+                # replayed as if they had independently been sampled.
+                'seq_action': rank_idx if rank_idx == priority_order[0] else -1,
+                'seq_candidate_count': len(ready_ops),
                 'route_action': route_action.item(),
-                'agv_action': agv_action.item(),
+                'agv_action': stored_agv_action,
                 'seq_features': seq_features,
                 'route_features': route_feats_np[route_action.item()],
                 'route_all_candidate_features': route_feats_np,  # full candidate set
                 'agv_features': agv_feats_np[agv_action.item()],
                 'agv_all_candidate_features': agv_feats_np,      # full candidate set
-                'seq_log_prob': seq_log_prob,
+                'seq_log_prob': seq_log_prob if rank_idx == priority_order[0] else 0.0,
                 'route_log_prob': route_log_prob,
-                'agv_log_prob': agv_log_prob,
+                'agv_log_prob': stored_agv_log_prob,
             })
 
         # Store transition data for training
         self._store_transition(
             global_state_np, seq_features, current_decisions_info,
             None, None, None,
+            graph_data=graph_snapshot,
+            graph_node_type_offsets=graph_node_type_offsets,
         )
 
         return decisions, DEFAULT_STEP_TIME
@@ -1432,6 +1674,12 @@ class GraphGRPOAgent(BaseAgent):
         if makespan == 0.0 and self.context and hasattr(self.context, 'env_timeline'):
             makespan = self.context.env_timeline
 
+        # Controlled reward ablation. This is a dense elapsed-time penalty;
+        # call it ``time-only`` in the paper rather than exact terminal
+        # C_max optimization.
+        if self.reward_mode == 'time_only':
+            return -0.005 * makespan
+
         # ---- DualDRLAgent-style routing reward ----
         # Makespan penalty
         reward -= 0.005 * makespan
@@ -1489,7 +1737,10 @@ class GraphGRPOAgent(BaseAgent):
     # ----------------------------------------------------------
 
     def _store_transition(self, global_state_np, seq_features, decisions_info,
-                          next_global_state_np, next_seq_features, reward):
+                          next_global_state_np, next_seq_features, reward,
+                          graph_data: Optional[Data] = None,
+                          graph_node_type_offsets: Optional[Dict[str, Tuple[int, int]]] = None,
+                          done_override: Optional[bool] = None):
         """Store current step data and collect transition from previous step into rollout buffer.
 
         For GRPO, we push ALL decisions (not just the first) per step,
@@ -1498,8 +1749,15 @@ class GraphGRPOAgent(BaseAgent):
         if self.task_mode != TRAINING:
             self._prev_global_state = global_state_np
             self._prev_seq_features = seq_features
+            self._prev_graph_data = graph_data
+            self._prev_graph_node_type_offsets = graph_node_type_offsets
             self._prev_decisions_info = []
             return
+
+        # Count calls from the environment, rather than action transitions:
+        # waiting steps may legitimately produce no transition while still
+        # advancing the rollout horizon.
+        self._rollout_step_count += 1
 
         # Collect transitions from previous step into rollout buffer
         if self._prev_global_state is not None and self._prev_decisions_info:
@@ -1509,14 +1767,21 @@ class GraphGRPOAgent(BaseAgent):
             self.reward_normalizer.update(np.array([step_reward]))
             norm_reward = self.reward_normalizer.normalize(np.array([step_reward]))[0]
 
-            done = False
-            if self.context and hasattr(self.context, 'jobs'):
+            done = bool(done_override) if done_override is not None else False
+            if done_override is None and self.context and hasattr(self.context, 'jobs'):
                 done = all(j.is_finished() for j in self.context.jobs)
 
             n_decisions = len(self._prev_decisions_info)
             shared_reward = norm_reward / max(n_decisions, 1)
 
-            # Push every decision (GRPO benefits from more samples)
+            # Push every decision from this environment step into the same
+            # decision-batch group.  The next environment state starts a new
+            # group, so a group never crosses state boundaries.
+            transition_group_id = (
+                self._strict_group_id
+                if self.strict_group_sampling and self._strict_group_id is not None
+                else self._grpo_group_id
+            )
             for info in self._prev_decisions_info:
                 route_candidate_feats = info.get('route_all_candidate_features')
                 agv_candidate_feats = info.get('agv_all_candidate_features')
@@ -1526,10 +1791,17 @@ class GraphGRPOAgent(BaseAgent):
                     seq_features=self._prev_seq_features,
                     reward=shared_reward,
                     done=float(done),
-                    group_id=self._grpo_group_id,
+                    group_id=transition_group_id,
+                    trajectory_id=(
+                        self._strict_trajectory_id
+                        if self.strict_group_sampling else None
+                    ),
+                    graph_data=self._prev_graph_data,
+                    graph_node_type_offsets=self._prev_graph_node_type_offsets,
                     # Sequencing
                     seq_action=info.get('seq_action', -1),
                     seq_log_prob=info.get('seq_log_prob', 0.0),
+                    seq_candidate_count=info.get('seq_candidate_count', 0),
                     # Routing
                     route_action=info.get('route_action', -1),
                     route_log_prob=info.get('route_log_prob', 0.0),
@@ -1540,17 +1812,14 @@ class GraphGRPOAgent(BaseAgent):
                     agv_all_candidate_feats=agv_candidate_feats,
                 )
 
-                # Update group tracking
-                self._samples_in_current_group += 1
-                if self._samples_in_current_group >= self.grpo_group_size:
-                    self._grpo_group_id += 1
-                    self._samples_in_current_group = 0
-
-            self._rollout_step_count += 1
+            if not self.strict_group_sampling:
+                self._grpo_group_id += 1
 
         # Update previous state
         self._prev_global_state = global_state_np
         self._prev_seq_features = seq_features
+        self._prev_graph_data = graph_data
+        self._prev_graph_node_type_offsets = graph_node_type_offsets
         self._prev_decisions_info = decisions_info if decisions_info else []
 
     def after_sample(self, *args, **kwargs):
@@ -1572,16 +1841,30 @@ class GraphGRPOAgent(BaseAgent):
         1. Compute group-relative advantages (no critic/GAE).
         2. Perform grpo_epochs of clipped surrogate updates for each sub-agent.
         """
-        if self.task_mode != TRAINING:
+        if self.task_mode != TRAINING or self.defer_updates:
             return
 
-        # Only update when rollout buffer is full enough
-        if len(self.rollout_buffer) < self.rollout_steps:
+        # ``rollout_steps`` is an environment-decision horizon. A single
+        # environment step can emit zero, one, or several action transitions,
+        # so using ``len(rollout_buffer)`` here would make training frequency
+        # depend on the number of AGVs/READY operations and can prevent any
+        # update on instances with sparse decisions.
+        if self._rollout_step_count < self.rollout_steps:
+            return
+        if len(self.rollout_buffer) == 0:
             return
 
         # Compute group-relative advantages (no critic needed)
-        self.rollout_buffer.compute_group_relative_advantages(
-            gamma=self.gamma, min_group_size=self.min_group_size,
+        if self.strict_group_sampling:
+            self.rollout_buffer.compute_strict_group_relative_advantages(
+                gamma=self.gamma,
+            )
+        else:
+            self.rollout_buffer.compute_group_relative_advantages(
+                gamma=self.gamma, min_group_size=self.min_group_size,
+            )
+        self.training_history['advantage_diagnostics'].append(
+            dict(self.rollout_buffer.advantage_diagnostics)
         )
 
         # GRPO update for all three sub-agents
@@ -1622,6 +1905,52 @@ class GraphGRPOAgent(BaseAgent):
         # Clear rollout buffer after update
         self.rollout_buffer.reset()
         self._rollout_step_count = 0
+
+    def flush_pending_transition(self, done: bool = True):
+        """Commit the final action of an episode to the rollout buffer.
+
+        ``env.step`` terminates immediately after the final action, so there
+        may be no subsequent ``sample`` call to collect that action's reward.
+        Strict multi-rollout collection calls this method before resetting the
+        environment, ensuring every trajectory has an explicit terminal
+        transition.
+        """
+        if self.task_mode != TRAINING or self._prev_global_state is None:
+            return
+        self._store_transition(
+            self._prev_global_state,
+            self._prev_seq_features,
+            [], None, None, None,
+            graph_data=self._prev_graph_data,
+            graph_node_type_offsets=self._prev_graph_node_type_offsets,
+            done_override=done,
+        )
+
+    def _reencode_rollout_states(self, data: Dict[str, Any], indices: List[int]) -> torch.Tensor:
+        """Re-encode stored graph snapshots for a policy-update mini-batch.
+
+        Rollout action selection intentionally runs under ``no_grad``.  During
+        the update, graph snapshots are replayed through the current encoder so
+        the policy loss can provide gradients to GNN parameters.  Missing
+        snapshots are supported for backward compatibility with synthetic or
+        legacy buffers and fall back to the stored global vectors.
+        """
+        if not self.train_gnn:
+            return data['states'][indices]
+
+        graph_data = data.get('graph_data', [])
+        graph_offsets = data.get('graph_node_type_offsets', [])
+        encoded = []
+        for idx in indices:
+            graph = graph_data[idx] if idx < len(graph_data) else None
+            offsets = graph_offsets[idx] if idx < len(graph_offsets) else None
+            if graph is None or offsets is None:
+                encoded.append(data['states'][idx])
+                continue
+            graph = graph.to(self.device)
+            global_state, _ = self._encode_state_graph(graph, offsets)
+            encoded.append(global_state)
+        return torch.stack(encoded, dim=0)
 
     def _grpo_update_sub_agent(self, sub_agent: str) -> Optional[Dict[str, float]]:
         """Perform one GRPO update epoch for a sub-agent.
@@ -1675,28 +2004,42 @@ class GraphGRPOAgent(BaseAgent):
 
         for batch_indices in mini_batches:
             if sub_agent == 'seq':
+                if batch_indices is None:
+                    sample_indices = list(range(n_samples))
+                else:
+                    sample_indices = batch_indices.tolist()
+                encoded_states = self._reencode_rollout_states(data, sample_indices)
+
                 # Sequencing: standard categorical distribution over fixed output dims
                 if batch_indices is None:
-                    states = data['states']
+                    states = encoded_states
                     features = data[feat_key]
                     actions = data['actions']
                     old_log_probs = data['old_log_probs']
+                    candidate_counts = data['candidate_counts']
                     advantages = data['advantages']
                 else:
-                    states = data['states'][batch_indices]
+                    states = encoded_states
                     features = data[feat_key][batch_indices]
                     actions = data['actions'][batch_indices]
                     old_log_probs = data['old_log_probs'][batch_indices]
+                    candidate_counts = data['candidate_counts'][batch_indices]
                     advantages = data['advantages'][batch_indices]
 
-                # Filter valid actions
-                valid_mask = actions >= 0
+                # The sequencing policy is sampled only over the currently
+                # executable operations.  Reconstruct that same masked
+                # categorical distribution during the update; treating the
+                # fixed output tail as valid would assign probability mass to
+                # operations that were not candidates at sampling time.
+                candidate_counts = candidate_counts.clamp(min=1, max=max_output_dim)
+                valid_mask = (actions >= 0) & (actions < candidate_counts)
                 if valid_mask.sum() == 0:
                     continue
                 states = states[valid_mask]
                 features = features[valid_mask]
                 actions = actions[valid_mask]
                 old_log_probs = old_log_probs[valid_mask]
+                candidate_counts = candidate_counts[valid_mask]
                 advantages = advantages[valid_mask]
 
                 # Clamp actions to valid range
@@ -1704,7 +2047,14 @@ class GraphGRPOAgent(BaseAgent):
 
                 # Evaluate current policy
                 logits = actor(states, features)
-                dist = Categorical(logits=logits)
+                output_indices = torch.arange(
+                    logits.shape[-1], device=self.device
+                ).unsqueeze(0)
+                masked_logits = logits.masked_fill(
+                    output_indices >= candidate_counts.unsqueeze(1),
+                    float('-inf'),
+                )
+                dist = Categorical(logits=masked_logits)
                 new_log_probs = dist.log_prob(actions)
                 entropy = dist.entropy().mean()
 
@@ -1719,10 +2069,15 @@ class GraphGRPOAgent(BaseAgent):
                 else:
                     batch_idx_list = batch_indices.tolist()
 
+                encoded_states = self._reencode_rollout_states(data, batch_idx_list)
+                encoded_state_by_index = {
+                    idx: encoded_states[pos] for pos, idx in enumerate(batch_idx_list)
+                }
+
                 new_log_probs_list = []
                 old_log_probs_list = []
                 advantages_list = []
-                entropy_sum = 0.0
+                entropy_values = []
                 n_valid = 0
 
                 for i in batch_idx_list:
@@ -1734,7 +2089,7 @@ class GraphGRPOAgent(BaseAgent):
                     if candidate_feats.shape[0] <= 1 and candidate_feats.shape[1] <= 1:
                         continue
 
-                    state_i = data['states'][i]
+                    state_i = encoded_state_by_index[i]
                     advantage_i = data['advantages'][i]
                     old_lp_i = data['old_log_probs'][i].item()
 
@@ -1755,7 +2110,9 @@ class GraphGRPOAgent(BaseAgent):
                     new_log_probs_list.append(new_lp.unsqueeze(0))
                     old_log_probs_list.append(old_lp_i)
                     advantages_list.append(advantage_i.item())
-                    entropy_sum += ent.item()
+                    # Keep entropy as a tensor so the entropy coefficient
+                    # contributes gradients to the actor and shared encoder.
+                    entropy_values.append(ent)
                     n_valid += 1
 
                 if n_valid == 0:
@@ -1766,8 +2123,7 @@ class GraphGRPOAgent(BaseAgent):
                                             device=self.device)
                 advantages = torch.tensor(advantages_list, dtype=torch.float32,
                                          device=self.device)
-                entropy = torch.tensor(entropy_sum / n_valid, dtype=torch.float32,
-                                      device=self.device)
+                entropy = torch.stack(entropy_values).mean()
 
             # GRPO clipped surrogate loss
             ratio = torch.exp(new_log_probs - old_log_probs)
@@ -1842,10 +2198,13 @@ class GraphGRPOAgent(BaseAgent):
         """Save all network state_dicts and hyperparameters to a .pt file."""
         try:
             if path is None:
-                agent_name = self.name or "GraphGRPOAgent"
-                agent_dir = f"training_logs/models/{agent_name}"
-                os.makedirs(agent_dir, exist_ok=True)
-                path = f"{agent_dir}/agent_model.pt"
+                if self.model_path:
+                    path = self.model_path
+                else:
+                    agent_name = self.name or "GraphGRPOAgent"
+                    agent_dir = f"training_logs/models/{agent_name}"
+                    os.makedirs(agent_dir, exist_ok=True)
+                    path = f"{agent_dir}/agent_model.pt"
 
             dir_name = os.path.dirname(path)
             if dir_name:
@@ -1879,6 +2238,11 @@ class GraphGRPOAgent(BaseAgent):
                     'route_feature_dim': self.route_feature_dim,
                     'agv_feature_dim': self.agv_feature_dim,
                     'allow_agv_reassignment': self.allow_agv_reassignment,
+                    'train_gnn': self.train_gnn,
+                    'strict_group_sampling': self.strict_group_sampling,
+                    'state_encoder_mode': self.state_encoder_mode,
+                    'reward_mode': self.reward_mode,
+                    'agv_selection_mode': self.agv_selection_mode,
                 },
                 'reward_normalizer': {
                     'mean': self.reward_normalizer.mean,
@@ -1928,6 +2292,13 @@ class GraphGRPOAgent(BaseAgent):
             self.min_group_size = hp.get('min_group_size', self.min_group_size)
             self.entropy_coeff = hp.get('entropy_coeff', self.entropy_coeff)
             self.kl_coeff = hp.get('kl_coeff', self.kl_coeff)
+            self.train_gnn = hp.get('train_gnn', self.train_gnn)
+            self.strict_group_sampling = hp.get(
+                'strict_group_sampling', self.strict_group_sampling
+            )
+            self.state_encoder_mode = hp.get('state_encoder_mode', self.state_encoder_mode)
+            self.reward_mode = hp.get('reward_mode', self.reward_mode)
+            self.agv_selection_mode = hp.get('agv_selection_mode', self.agv_selection_mode)
 
             if 'reward_normalizer' in checkpoint:
                 rn = checkpoint['reward_normalizer']
@@ -1937,6 +2308,11 @@ class GraphGRPOAgent(BaseAgent):
 
             if 'training_history' in checkpoint:
                 self.training_history = checkpoint['training_history']
+            # Checkpoints created before advantage diagnostics were added do
+            # not contain the new history key. Keep loading backward
+            # compatible so a legacy checkpoint can be fine-tuned or used in
+            # the short verification run without failing on the first update.
+            self.training_history.setdefault('advantage_diagnostics', [])
 
             self._train_step = checkpoint.get('train_step', 0)
 
@@ -1971,10 +2347,12 @@ class GraphGRPOAgent(BaseAgent):
         self._episode_reward = 0.0
         self._prev_global_state = None
         self._prev_seq_features = None
+        self._prev_graph_data = None
+        self._prev_graph_node_type_offsets = None
         self._prev_decisions_info = []
         self._prev_queue_len = 0
 
-        # Record episode stats
+        # Record episode stats.
         if self.training_history['episodes']:
             last_ep = self.training_history['episodes'][-1] + 1
         else:
@@ -1985,6 +2363,23 @@ class GraphGRPOAgent(BaseAgent):
         if self.context and hasattr(self.context, 'env_timeline'):
             makespan = self.context.env_timeline
         self.training_history['makespans'].append(makespan)
+
+    def begin_strict_rollout(self, group_id: int, trajectory_id: int):
+        """Attach subsequent transitions to one strict GRPO rollout.
+
+        The caller must create independent environments from the same initial
+        instance/state, keep the policy fixed while collecting all members of
+        a group, and call :meth:`train` only after the group is complete.
+        """
+        if not self.strict_group_sampling:
+            raise RuntimeError("set strict_group_sampling=true before collecting strict rollouts")
+        self._strict_group_id = int(group_id)
+        self._strict_trajectory_id = int(trajectory_id)
+
+    def end_strict_rollout(self):
+        """Stop attaching transitions to the current strict rollout."""
+        self._strict_group_id = None
+        self._strict_trajectory_id = None
 
     def __repr__(self):
         return (f"<GraphGRPOAgent id={self.agent_id} name={self.name} "

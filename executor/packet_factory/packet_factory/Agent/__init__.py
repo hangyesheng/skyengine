@@ -10,4 +10,5 @@ from .GraphDPAgent import *
 from .GraphDualAgent import *
 from .GraphPPOAgent import *
 from .GraphGRPOAgent import *
-__all__ = ['BaseAgent', 'GreedyAgent', 'RandomAgent', 'SimpleRLAgent', 'AdvancedRLAgent', 'DualDRLAgent', 'ORToolsAgent', 'ORToolsBatchAgent', 'GraphDPAgent', 'GraphDualAgent', 'GraphPPOAgent', 'GraphGRPOAgent']
+from .HGSAdaptedAgent import *
+__all__ = ['BaseAgent', 'GreedyAgent', 'RandomAgent', 'SimpleRLAgent', 'AdvancedRLAgent', 'DualDRLAgent', 'ORToolsAgent', 'ORToolsBatchAgent', 'GraphDPAgent', 'GraphDualAgent', 'GraphPPOAgent', 'GraphGRPOAgent', 'HGSAdaptedAgent']

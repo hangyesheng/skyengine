@@ -37,14 +37,17 @@
 
 import argparse
 import copy
+import hashlib
 import json
 import logging
 import multiprocessing
 import os
+import random
 import signal
 import sys
 import threading
 import time
+from collections import Counter
 from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor, wait, FIRST_COMPLETED
 from pathlib import Path
 from typing import Dict, List, Optional, Set, Tuple
@@ -104,6 +107,9 @@ AGENT_CONFIGS = {
     "GraphGRPOAgent": {
         "model_path": "./training_logs/models/GraphGRPOAgent/agent_model.pt",
     },
+    "HGSAdaptedAgent": {
+        "model_path": "./training_logs/models/HGSAdaptedAgent/agent_model.pt",
+    },
 }
 
 ALL_FAMILIES = ["barnes", "behnke", "brandimarte", "dauzere", "fattahi", "hurink", "kacem"]
@@ -112,6 +118,7 @@ ALL_FAMILIES = ["barnes", "behnke", "brandimarte", "dauzere", "fattahi", "hurink
 DRL_AGENTS = {
     "DualDRLAgent", "GraphDPAgent", "GraphDualAgent",
     "GraphPPOAgent", "GraphGRPOAgent",
+    "HGSAdaptedAgent",
 }
 
 # OR-Tools 优化 agent 集合：这些 agent 的每次 solve 会启动 num_workers 个内部线程，
@@ -373,7 +380,26 @@ def load_uncertain_events_for_instance(instance_path: Path, scenario: str) -> Op
     return data.get("event_timeline", [])
 
 
-def build_config(agent_key: str, instance_config: dict, base_yaml_path: Optional[str] = None, time_limit: int = 30, num_workers: Optional[int] = None, device: Optional[str] = None) -> dict:
+def build_event_metadata(instance_path: Path, scenario: Optional[str], events: Optional[List[dict]]) -> dict:
+    """构建可写入 trial 结果的事件元数据。"""
+    event_types = [event.get("type") for event in (events or []) if event.get("type")]
+    return {
+        "uncertain_scenario": scenario,
+        "uncertain_event_file": (
+            str(Path("dataset") / "uncertain-events" / scenario / instance_path.relative_to(DATA_DIR).parent
+                / f"{instance_path.stem}_events.json")
+            if scenario else None
+        ),
+        "planned_event_count": len(events or []),
+        "planned_event_types": sorted(set(event_types)),
+        "planned_event_type_counts": dict(sorted(Counter(event_types).items())),
+        "events_loaded": events is not None if scenario else True,
+    }
+
+
+def build_config(agent_key: str, instance_config: dict, base_yaml_path: Optional[str] = None,
+                 time_limit: int = 30, num_workers: Optional[int] = None,
+                 device: Optional[str] = None, model_path: Optional[str] = None) -> dict:
     """构建完整的 bootstrap 配置
 
     从 config/agents/{agent_key}.yaml 加载 Agent 超参数，
@@ -388,6 +414,8 @@ def build_config(agent_key: str, instance_config: dict, base_yaml_path: Optional
             通过 agent_initializer 的 extra_kwargs 机制透传到 ORToolsOptimizer。
         device: 可选的计算设备覆盖（'auto'/'cpu'/'cuda'），优先于 agent YAML 中的 device 配置；
             None 表示不覆盖，沿用 YAML 中的 device。仅对 DRL agent 有意义（OR-Tools 始终 CPU）。
+        model_path: 可选的模型检查点覆盖路径；用于把正式训练实验的 checkpoint
+            明确接入 benchmark，而不必复制到共享默认目录。
     """
     yaml_path = base_yaml_path or str(DEFAULT_CONFIG_PATH)
     with open(yaml_path, "r", encoding="utf-8") as f:
@@ -411,6 +439,8 @@ def build_config(agent_key: str, instance_config: dict, base_yaml_path: Optional
         config["simulation"]["agent"]["time_limit_seconds"] = time_limit
     if "model_path" in agent_cfg:
         config["simulation"]["agent"]["model_path"] = agent_cfg["model_path"]
+    if model_path is not None:
+        config["simulation"]["agent"]["model_path"] = model_path
 
     # 计算设备覆盖：CLI --device 优先于 agent YAML 中的 device 配置
     if device is not None:
@@ -426,6 +456,50 @@ def build_config(agent_key: str, instance_config: dict, base_yaml_path: Optional
     config["simulation"]["event_config"] = instance_config["event_config"]
 
     return config
+
+
+def build_model_metadata(config: dict) -> dict:
+    """归档推理检查点身份；文件存在不等同于模型已经成功加载。"""
+    simulation = config["simulation"]
+    path_string = simulation["agent"].get("model_path")
+    path = Path(path_string) if path_string else None
+    if path is not None and not path.is_absolute():
+        path = PROJECT_ROOT / path
+    exists = path is not None and path.is_file()
+    return {
+        "task_mode": simulation.get("task_mode"),
+        "model_path": path_string,
+        "model_file_exists": exists,
+        "model_sha256": hashlib.sha256(path.read_bytes()).hexdigest() if exists else None,
+    }
+
+
+def derive_trial_seed(base_seed: Optional[int], family: str, instance: str, run: int) -> Optional[int]:
+    """从实验基准种子和 trial 身份生成稳定的 32 位种子。"""
+    if base_seed is None:
+        return None
+    identity = f"{base_seed}:{family}:{instance}:{run}".encode("utf-8")
+    digest = hashlib.sha256(identity).digest()
+    return int.from_bytes(digest[:4], "big")
+
+
+def seed_everything(seed: Optional[int]):
+    """在 worker 中设置 Python、NumPy 和 Torch 的随机种子。"""
+    if seed is None:
+        return
+    random.seed(seed)
+    try:
+        import numpy as np
+        np.random.seed(seed)
+    except ImportError:
+        pass
+    try:
+        import torch
+        torch.manual_seed(seed)
+        if torch.cuda.is_available():
+            torch.cuda.manual_seed_all(seed)
+    except ImportError:
+        pass
 
 
 # ==================== Episode 运行 ====================
@@ -464,15 +538,26 @@ def run_episode(config: dict, timeout: int = 600, bootstrap_lock: Optional[threa
     start_time = time.time()
     step_count = 0
 
+    def event_summary():
+        event_manager = getattr(getattr(env, "event_queue", None), "event_manager", None)
+        event_history = getattr(event_manager, "history", [])
+        executed_event_types = [f"packet_factory.{event.event_type.name}" for event, _ in event_history]
+        return {
+            "executed_event_count": len(event_history),
+            "executed_event_types": sorted(set(executed_event_types)),
+            "executed_event_type_counts": dict(sorted(Counter(executed_event_types).items())),
+            "successful_event_count": len(event_history),
+        }
+
     try:
         while not env.env_is_finished():
             if _is_shutdown():
                 logger.info("收到中断信号，正在停止当前 episode...")
-                return {"status": "interrupted", "makespan": None, "decision_stats": {}, "steps": step_count, "elapsed": time.time() - start_time}
+                return {"status": "interrupted", "makespan": None, "decision_stats": {}, "steps": step_count, "elapsed": time.time() - start_time, **event_summary()}
 
             if time.time() - start_time > timeout:
                 logger.warning(f"Episode 超时 ({timeout}s)，已执行 {step_count} 步")
-                return {"status": "timeout", "makespan": None, "decision_stats": {}, "steps": step_count, "elapsed": time.time() - start_time}
+                return {"status": "timeout", "makespan": None, "decision_stats": {}, "steps": step_count, "elapsed": time.time() - start_time, **event_summary()}
 
             actions = env.action_space(agent)
             obs, rewards, terminations, truncations, infos = env.step(actions)
@@ -486,13 +571,20 @@ def run_episode(config: dict, timeout: int = 600, bootstrap_lock: Optional[threa
         decision_stats = agent.get_decision_stats() if hasattr(agent, "get_decision_stats") else {}
         elapsed = time.time() - start_time
 
-        return {"status": "completed", "makespan": makespan, "decision_stats": decision_stats, "steps": step_count, "elapsed": elapsed}
+        return {
+            "status": "completed",
+            "makespan": makespan,
+            "decision_stats": decision_stats,
+            "steps": step_count,
+            "elapsed": elapsed,
+            **event_summary(),
+        }
 
     except Exception as e:
         logger.error(f"Episode 运行异常: {e}")
         import traceback
         traceback.print_exc()
-        return {"status": "error", "makespan": None, "decision_stats": {}, "steps": step_count, "elapsed": time.time() - start_time, "error": str(e)}
+        return {"status": "error", "makespan": None, "decision_stats": {}, "steps": step_count, "elapsed": time.time() - start_time, "error": str(e), **event_summary()}
 
 
 def run_trial(task: dict) -> dict:
@@ -509,6 +601,7 @@ def run_trial(task: dict) -> dict:
     instance_name = task["instance"]
     run = task["run"]
     num_runs = task["num_runs"]
+    seed_everything(task.get("seed"))
     logger.info(f"[worker] {agent_key} | {family}/{instance_name} | run {run}/{num_runs} 开始")
 
     try:
@@ -525,13 +618,20 @@ def run_trial(task: dict) -> dict:
         "family": family,
         "instance": instance_name,
         "run": run,
+        "seed": task.get("seed"),
         "status": result["status"],
         "makespan": result.get("makespan"),
         "decision_stats": result.get("decision_stats", {}),
         "steps": result.get("steps", 0),
         "elapsed": result.get("elapsed", 0),
+        "executed_event_count": result.get("executed_event_count"),
+        "executed_event_types": result.get("executed_event_types"),
+        "executed_event_type_counts": result.get("executed_event_type_counts"),
+        "successful_event_count": result.get("successful_event_count"),
         "timestamp": time.strftime("%Y-%m-%d %H:%M:%S"),
     }
+    record.update(task.get("event_metadata", {}))
+    record.update(task.get("model_metadata", {}))
     if "error" in result:
         record["error"] = result["error"]
     return record
@@ -631,6 +731,30 @@ def discover_instances(families: List[str], small_only: bool = False, max_jobs: 
     return result
 
 
+def filter_instances_by_name(family_instances: Dict[str, List[Path]], instance_names: Optional[List[str]]) -> Dict[str, List[Path]]:
+    """按实例 stem 过滤已发现的数据集，保证 clean/uncertain 使用同一实例集合。"""
+    if not instance_names:
+        return family_instances
+
+    requested = {name.removesuffix("_agv") for name in instance_names}
+    filtered: Dict[str, List[Path]] = {}
+    matched = set()
+    for family, instances in family_instances.items():
+        selected = []
+        for instance in instances:
+            name = instance.stem.removesuffix("_agv")
+            if name in requested:
+                selected.append(instance)
+                matched.add(name)
+        if selected:
+            filtered[family] = selected
+
+    missing = sorted(requested - matched)
+    if missing:
+        raise ValueError("未找到指定实例: " + ", ".join(missing))
+    return filtered
+
+
 # ==================== 主实验循环 ====================
 
 def run_benchmark(args):
@@ -656,10 +780,14 @@ def run_benchmark(args):
         "small_only": args.small_only,
         "small_max_jobs": args.small_max_jobs,
         "small_max_machines": args.small_max_machines,
+        "instances": args.instances,
         "workers": args.workers,
         "parallel_mode": args.parallel_mode,
         "ortools_workers": args.ortools_workers,
         "device": args.device,
+        "model_path": args.model_path,
+        "uncertain_scenario": args.uncertain_scenario,
+        "seed": args.seed,
         "created_at": time.strftime("%Y-%m-%d %H:%M:%S"),
     }
     with open(exp_dir / "experiment_config.json", "w", encoding="utf-8") as f:
@@ -677,6 +805,7 @@ def run_benchmark(args):
         max_jobs=args.small_max_jobs,
         max_machines=args.small_max_machines,
     )
+    family_instances = filter_instances_by_name(family_instances, args.instances)
     if not family_instances:
         logger.error("未找到任何实例文件")
         return
@@ -693,6 +822,8 @@ def run_benchmark(args):
 
     # ---- 预解析 + 缓存每个实例的 instance_config（同一实例的多个 run 复用）----
     instance_config_cache: Dict[str, dict] = {}
+    instance_event_metadata_cache: Dict[str, dict] = {}
+    model_metadata_cache: Dict[str, dict] = {}
 
     def get_instance_config(instance_file: Path) -> Optional[dict]:
         key = str(instance_file)
@@ -704,11 +835,20 @@ def run_benchmark(args):
             logger.error(f"解析失败 {instance_file}: {e}")
             return None
         instance_config = generate_instance_config(parsed)
+        event_metadata = build_event_metadata(instance_file, args.uncertain_scenario, None)
         if args.uncertain_scenario:
             uncertain_events = load_uncertain_events_for_instance(instance_file, args.uncertain_scenario)
+            event_metadata = build_event_metadata(instance_file, args.uncertain_scenario, uncertain_events)
             if uncertain_events:
                 instance_config = generate_instance_config(parsed, uncertain_events=uncertain_events)
+            else:
+                logger.warning(
+                    "未找到或为空的事件文件: scenario=%s, instance=%s",
+                    args.uncertain_scenario,
+                    instance_file,
+                )
         instance_config_cache[key] = instance_config
+        instance_event_metadata_cache[key] = event_metadata
         return instance_config
 
     # ---- 构建 task 列表（跳过已完成）----
@@ -732,7 +872,10 @@ def run_benchmark(args):
                         time_limit=args.time_limit,
                         num_workers=(ortools_nw if agent_key in OR_TOOLS_AGENTS else None),
                         device=args.device,
+                        model_path=args.model_path,
                     )
+                    if agent_key not in model_metadata_cache:
+                        model_metadata_cache[agent_key] = build_model_metadata(config)
                     tasks.append({
                         "config": config,
                         "timeout": args.timeout,
@@ -741,6 +884,9 @@ def run_benchmark(args):
                         "instance": instance_name,
                         "run": run,
                         "num_runs": num_runs,
+                        "seed": derive_trial_seed(args.seed, family, instance_name, run),
+                        "event_metadata": instance_event_metadata_cache[str(instance_file)],
+                        "model_metadata": model_metadata_cache[agent_key],
                         "bootstrap_lock": None,  # 稍后按并行模式注入
                     })
 
@@ -824,9 +970,12 @@ def run_benchmark(args):
                     logger.error(f"[{trial_count}/{total_trials}] {agent_key} | {family}/{instance_name} | run {run}/{num_runs} 调度异常: {e}")
                     record = {
                         "agent": agent_key, "family": family, "instance": instance_name, "run": run,
+                        "seed": t.get("seed"),
                         "status": "error", "makespan": None, "decision_stats": {}, "steps": 0, "elapsed": 0.0,
                         "timestamp": time.strftime("%Y-%m-%d %H:%M:%S"), "error": str(e),
                     }
+                    record.update(t.get("event_metadata", {}))
+                    record.update(t.get("model_metadata", {}))
 
                 append_result(results_path, record)
 
@@ -854,8 +1003,11 @@ def run_benchmark(args):
                             trial_count += 1
                             append_result(results_path, {
                                 "agent": ct["agent"], "family": ct["family"], "instance": ct["instance"], "run": ct["run"],
+                                "seed": ct.get("seed"),
                                 "status": "cancelled", "makespan": None, "decision_stats": {}, "steps": 0, "elapsed": 0.0,
                                 "timestamp": time.strftime("%Y-%m-%d %H:%M:%S"),
+                                **ct.get("event_metadata", {}),
+                                **ct.get("model_metadata", {}),
                             })
                             logger.warning(f"[{trial_count}/{total_trials}] {ct['agent']} | {ct['family']}/{ct['instance']} | run {ct['run']}/{ct['num_runs']} -> cancelled")
     except KeyboardInterrupt:
@@ -899,6 +1051,9 @@ def parse_args():
   # 指定实验 ID（用于续跑）
   uv run python scripts/run_benchmark.py --experiment-id bench_20260519
 
+  # 固定实例集合和随机种子，生成可配对的 clean/uncertain 试验
+  uv run python scripts/run_benchmark.py --families brandimarte --instances mk02 mk03 mk04 --seed 42
+
   # 只运行小规模数据集（默认 jobs<=15, machines<=10），方便与全局最优解对比
   uv run python scripts/run_benchmark.py --small-only
 
@@ -937,6 +1092,8 @@ def parse_args():
     parser.add_argument("--runs-opt", type=int, default=3, help="OR-Tools agent 每实例运行次数 (默认: 3)")
     parser.add_argument("--config-yaml", type=str, default=None, help="可选的自定义基础 YAML 配置路径")
     parser.add_argument("--experiment-id", type=str, default=None, help="实验标识（默认自动生成时间戳）")
+    parser.add_argument("--seed", type=int, default=None,
+                        help="实验基准随机种子；按 family/instance/run 派生并写入每条结果")
     parser.add_argument("--timeout", type=int, default=600, help="单次 episode 超时秒数 (默认: 600)")
     parser.add_argument("--time-limit", type=int, default=30, help="OR-Tools 求解时间限制秒数 (默认: 30)")
     parser.add_argument("-j", "--workers", type=int, default=8,
@@ -954,12 +1111,16 @@ def parse_args():
                         help="小规模实例的最大作业数阈值 (默认: 15)")
     parser.add_argument("--small-max-machines", type=int, default=10,
                         help="小规模实例的最大机器数阈值 (默认: 10)")
+    parser.add_argument("--instances", nargs="+", default=None,
+                        help="可选的实例名称过滤（如 mk02 mk03 mk04），名称可带或不带 _agv 后缀")
     parser.add_argument("--uncertain-scenario", type=str, default=None,
                         help="不确定性事件场景名（如 default, heavy），加载 dataset/uncertain-events/<scenario>/ 下的预生成事件数据")
     parser.add_argument("--device", type=str, default=None, choices=["auto", "cpu", "cuda"],
                         help="计算设备覆盖：强制指定 DRL agent 的 device，优先于 agent YAML 中的 device 配置 "
                              "(默认: None=使用 YAML；cpu=强制 CPU；cuda=强制 GPU 不可用时回退 CPU；auto=自动选择)。"
                              "OR-Tools agent 始终 CPU，此参数对其无影响")
+    parser.add_argument("--model-path", type=str, default=None,
+                        help="可选的模型 checkpoint 覆盖路径；对本次 benchmark 中的学习 Agent 生效")
 
     return parser.parse_args()
 

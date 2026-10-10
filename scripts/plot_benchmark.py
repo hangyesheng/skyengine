@@ -10,6 +10,7 @@ Benchmark 实验结果绘图脚本
     uv run python scripts/plot_benchmark.py --experiment-id bench_20260519_120000
     uv run python scripts/plot_benchmark.py --experiment-id my_exp --metric makespan
     uv run python scripts/plot_benchmark.py --experiment-id my_exp --metric avg_decision_time
+    uv run python scripts/plot_benchmark.py --clean-experiment-id clean --uncertain-experiment-id uncertain --paired-output benchmark_plots/paired.csv
 """
 
 import argparse
@@ -44,6 +45,7 @@ AGENT_COLORS = {
     "GraphDualAgent": "#E91E63",
     "GraphPPOAgent": "#00BCD4",
     "GraphGRPOAgent": "#3F51B5",
+    "HGSAdaptedAgent": "#795548",
 }
 
 AGENT_LABELS = {
@@ -54,6 +56,7 @@ AGENT_LABELS = {
     "GraphDualAgent": "GraphDual",
     "GraphPPOAgent": "GraphPPO",
     "GraphGRPOAgent": "GraphGRPO",
+    "HGSAdaptedAgent": "HGS-adapted",
 }
 
 METRIC_LABELS = {
@@ -271,6 +274,211 @@ def generate_summary_csv(records: List[dict], output_dir: Path):
     logger.info(f"保存汇总表: {csv_path}")
 
 
+def _paired_rows(clean_records: List[dict], uncertain_records: List[dict]) -> List[dict]:
+    """按 trial 键生成 clean/uncertain 配对记录。"""
+    clean_by_key = {
+        (r.get("agent"), r.get("family"), r.get("instance"), r.get("run")): r
+        for r in clean_records
+        if r.get("status") == "completed" and r.get("makespan") is not None
+    }
+    uncertain_by_key = {
+        (r.get("agent"), r.get("family"), r.get("instance"), r.get("run")): r
+        for r in uncertain_records
+        if r.get("status") == "completed" and r.get("makespan") is not None
+    }
+
+    rows = []
+    for key in sorted(set(clean_by_key) & set(uncertain_by_key)):
+        clean = clean_by_key[key]
+        uncertain = uncertain_by_key[key]
+        clean_makespan = clean["makespan"]
+        uncertain_makespan = uncertain["makespan"]
+        delta = uncertain_makespan - clean_makespan
+        rows.append({
+            "agent": key[0],
+            "family": key[1],
+            "instance": key[2],
+            "run": key[3],
+            "clean_makespan": clean_makespan,
+            "uncertain_makespan": uncertain_makespan,
+            "delta_makespan": delta,
+            "relative_degradation": delta / clean_makespan if clean_makespan else None,
+            "uncertain_scenario": uncertain.get("uncertain_scenario") or "unknown",
+            "planned_event_count": uncertain.get("planned_event_count", 0) or 0,
+            "executed_event_count": uncertain.get("executed_event_count", 0) or 0,
+            "executed_event_types": uncertain.get("executed_event_types") or [],
+        })
+    return rows
+
+
+def generate_paired_summary_csv(clean_records: List[dict], uncertain_records: List[dict], output_dir: Path):
+    """生成 clean/uncertain 配对 makespan 与退化率汇总。"""
+    import csv
+
+    rows = _paired_rows(clean_records, uncertain_records)
+
+    csv_path = output_dir / "paired_summary.csv"
+    with open(csv_path, "w", newline="", encoding="utf-8") as f:
+        writer = csv.writer(f)
+        writer.writerow([
+            "agent", "family", "instance", "run", "clean_makespan",
+            "uncertain_makespan", "delta_makespan", "relative_degradation",
+            "uncertain_scenario", "planned_event_count", "executed_event_count",
+            "executed_event_types",
+        ])
+        for row in rows:
+            writer.writerow([
+                row["agent"], row["family"], row["instance"], row["run"],
+                row["clean_makespan"], row["uncertain_makespan"], row["delta_makespan"],
+                f"{row['relative_degradation']:.6f}" if row["relative_degradation"] is not None else "",
+                row["uncertain_scenario"], row["planned_event_count"], row["executed_event_count"],
+                ";".join(row["executed_event_types"]),
+            ])
+
+    logger.info(f"保存配对汇总表: {csv_path}（{len(rows)} 条）")
+    return rows
+
+
+def _mean_std(values: List[float]):
+    """返回适合 CSV 写入的均值和总体标准差。"""
+    if not values:
+        return "", ""
+    return f"{np.mean(values):.4f}", f"{np.std(values):.4f}"
+
+
+def generate_paired_stats_csv(rows: List[dict], output_dir: Path, filename: str = "paired_stats.csv"):
+    """按 agent、数据集族和场景汇总配对均值、波动和事件暴露。"""
+    import csv
+
+    grouped = defaultdict(list)
+    for row in rows:
+        grouped[(row["agent"], row["family"], row["uncertain_scenario"])].append(row)
+
+    csv_path = output_dir / filename
+    with open(csv_path, "w", newline="", encoding="utf-8") as f:
+        writer = csv.writer(f)
+        writer.writerow([
+            "agent", "family", "uncertain_scenario", "n_pairs",
+            "clean_makespan_mean", "clean_makespan_std",
+            "uncertain_makespan_mean", "uncertain_makespan_std",
+            "delta_makespan_mean", "delta_makespan_std",
+            "relative_degradation_mean", "relative_degradation_std",
+            "positive_degradation_rate", "planned_event_mean", "executed_event_mean",
+            "event_execution_rate",
+        ])
+        for (agent, family, scenario), items in sorted(grouped.items()):
+            clean = [float(r["clean_makespan"]) for r in items]
+            uncertain = [float(r["uncertain_makespan"]) for r in items]
+            delta = [float(r["delta_makespan"]) for r in items]
+            relative = [r["relative_degradation"] for r in items if r["relative_degradation"] is not None]
+            planned = [int(r["planned_event_count"]) for r in items]
+            executed = [int(r["executed_event_count"]) for r in items]
+            clean_mean, clean_std = _mean_std(clean)
+            uncertain_mean, uncertain_std = _mean_std(uncertain)
+            delta_mean, delta_std = _mean_std(delta)
+            relative_mean, relative_std = _mean_std([float(v) for v in relative])
+            total_planned = sum(planned)
+            total_executed = sum(executed)
+            writer.writerow([
+                agent, family, scenario, len(items), clean_mean, clean_std,
+                uncertain_mean, uncertain_std, delta_mean, delta_std,
+                relative_mean, relative_std,
+                f"{sum(v > 0 for v in delta) / len(delta):.4f}" if delta else "",
+                f"{np.mean(planned):.4f}" if planned else "",
+                f"{np.mean(executed):.4f}" if executed else "",
+                f"{total_executed / total_planned:.4f}" if total_planned else "",
+            ])
+    logger.info(f"保存配对统计表: {csv_path}")
+
+
+def _event_counts(record: dict, field: str) -> Dict[str, int]:
+    """读取事件类型计数，并兼容旧结果中只有类型集合的记录。"""
+    counts = record.get(field)
+    if isinstance(counts, dict):
+        return {str(k): int(v) for k, v in counts.items()}
+    types = record.get(field.replace("_type_counts", "_types")) or []
+    return {str(event_type): 1 for event_type in types}
+
+
+def generate_status_summary_csv(records: List[dict], output_dir: Path, filename: str = "status_summary.csv"):
+    """按 agent、数据集族、场景和状态统计 trial 数量。"""
+    import csv
+
+    grouped = defaultdict(int)
+    for record in records:
+        scenario = record.get("uncertain_scenario") or "clean"
+        grouped[(record.get("agent"), record.get("family"), scenario, record.get("status", "unknown"))] += 1
+    csv_path = output_dir / filename
+    with open(csv_path, "w", newline="", encoding="utf-8") as f:
+        writer = csv.writer(f)
+        writer.writerow(["agent", "family", "scenario", "status", "n_records"])
+        for key, count in sorted(grouped.items()):
+            writer.writerow([*key, count])
+    logger.info(f"保存状态统计表: {csv_path}")
+
+
+def generate_event_summary_csv(records: List[dict], output_dir: Path, filename: str = "event_summary.csv"):
+    """按事件类型汇总计划数量、实际执行数量和暴露 trial 数。"""
+    import csv
+
+    grouped = defaultdict(lambda: {"records": 0, "planned": 0, "executed": 0})
+    for record in records:
+        scenario = record.get("uncertain_scenario")
+        if not scenario:
+            continue
+        planned_counts = _event_counts(record, "planned_event_type_counts")
+        executed_counts = _event_counts(record, "executed_event_type_counts")
+        event_types = set(planned_counts) | set(executed_counts)
+        for event_type in event_types:
+            item = grouped[(record.get("agent"), record.get("family"), scenario, event_type)]
+            item["records"] += 1
+            item["planned"] += planned_counts.get(event_type, 0)
+            item["executed"] += executed_counts.get(event_type, 0)
+    csv_path = output_dir / filename
+    with open(csv_path, "w", newline="", encoding="utf-8") as f:
+        writer = csv.writer(f)
+        writer.writerow(["agent", "family", "scenario", "event_type", "n_records", "planned_count", "executed_count", "execution_rate"])
+        for key, item in sorted(grouped.items()):
+            planned = item["planned"]
+            executed = item["executed"]
+            writer.writerow([
+                *key, item["records"], planned, executed,
+                f"{executed / planned:.4f}" if planned else "",
+            ])
+    logger.info(f"保存事件统计表: {csv_path}")
+
+
+def plot_paired_benchmark(args):
+    """对两个实验目录按 trial 配对并生成退化汇总。"""
+    clean_dir = RESULTS_ROOT / args.clean_experiment_id
+    uncertain_dir = RESULTS_ROOT / args.uncertain_experiment_id
+    clean_records = load_results(clean_dir / "results.jsonl")
+    uncertain_records = load_results(uncertain_dir / "results.jsonl")
+    if not clean_records or not uncertain_records:
+        logger.error("clean 或 uncertain 结果为空，无法生成配对汇总")
+        return
+
+    if args.paired_output:
+        output_path = Path(args.paired_output)
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+        rows = generate_paired_summary_csv(clean_records, uncertain_records, output_path.parent)
+        output_stem = output_path.stem
+        generate_paired_stats_csv(rows, output_path.parent, f"{output_stem}_stats.csv")
+        generate_status_summary_csv(clean_records + uncertain_records, output_path.parent, f"{output_stem}_status_summary.csv")
+        generate_event_summary_csv(uncertain_records, output_path.parent, f"{output_stem}_event_summary.csv")
+        generated_path = output_path.parent / "paired_summary.csv"
+        if generated_path != output_path:
+            generated_path.replace(output_path)
+        logger.info(f"配对汇总输出: {output_path}")
+    else:
+        output_dir = Path(args.output_dir) / f"pair_{args.clean_experiment_id}_vs_{args.uncertain_experiment_id}"
+        output_dir.mkdir(parents=True, exist_ok=True)
+        rows = generate_paired_summary_csv(clean_records, uncertain_records, output_dir)
+        generate_paired_stats_csv(rows, output_dir)
+        generate_status_summary_csv(clean_records + uncertain_records, output_dir)
+        generate_event_summary_csv(uncertain_records, output_dir)
+
+
 def plot_benchmark(args):
     experiment_id = args.experiment_id
     exp_dir = RESULTS_ROOT / experiment_id
@@ -326,6 +534,8 @@ def plot_benchmark(args):
 
     # 汇总 CSV
     generate_summary_csv(records, output_dir)
+    generate_status_summary_csv(records, output_dir)
+    generate_event_summary_csv(records, output_dir)
 
     logger.info(f"\n绘图完成，输出目录: {output_dir}")
 
@@ -342,7 +552,10 @@ def parse_args():
         """,
     )
 
-    parser.add_argument("--experiment-id", type=str, required=True, help="实验 ID（对应 benchmark_results/ 下的目录名）")
+    parser.add_argument("--experiment-id", type=str, help="单实验 ID（对应 benchmark_results/ 下的目录名）")
+    parser.add_argument("--clean-experiment-id", type=str, help="clean 对照实验 ID；与 --uncertain-experiment-id 一起使用")
+    parser.add_argument("--uncertain-experiment-id", type=str, help="uncertain 实验 ID；与 --clean-experiment-id 一起使用")
+    parser.add_argument("--paired-output", type=str, help="配对汇总 CSV 输出路径")
     parser.add_argument(
         "--metrics",
         nargs="+",
@@ -360,4 +573,11 @@ def parse_args():
 if __name__ == "__main__":
     args = parse_args()
     setup_logging(args.log_level)
-    plot_benchmark(args)
+    if bool(args.clean_experiment_id) != bool(args.uncertain_experiment_id):
+        raise SystemExit("--clean-experiment-id 和 --uncertain-experiment-id 必须同时提供")
+    if args.clean_experiment_id and args.uncertain_experiment_id:
+        plot_paired_benchmark(args)
+    elif args.experiment_id:
+        plot_benchmark(args)
+    else:
+        raise SystemExit("普通模式需要 --experiment-id；配对模式需要同时提供 --clean-experiment-id 和 --uncertain-experiment-id")

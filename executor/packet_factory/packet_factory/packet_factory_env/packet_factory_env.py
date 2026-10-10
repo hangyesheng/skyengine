@@ -129,7 +129,14 @@ class PacketFactoryEnv(ParallelEnv):
                 if job.is_finished():
                     cnt += 1
             res = False
-            if cnt == len(self.jobs):
+            pending_job_add = (
+                self.event_queue is not None
+                and any(
+                    event.event_type.name == 'JOB_ADD' and event.status == 'trigger'
+                    for _, _, event in self.event_queue.list_all_events()
+                )
+            )
+            if cnt == len(self.jobs) and not pending_job_add:
                 self.agent.alive = False
                 self.status = EnvStatus.FINISHED
                 res = True

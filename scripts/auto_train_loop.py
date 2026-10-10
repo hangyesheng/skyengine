@@ -33,6 +33,7 @@
 """
 import copy
 import gc
+import hashlib
 import random
 import time
 import yaml
@@ -41,6 +42,7 @@ import sys
 import os
 import argparse
 import logging
+import torch
 from pathlib import Path
 from typing import Optional, Tuple, List, Dict
 
@@ -72,13 +74,14 @@ AGENTS_CONFIG_DIR = (
 # 可选的 Agent 类型
 AVAILABLE_AGENTS = [
     "GraphGRPOAgent", "GraphPPOAgent", "GraphDualAgent", "GraphDPAgent",
-    "DualDRLAgent", "ORToolsAgent", "ORToolsBatchAgent",
+    "HGSAdaptedAgent", "DualDRLAgent", "ORToolsAgent", "ORToolsBatchAgent",
 ]
 
 # DRL agents（需要训练更新）
 DRL_AGENTS = {
     "DualDRLAgent", "GraphDPAgent", "GraphDualAgent",
     "GraphPPOAgent", "GraphGRPOAgent",
+    "HGSAdaptedAgent",
 }
 
 # === Epoch 级训练默认参数 ===
@@ -99,6 +102,7 @@ VAL_EPISODE_TIMEOUT = 600  # 单次验证 episode 超时（秒）= 10分钟（�
 VAL_SAMPLE_SIZE = 10       # 每次验证随机抽取的实例数（0 = 用全部验证集）
 VAL_SAMPLE_SEED = 42       # 验证子集随机种子（固定 → 跨 epoch 指标可比，早停信号稳定）
 NO_PROGRESS_LIMIT = 50     # 连续 N 步 env_timeline 无推进视为死锁，立即终止该 episode
+TRAIN_SEED = 42             # 训练随机种子；正式实验应显式记录并使用多个 seed
 
 # === 旧版收敛条件默认值（仅 --legacy-convergence 时使用）===
 REWARD_THRESHOLD = 1000.0
@@ -177,6 +181,27 @@ def parse_args():
         help=f'训练使用的 Agent 类型 (默认: GraphPPOAgent)，可选: {", ".join(AVAILABLE_AGENTS)}'
     )
 
+    parser.add_argument(
+        '--families', nargs='+', default=None,
+        help='训练数据集族过滤（例如 brandimarte kacem）；默认使用全部族'
+    )
+    parser.add_argument(
+        '--instances', nargs='+', default=None,
+        help='训练实例名过滤（例如 mk02 mk03）；默认使用全部实例'
+    )
+    parser.add_argument(
+        '--split-manifest', type=str, default=None,
+        help='固定 train/validation/test 实例清单 JSON；训练只读取 train 和 validation，test 仅归档'
+    )
+    parser.add_argument(
+        '--model-path', type=str, default=None,
+        help='指定初始模型路径；不指定时使用 Agent YAML 中的路径'
+    )
+    parser.add_argument(
+        '--fresh', action='store_true',
+        help='忽略 Agent YAML 中已有模型，从随机初始化开始训练'
+    )
+
     # === 计算设备 ===
     parser.add_argument(
         '--device',
@@ -225,6 +250,26 @@ def parse_args():
         default=TRAIN_INTERVAL,
         help=f'训练间隔：每隔多少步调用一次 agent.train() (默认: {TRAIN_INTERVAL})'
     )
+    parser.add_argument(
+        '--strict-group-size', type=int, default=1,
+        help='GraphGRPO 严格组采样的独立 rollout 数；1 表示当前决策批次分组变体'
+    )
+    parser.add_argument(
+        '--train-gnn', action=argparse.BooleanOptionalAction, default=None,
+        help='GraphGRPO 图编码器训练开关；--no-train-gnn 用于固定 GNN 消融，默认沿用模型/YAML'
+    )
+    parser.add_argument(
+        '--state-encoder-mode', choices=['graph', 'flat'], default=None,
+        help='GraphGRPO 状态编码器；flat 用于去图关系消融，默认沿用 YAML/模型'
+    )
+    parser.add_argument(
+        '--reward-mode', choices=['composite', 'time_only'], default=None,
+        help='GraphGRPO 奖励模式；time_only 用于移除资源塑形项的消融，默认沿用 YAML/模型'
+    )
+    parser.add_argument(
+        '--agv-selection-mode', choices=['policy', 'first_available'], default=None,
+        help='GraphGRPO AGV 选择模式；first_available 用于去除 AGV 策略阶段的消融'
+    )
 
     parser.add_argument(
         '--episode-timeout',
@@ -253,6 +298,13 @@ def parse_args():
         type=int,
         default=SPLIT_SEED,
         help=f'数据集划分随机种子 (默认: {SPLIT_SEED})'
+    )
+
+    parser.add_argument(
+        '--seed',
+        type=int,
+        default=TRAIN_SEED,
+        help=f'训练随机种子，同时固定 Python/NumPy/PyTorch (默认: {TRAIN_SEED})'
     )
 
     parser.add_argument(
@@ -393,6 +445,30 @@ def parse_args():
     )
 
     return parser.parse_args()
+
+
+def seed_everything(seed: Optional[int]):
+    """固定训练脚本使用的 Python、NumPy 和 PyTorch 随机源。"""
+    if seed is None:
+        return
+    random.seed(seed)
+    try:
+        import numpy as np
+        np.random.seed(seed)
+    except ImportError:
+        pass
+    torch.manual_seed(seed)
+    if torch.cuda.is_available():
+        torch.cuda.manual_seed_all(seed)
+
+
+def derive_trajectory_seed(base_seed: Optional[int], epoch: int,
+                           episode_index: int, trajectory_index: int) -> Optional[int]:
+    """为严格组中的每条独立轨迹生成稳定的 32 位种子。"""
+    if base_seed is None:
+        return None
+    identity = f"{base_seed}:{epoch}:{episode_index}:{trajectory_index}".encode("utf-8")
+    return int.from_bytes(hashlib.sha256(identity).digest()[:4], "big")
 
 
 def load_agent_config(agent_name: str) -> dict:
@@ -631,7 +707,10 @@ def generate_instance_config(parsed_data: dict, uncertain_events: Optional[List[
 
 def build_config(agent_key: str, instance_config: dict,
                  base_yaml_path: Optional[str] = None,
-                 device: Optional[str] = None) -> dict:
+                 device: Optional[str] = None,
+                 state_encoder_mode: Optional[str] = None,
+                 reward_mode: Optional[str] = None,
+                 agv_selection_mode: Optional[str] = None) -> dict:
     """构建完整的 bootstrap 配置（带缓存）
 
     从 config/agents/{agent_key}.yaml 加载 Agent 超参数，
@@ -644,6 +723,8 @@ def build_config(agent_key: str, instance_config: dict,
         base_yaml_path: 可选的自定义基础 YAML 路径
         device: 可选的计算设备覆盖（'auto'/'cpu'/'cuda'），优先于 agent YAML 中的 device 配置；
             None 表示不覆盖，沿用 YAML 中的 device
+        state_encoder_mode: GraphGRPO 的 `graph` 或 `flat` 状态编码消融覆盖
+        reward_mode: GraphGRPO 的 `composite` 或 `time_only` 奖励消融覆盖
     """
     global _cached_base_template
 
@@ -665,6 +746,12 @@ def build_config(agent_key: str, instance_config: dict,
     # 计算设备覆盖：CLI --device 优先于 agent YAML 中的 device 配置
     if device is not None:
         config["simulation"]["agent"]["device"] = device
+    if state_encoder_mode is not None:
+        config["simulation"]["agent"]["state_encoder_mode"] = state_encoder_mode
+    if reward_mode is not None:
+        config["simulation"]["agent"]["reward_mode"] = reward_mode
+    if agv_selection_mode is not None:
+        config["simulation"]["agent"]["agv_selection_mode"] = agv_selection_mode
 
     # 训练模式：始终使用 backend + training
     config["simulation"]["ui_mode"] = "backend"
@@ -725,7 +812,8 @@ def load_uncertain_events_for_instance(instance_path: Path, scenario: str) -> Op
 # ==================== 数据集划分 ====================
 
 def split_dataset(data_dir: Path, val_ratio: float = 0.2,
-                  seed: int = 42) -> Tuple[List[Path], List[Path]]:
+                  seed: int = 42, families: Optional[List[str]] = None,
+                  instances: Optional[List[str]] = None) -> Tuple[List[Path], List[Path]]:
     """将数据文件划分为训练集和验证集（按子目录分层采样）
 
     Args:
@@ -737,6 +825,15 @@ def split_dataset(data_dir: Path, val_ratio: float = 0.2,
         (train_files, val_files): 训练集和验证集文件路径列表
     """
     all_files = sorted(data_dir.glob('**/*_agv.txt'))
+    if families:
+        family_set = set(families)
+        all_files = [f for f in all_files
+                     if f.relative_to(data_dir).parts
+                     and f.relative_to(data_dir).parts[0] in family_set]
+    if instances:
+        instance_set = {name.removesuffix('_agv') for name in instances}
+        all_files = [f for f in all_files
+                     if f.stem.removesuffix('_agv') in instance_set]
     if not all_files:
         raise FileNotFoundError(f"未找到数据文件: {data_dir}/**/*_agv.txt")
 
@@ -768,12 +865,64 @@ def split_dataset(data_dir: Path, val_ratio: float = 0.2,
     return train_files, val_files
 
 
+def load_split_manifest(manifest_path: str, data_dir: Path) -> Tuple[List[Path], List[Path], List[Path]]:
+    """Load an explicit train/validation/test split manifest.
+
+    Entries are relative paths such as ``brandimarte/mk02`` or
+    ``brandimarte/mk02_agv.txt``.  The test split is returned for archival
+    and validation checks but is never used by the training loop.
+    """
+    path = Path(manifest_path)
+    if not path.is_absolute():
+        path = PROJECT_ROOT / path
+    with open(path, 'r', encoding='utf-8') as f:
+        manifest = json.load(f)
+
+    def resolve_entries(key: str) -> List[Path]:
+        entries = manifest.get(key, [])
+        resolved = []
+        for entry in entries:
+            rel = str(entry)
+            if rel.endswith('_agv.txt'):
+                rel_path = Path(rel)
+            else:
+                rel_path = Path(rel + '_agv.txt')
+            candidate = data_dir / rel_path
+            if not candidate.exists():
+                raise FileNotFoundError(
+                    f"split manifest {path} 中的 {key} 实例不存在: {rel} -> {candidate}"
+                )
+            resolved.append(candidate)
+        if not resolved:
+            raise ValueError(f"split manifest {path} 的 {key} 列表为空")
+        return resolved
+
+    train_files = resolve_entries('train')
+    val_files = resolve_entries('validation')
+    test_files = resolve_entries('test')
+    all_sets = {
+        p for files in (train_files, val_files, test_files) for p in files
+    }
+    if len(all_sets) != len(train_files) + len(val_files) + len(test_files):
+        raise ValueError(f"split manifest {path} 存在 train/validation/test 重叠实例")
+    logger.info(
+        "固定 split manifest=%s: %d train, %d validation, %d test",
+        path, len(train_files), len(val_files), len(test_files),
+    )
+    return train_files, val_files, test_files
+
+
 # ==================== Agent 一次性初始化 ====================
 
 def initialize_training(agent_key: str,
                         base_yaml_path: Optional[str] = None,
                         uncertain_scenario: Optional[str] = None,
-                        device: Optional[str] = None) -> object:
+                        device: Optional[str] = None,
+                        state_encoder_mode: Optional[str] = None,
+                        reward_mode: Optional[str] = None,
+                        agv_selection_mode: Optional[str] = None,
+                        model_path: Optional[str] = None,
+                        load_model: bool = True) -> object:
     """一次性初始化：加载配置、扫描组件、创建 Agent
 
     与 bootstrap() 不同，此函数只创建 Agent 而不创建 env。
@@ -784,6 +933,8 @@ def initialize_training(agent_key: str,
         base_yaml_path: 可选的自定义基础 YAML 路径
         uncertain_scenario: 可选的不确定性事件场景名
         device: 可选的计算设备覆盖（'auto'/'cpu'/'cuda'），优先于 agent YAML 中的 device 配置
+        state_encoder_mode: GraphGRPO 状态编码器覆盖
+        reward_mode: GraphGRPO 奖励模式覆盖
 
     Returns:
         Agent 实例（持久化）
@@ -807,8 +958,15 @@ def initialize_training(agent_key: str,
         if uncertain_events:
             logger.info(f"已加载不确定性事件: 场景={uncertain_scenario}, {len(uncertain_events)} 个事件")
     instance_config = generate_instance_config(parsed_data, uncertain_events=uncertain_events)
-    config = build_config(agent_key, instance_config, base_yaml_path=base_yaml_path,
-                          device=device)
+    config = build_config(
+        agent_key, instance_config, base_yaml_path=base_yaml_path,
+        device=device, state_encoder_mode=state_encoder_mode,
+        reward_mode=reward_mode, agv_selection_mode=agv_selection_mode,
+    )
+    if model_path is not None:
+        config["simulation"]["agent"]["model_path"] = model_path
+    elif not load_model:
+        config["simulation"]["agent"]["model_path"] = None
 
     # 存储配置到全局注册表
     load_config(config)
@@ -1010,6 +1168,66 @@ def run_episode_with_env(agent: object, env: object,
         if not is_training and original_task_mode is not None:
             agent.task_mode = original_task_mode
             agent.mode = original_mode
+
+
+def run_strict_training_episode(agent: object, data_file: Path, args) -> dict:
+    """Run one member of a strict GraphGRPO group on a fresh environment.
+
+    The caller sets ``begin_strict_rollout`` before invoking this function and
+    defers policy updates until all members of the group have completed.
+    """
+    relative_path = data_file.relative_to(DATA_DIR)
+    try:
+        parsed_data = parse_agv_instance(data_file)
+        lower_bound = compute_makespan_lower_bound(parsed_data)
+        instance_config = generate_instance_config(parsed_data)
+        if args.uncertain_scenario:
+            uncertain_events = load_uncertain_events_for_instance(
+                data_file, args.uncertain_scenario
+            )
+            if uncertain_events:
+                instance_config = generate_instance_config(
+                    parsed_data, uncertain_events=uncertain_events
+                )
+        env = create_env_for_instance(
+            agent, instance_config, args.agent,
+            base_yaml_path=args.config_yaml, device=args.device,
+        )
+    except Exception as exc:
+        logger.error(f"严格组环境创建失败 {relative_path}: {exc}")
+        return {
+            'status': 'error', 'makespan': 0.0, 'metrics': {},
+            'steps': 0, 'elapsed': 0.0,
+            'makespan_gap': float('inf'),
+            'data_file': str(relative_path), 'error': str(exc),
+        }
+
+    result = {
+        'status': 'error', 'makespan': 0.0, 'metrics': {},
+        'steps': 0, 'elapsed': 0.0,
+    }
+    try:
+        result = run_episode_with_env(
+            agent, env,
+            train_interval=args.train_interval,
+            timeout=args.episode_timeout,
+            is_training=True,
+            no_progress_limit=args.no_progress_limit,
+        )
+    finally:
+        # The last action is otherwise never observed by another sample call
+        # once env.step reports completion.
+        if hasattr(agent, 'flush_pending_transition'):
+            agent.flush_pending_transition(done=result.get('status') == 'completed')
+        del env
+
+    result['makespan_gap'] = (
+        (result.get('makespan', 0.0) - lower_bound) / lower_bound
+        if lower_bound > 0 else float('inf')
+    )
+    result['makespan_lower_bound'] = lower_bound
+    result['data_file'] = str(relative_path)
+    return result
 
 
 # ==================== Makespan 下界计算 ====================
@@ -1378,14 +1596,22 @@ def save_best_checkpoint(agent: object, experiment_dir: Path,
     checkpoint_dir = experiment_dir / "checkpoints"
     checkpoint_dir.mkdir(parents=True, exist_ok=True)
 
-    # 保存模型
+    # 最佳模型必须写入独立的 best.pt。Agent 的 model_path 固定指向
+    # last.pt，用 save_model() 的默认路径会在后续 epoch 被覆盖，导致
+    # 验证指标对应的 epoch 与 benchmark 实际加载的模型不一致。
+    best_path = checkpoint_dir / "best.pt"
+    model_saved = False
     if hasattr(agent, 'save_model'):
         try:
-            model_path = agent.save_model()
-            if model_path:
-                logger.info(f"最佳模型已保存到: {model_path}")
+            model_saved = bool(agent.save_model(str(best_path)))
+            if model_saved:
+                logger.info(f"最佳模型已保存到: {best_path}")
         except Exception as e:
             logger.warning(f"保存模型失败: {e}")
+
+    model_sha256 = None
+    if model_saved and best_path.exists():
+        model_sha256 = hashlib.sha256(best_path.read_bytes()).hexdigest()
 
     # 保存检查点元数据
     meta = {
@@ -1394,6 +1620,8 @@ def save_best_checkpoint(agent: object, experiment_dir: Path,
         'train_mean_reward': epoch_metrics.get('train_mean_reward'),
         'train_mean_makespan_gap': epoch_metrics.get('train_mean_makespan_gap'),
         'epsilon': epoch_metrics.get('epsilon'),
+        'checkpoint_path': str(best_path) if model_saved else None,
+        'checkpoint_sha256': model_sha256,
         'timestamp': time.strftime("%Y-%m-%d %H:%M:%S"),
     }
     meta_path = checkpoint_dir / "best_checkpoint_meta.json"
@@ -1462,6 +1690,20 @@ def main():
     """主函数"""
     args = parse_args()
 
+    # 在划分数据集、抽样训练 episode 和初始化 Agent 之前固定全部随机源。
+    # 严格组内还会基于该种子为每条轨迹派生独立 seed。
+    seed_everything(args.seed)
+
+    if args.strict_group_size < 1:
+        raise ValueError("--strict-group-size 必须大于等于 1")
+    if args.strict_group_size > 1 and args.agent != 'GraphGRPOAgent':
+        raise ValueError("严格组采样当前只支持 GraphGRPOAgent")
+    if args.train_gnn is not None and args.agent != 'GraphGRPOAgent':
+        raise ValueError("--train-gnn/--no-train-gnn 当前只支持 GraphGRPOAgent")
+    if (args.state_encoder_mode is not None or args.reward_mode is not None
+            or args.agv_selection_mode is not None) and args.agent != 'GraphGRPOAgent':
+        raise ValueError("GraphGRPO 消融开关当前只支持 GraphGRPOAgent")
+
     # 设置日志级别
     setup_logging(args.log_level, args.backend_log_level)
 
@@ -1485,8 +1727,28 @@ def main():
         experiment_dir = RESULTS_DIR / experiment_id
         experiment_dir.mkdir(parents=True, exist_ok=True)
 
-    # 划分数据集
-    train_files, val_files = split_dataset(DATA_DIR, args.val_ratio, args.split_seed)
+    # 划分数据集；正式实验优先使用固定 manifest，避免测试实例被运行时
+    # 随机切分误纳入训练或验证。未提供 manifest 时保留原有随机切分模式。
+    test_files = []
+    if args.split_manifest:
+        train_files, val_files, test_files = load_split_manifest(
+            args.split_manifest, DATA_DIR
+        )
+        if args.families:
+            family_set = set(args.families)
+            selected = train_files + val_files + test_files
+            if any(p.relative_to(DATA_DIR).parts[0] not in family_set for p in selected):
+                raise ValueError("--families 与 --split-manifest 中的实例族不一致")
+        if args.instances:
+            instance_set = {name.removesuffix('_agv') for name in args.instances}
+            selected = train_files + val_files + test_files
+            if any(p.stem.removesuffix('_agv') not in instance_set for p in selected):
+                raise ValueError("--instances 与 --split-manifest 中的实例名不一致")
+    else:
+        train_files, val_files = split_dataset(
+            DATA_DIR, args.val_ratio, args.split_seed,
+            families=args.families, instances=args.instances,
+        )
 
     # 验证子集：固定随机抽样一份子集，跨 epoch 复用 → 早停指标可比且单次验证耗时可控
     val_files_full = val_files
@@ -1510,6 +1772,7 @@ def main():
     logger.info(f"早停相对容差: {args.relative_tolerance:.1%}")
     logger.info(f"早停耐心度: {args.early_stop_patience}")
     logger.info(f"训练间隔: 每 {args.train_interval} 步")
+    logger.info(f"严格组采样: {args.strict_group_size} 条独立 rollout/组")
     logger.info(f"训练 episode 超时: {args.episode_timeout}s，验证 episode 超时: {args.val_episode_timeout}s")
     logger.info(f"死锁检测: 连续 {args.no_progress_limit} 步 timeline 无推进即终止 episode")
     logger.info(f"数据集: {len(train_files)} 训练, {len(val_files)} 验证"
@@ -1525,15 +1788,24 @@ def main():
     config_snapshot = {
         "experiment_id": experiment_id,
         "agent": args.agent,
+        "families": args.families,
+        "instances": args.instances,
+        "split_manifest": args.split_manifest,
         "epoch_size": args.epoch_size,
         "max_epochs": args.max_epochs,
         "min_epochs": args.min_epochs,
         "val_ratio": args.val_ratio,
         "split_seed": args.split_seed,
+        "seed": args.seed,
         "val_interval": args.val_interval,
         "relative_tolerance": args.relative_tolerance,
         "early_stop_patience": args.early_stop_patience,
         "train_interval": args.train_interval,
+        "strict_group_size": args.strict_group_size,
+        "train_gnn_override": args.train_gnn,
+        "state_encoder_mode_override": args.state_encoder_mode,
+        "reward_mode_override": args.reward_mode,
+        "agv_selection_mode_override": args.agv_selection_mode,
         "episode_timeout": args.episode_timeout,
         "val_episode_timeout": args.val_episode_timeout,
         "no_progress_limit": args.no_progress_limit,
@@ -1541,12 +1813,15 @@ def main():
         "val_sample_seed": args.val_sample_seed,
         "config_yaml": args.config_yaml,
         "device": args.device,
+        "model_path": args.model_path,
+        "fresh": args.fresh,
         "legacy_convergence": args.legacy_convergence,
         "reward_threshold": args.reward_threshold if args.legacy_convergence else None,
         "loss_threshold": args.loss_threshold if args.legacy_convergence else None,
         "convergence_patience": args.convergence_patience if args.legacy_convergence else None,
         "train_files": [str(f.relative_to(DATA_DIR)) for f in train_files],
         "val_files": [str(f.relative_to(DATA_DIR)) for f in val_files],
+        "test_files": [str(f.relative_to(DATA_DIR)) for f in test_files],
         "created_at": time.strftime("%Y-%m-%d %H:%M:%S"),
     }
     with open(experiment_dir / "experiment_config.json", "w", encoding="utf-8") as f:
@@ -1557,9 +1832,46 @@ def main():
     # 在 epoch 级别用 try/except KeyboardInterrupt 捕获并优雅保存
 
     # === 一次性 Agent 初始化 ===
-    agent = initialize_training(args.agent, base_yaml_path=args.config_yaml,
-                               uncertain_scenario=args.uncertain_scenario,
-                               device=args.device)
+    checkpoint_path = experiment_dir / "checkpoints" / "last.pt"
+    if args.resume_from and checkpoint_path.exists():
+        initial_model_path = str(checkpoint_path)
+        load_initial_model = True
+    elif args.fresh:
+        initial_model_path = None
+        load_initial_model = False
+    else:
+        initial_model_path = args.model_path
+        load_initial_model = True
+
+    agent = initialize_training(
+        args.agent, base_yaml_path=args.config_yaml,
+        uncertain_scenario=args.uncertain_scenario,
+        device=args.device,
+        state_encoder_mode=args.state_encoder_mode,
+        reward_mode=args.reward_mode,
+        agv_selection_mode=args.agv_selection_mode,
+        model_path=initial_model_path,
+        load_model=load_initial_model,
+    )
+    if args.train_gnn is not None:
+        agent.train_gnn = args.train_gnn
+    if args.strict_group_size > 1:
+        agent.strict_group_sampling = True
+        agent.defer_updates = True
+    # All checkpoints from this training run are kept with the experiment
+    # rather than silently overwriting the shared default model.
+    agent.model_path = str(checkpoint_path)
+    # Archive effective ablation settings after loading a checkpoint, since
+    # its saved hyperparameters may override the YAML defaults.
+    config_snapshot['train_gnn'] = getattr(agent, 'train_gnn', None)
+    config_snapshot['strict_group_sampling'] = getattr(agent, 'strict_group_sampling', None)
+    config_snapshot['state_encoder_mode'] = getattr(agent, 'state_encoder_mode', None)
+    config_snapshot['reward_mode'] = getattr(agent, 'reward_mode', None)
+    config_snapshot['agv_selection_mode'] = getattr(agent, 'agv_selection_mode', None)
+    config_snapshot['uncertain_scenario'] = args.uncertain_scenario
+    config_snapshot['agent_config'] = load_agent_config(args.agent)
+    with open(experiment_dir / "experiment_config.json", "w", encoding="utf-8") as f:
+        json.dump(config_snapshot, f, indent=2, ensure_ascii=False)
 
     # === 加载已完成的 epoch（续跑支持）===
     start_epoch, early_stopping_state = load_completed_epochs(experiment_dir)
@@ -1592,6 +1904,60 @@ def main():
 
             for ep_idx, data_file in enumerate(epoch_train_files):
                 relative_path = data_file.relative_to(DATA_DIR)
+
+                # Strict GRPO collection: keep the policy fixed while running
+                # several independent environments from the same instance,
+                # then normalize complete trajectory returns within the group.
+                if args.strict_group_size > 1:
+                    strict_group_id = epoch * 1000000 + ep_idx
+                    agent.rollout_buffer.reset()
+                    agent._rollout_step_count = 0
+                    group_results = []
+                    all_completed = True
+                    for trajectory_idx in range(args.strict_group_size):
+                        trajectory_id = strict_group_id * 1000 + trajectory_idx
+                        # Distinct torch seeds make each rollout an independent
+                        # stochastic response while preserving the same
+                        # instance, event file and initial environment state.
+                        trajectory_seed = derive_trajectory_seed(
+                            args.seed, epoch, ep_idx, trajectory_idx
+                        )
+                        seed_everything(trajectory_seed)
+                        agent.begin_strict_rollout(strict_group_id, trajectory_id)
+                        try:
+                            strict_result = run_strict_training_episode(
+                                agent, data_file, args
+                            )
+                        except KeyboardInterrupt:
+                            agent.end_strict_rollout()
+                            raise
+                        finally:
+                            agent.end_strict_rollout()
+                        strict_result['strict_group_id'] = strict_group_id
+                        strict_result['trajectory_id'] = trajectory_id
+                        strict_result['trajectory_seed'] = trajectory_seed
+                        group_results.append(strict_result)
+                        all_completed = all_completed and strict_result.get('status') == 'completed'
+                        logger.info(
+                            f"  [Epoch {epoch} / StrictGroup {strict_group_id} / "
+                            f"Trajectory {trajectory_idx}] 文件={relative_path}, "
+                            f"状态={strict_result.get('status')}, "
+                            f"makespan={strict_result.get('makespan', 0.0):.2f}"
+                        )
+
+                    if all_completed:
+                        agent.defer_updates = False
+                        agent.train()
+                        agent.defer_updates = True
+                        train_results.extend(group_results)
+                    else:
+                        logger.warning(
+                            f"严格组 {strict_group_id} 未全部完成，丢弃该组训练更新"
+                        )
+                        agent.rollout_buffer.reset()
+                        agent._rollout_step_count = 0
+                        train_results.extend(group_results)
+                    continue
 
                 try:
                     parsed_data = parse_agv_instance(data_file)
@@ -1634,6 +2000,10 @@ def main():
                     continue
 
                 # 运行训练 episode
+                result = {
+                    'status': 'error', 'makespan': 0.0, 'metrics': {},
+                    'steps': 0, 'elapsed': 0.0,
+                }
                 try:
                     result = run_episode_with_env(
                         agent, env,
@@ -1645,6 +2015,13 @@ def main():
                 except KeyboardInterrupt:
                     logger.info("\n训练 episode 被中断，保存当前 epoch 结果...")
                     raise
+                finally:
+                    # env.step 在最终动作后立即结束，最后一个 GraphGRPO/HGS
+                    # 决策不会再触发下一次 sample；统一显式提交该 transition。
+                    if hasattr(agent, 'flush_pending_transition'):
+                        agent.flush_pending_transition(
+                            done=result.get('status') == 'completed'
+                        )
                 result['makespan_gap'] = (
                     (result.get('makespan', 0.0) - lower_bound) / lower_bound
                     if lower_bound > 0 else float('inf')
@@ -1749,6 +2126,19 @@ def main():
             epoch_metrics = compute_epoch_metrics(
                 train_results, val_results, epoch, agent=agent
             )
+            strict_seed_records = [
+                {
+                    'strict_group_id': r.get('strict_group_id'),
+                    'trajectory_id': r.get('trajectory_id'),
+                    'trajectory_seed': r.get('trajectory_seed'),
+                    'data_file': r.get('data_file'),
+                    'status': r.get('status'),
+                }
+                for r in train_results
+                if r.get('trajectory_seed') is not None
+            ]
+            if strict_seed_records:
+                epoch_metrics['strict_trajectory_seeds'] = strict_seed_records
 
             # ========== 早停检测 ==========
             # 仅在真正执行了验证的 epoch 更新早停状态。非验证 epoch 的

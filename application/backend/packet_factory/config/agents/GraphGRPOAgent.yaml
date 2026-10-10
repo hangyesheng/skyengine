@@ -14,6 +14,15 @@ device: cuda
 
 # GNN 编码器
 hidden_dim: 64
+train_gnn: true
+# Ablation switches. Defaults reproduce the graph/composite method.
+state_encoder_mode: graph
+reward_mode: composite
+agv_selection_mode: policy
+# Strict mode is an explicit interface for future same-initial-state
+# multi-rollout collection. The default keeps the current decision-batch
+# engineering variant until the collector is enabled in the training loop.
+strict_group_sampling: false
 
 # GRPO 公共参数
 gamma: 0.99
