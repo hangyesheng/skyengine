@@ -1,0 +1,27 @@
+{
+  "name": "thesis_formal_split_v1",
+  "train": [
+    "brandimarte/mk02",
+    "brandimarte/mk03",
+    "brandimarte/mk04",
+    "brandimarte/mk05",
+    "brandimarte/mk06",
+    "brandimarte/mk07",
+    "brandimarte/mk08",
+    "kacem/k1",
+    "kacem/k2"
+  ],
+  "validation": [
+    "brandimarte/mk09",
+    "brandimarte/mk10",
+    "kacem/k3"
+  ],
+  "test": [
+    "brandimarte/mk11",
+    "brandimarte/mk12",
+    "brandimarte/mk13",
+    "brandimarte/mk14",
+    "brandimarte/mk15",
+    "kacem/k4"
+  ]
+}
