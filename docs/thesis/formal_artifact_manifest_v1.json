@@ -1,12 +1,18 @@
 {
   "manifest_version": "formal_artifact_manifest_v1",
-  "generated_at_utc": "2026-10-10T09:33:15.569609+00:00",
-  "git_revision": "9b9c158ece4926ceaa701a12d4ff2fd9760e2022",
+  "generated_at_utc": "2026-10-12T14:30:19.080831+00:00",
+  "git_revision": "3cc6f6f70e870f4b933727c52cf66e24cb601489",
   "git_worktree": {
     "dirty": true,
-    "status_sha256": "718501108511a65b7d0dfdaeef798d5d27986f17202c9e4ae37b8b12e1fd8ed4"
+    "status_sha256": "62b56a0ea35dca139e30247d8978e01d1cc4a3bf90470d519132a63c617ff2db"
   },
   "protocol": "config/thesis_formal_split_v1.json",
+  "result_validity_notes": [
+    "The final main comparison uses the five-round checkpoints and the corrected HGS seed 103 event benchmark.",
+    "The balanced main comparison evaluates the three learning checkpoints and OR-Tools under test seeds 601--603; training seeds 104 and 105 are retained as a separate stability audit for the proposed method.",
+    "Strict-group v3 benchmark results were generated before decision-batch discounting was corrected and remain historical; strict-group v4 is retained as diagnostic evidence.",
+    "strict_discount_regression_20261011 verifies the corrected strict-group return computation on a two-trajectory smoke run."
+  ],
   "training_experiments": [
     {
       "experiment_id": "graphgrpo_ablation_fixedgnn_strict2_seed101_v3_20261010",
@@ -537,6 +543,70 @@
       }
     },
     {
+      "experiment_id": "graphppo_ablation_seed101_v2_20261010",
+      "experiment_config": "training_logs/results/graphppo_ablation_seed101_v2_20261010/experiment_config.json",
+      "best_checkpoint": "training_logs/results/graphppo_ablation_seed101_v2_20261010/checkpoints/best.pt",
+      "best_checkpoint_sha256": "752e9b76926ba443409dd256388a3491373eee0ca7ee7bfbf3937b7e945dfe80",
+      "best_checkpoint_meta": {
+        "epoch": 0,
+        "val_makespan_gap": 11.932718862398152,
+        "train_mean_reward": -16794.878354628207,
+        "train_mean_makespan_gap": 14.698547670916971,
+        "epsilon": null,
+        "checkpoint_path": "/Users/hangyesheng/workspace/研三上/柔性制造模拟/skyengine/training_logs/results/graphppo_ablation_seed101_v2_20261010/checkpoints/best.pt",
+        "checkpoint_sha256": "752e9b76926ba443409dd256388a3491373eee0ca7ee7bfbf3937b7e945dfe80",
+        "timestamp": "2026-10-10 17:46:48"
+      }
+    },
+    {
+      "experiment_id": "graphppo_ablation_seed102_v2_20261010",
+      "experiment_config": "training_logs/results/graphppo_ablation_seed102_v2_20261010/experiment_config.json",
+      "best_checkpoint": "training_logs/results/graphppo_ablation_seed102_v2_20261010/checkpoints/best.pt",
+      "best_checkpoint_sha256": "1ac551e406996766d7006785bcfb3702a2ded23a1c90110d545d576d806c9322",
+      "best_checkpoint_meta": {
+        "epoch": 0,
+        "val_makespan_gap": 11.309753337843404,
+        "train_mean_reward": -10217.32857319266,
+        "train_mean_makespan_gap": 17.53915226078191,
+        "epsilon": null,
+        "checkpoint_path": "/Users/hangyesheng/workspace/研三上/柔性制造模拟/skyengine/training_logs/results/graphppo_ablation_seed102_v2_20261010/checkpoints/best.pt",
+        "checkpoint_sha256": "1ac551e406996766d7006785bcfb3702a2ded23a1c90110d545d576d806c9322",
+        "timestamp": "2026-10-10 17:52:52"
+      }
+    },
+    {
+      "experiment_id": "graphppo_ablation_seed103_v2_20261010",
+      "experiment_config": "training_logs/results/graphppo_ablation_seed103_v2_20261010/experiment_config.json",
+      "best_checkpoint": "training_logs/results/graphppo_ablation_seed103_v2_20261010/checkpoints/best.pt",
+      "best_checkpoint_sha256": "ef391a58200fd16f15eb99f415df0e31c89aa94e7f3eff72ccdc0fcfc5c850d0",
+      "best_checkpoint_meta": {
+        "epoch": 0,
+        "val_makespan_gap": 10.467022525973448,
+        "train_mean_reward": -15181.800522623897,
+        "train_mean_makespan_gap": 14.017191408677657,
+        "epsilon": null,
+        "checkpoint_path": "/Users/hangyesheng/workspace/研三上/柔性制造模拟/skyengine/training_logs/results/graphppo_ablation_seed103_v2_20261010/checkpoints/best.pt",
+        "checkpoint_sha256": "ef391a58200fd16f15eb99f415df0e31c89aa94e7f3eff72ccdc0fcfc5c850d0",
+        "timestamp": "2026-10-10 17:52:52"
+      }
+    },
+    {
+      "experiment_id": "strict_discount_regression_20261011",
+      "experiment_config": "training_logs/results/strict_discount_regression_20261011/experiment_config.json",
+      "best_checkpoint": "training_logs/results/strict_discount_regression_20261011/checkpoints/best.pt",
+      "best_checkpoint_sha256": "f08cb7f4b7673ce1141d14bcc4ad3c2e023086ec02479638e57aa2d18120c465",
+      "best_checkpoint_meta": {
+        "epoch": 0,
+        "val_makespan_gap": 11.039408866995075,
+        "train_mean_reward": -1772.2967591250372,
+        "train_mean_makespan_gap": 21.542857142857144,
+        "epsilon": null,
+        "checkpoint_path": "/Users/hangyesheng/workspace/研三上/柔性制造模拟/skyengine/training_logs/results/strict_discount_regression_20261011/checkpoints/best.pt",
+        "checkpoint_sha256": "f08cb7f4b7673ce1141d14bcc4ad3c2e023086ec02479638e57aa2d18120c465",
+        "timestamp": "2026-10-11 20:17:35"
+      }
+    },
+    {
       "experiment_id": "graphgrpo_ablation_flat_strict2_seed101_v1_20261010",
       "experiment_config": "training_logs/results/graphgrpo_ablation_flat_strict2_seed101_v1_20261010/experiment_config.json",
       "best_checkpoint": "training_logs/results/graphgrpo_ablation_flat_strict2_seed101_v1_20261010/checkpoints/best.pt",
@@ -678,6 +748,614 @@
         "checkpoint_path": "/Users/hangyesheng/workspace/研三上/柔性制造模拟/skyengine/training_logs/results/graphgrpo_ablation_firstagv_strict2_seed103_v2_20261010/checkpoints/best.pt",
         "checkpoint_sha256": "02317e429030ffa78b6dc686228f8d008824c8cc56141abd536c85ddb1f2c311",
         "timestamp": "2026-10-10 14:24:02"
+      }
+    },
+    {
+      "experiment_id": "graphgrpo_formal_final_seed101_v1_20261011",
+      "experiment_config": "training_logs/results/graphgrpo_formal_final_seed101_v1_20261011/experiment_config.json",
+      "best_checkpoint": "training_logs/results/graphgrpo_formal_final_seed101_v1_20261011/checkpoints/best.pt",
+      "best_checkpoint_sha256": "b3a31e10b5d178a720c4b3d78632dcf41949922a51c6a3f9d10af5f49010ee43",
+      "best_checkpoint_meta": {
+        "epoch": 4,
+        "val_makespan_gap": 8.845562847187104,
+        "train_mean_reward": -13571.700221890913,
+        "train_mean_makespan_gap": 15.189338951744402,
+        "epsilon": null,
+        "checkpoint_path": "/Users/hangyesheng/workspace/研三上/柔性制造模拟/skyengine/training_logs/results/graphgrpo_formal_final_seed101_v1_20261011/checkpoints/best.pt",
+        "checkpoint_sha256": "b3a31e10b5d178a720c4b3d78632dcf41949922a51c6a3f9d10af5f49010ee43",
+        "timestamp": "2026-10-11 20:46:32"
+      }
+    },
+    {
+      "experiment_id": "graphgrpo_formal_final_seed102_v1_20261011",
+      "experiment_config": "training_logs/results/graphgrpo_formal_final_seed102_v1_20261011/experiment_config.json",
+      "best_checkpoint": "training_logs/results/graphgrpo_formal_final_seed102_v1_20261011/checkpoints/best.pt",
+      "best_checkpoint_sha256": "5e8cf39bfe27b695c5ea33e8063d37a2fe5e1257763cc8b2eb3efb43e69e63db",
+      "best_checkpoint_meta": {
+        "epoch": 4,
+        "val_makespan_gap": 11.3772305807084,
+        "train_mean_reward": -14157.419888296947,
+        "train_mean_makespan_gap": 14.980614248090916,
+        "epsilon": null,
+        "checkpoint_path": "/Users/hangyesheng/workspace/研三上/柔性制造模拟/skyengine/training_logs/results/graphgrpo_formal_final_seed102_v1_20261011/checkpoints/best.pt",
+        "checkpoint_sha256": "5e8cf39bfe27b695c5ea33e8063d37a2fe5e1257763cc8b2eb3efb43e69e63db",
+        "timestamp": "2026-10-11 20:50:05"
+      }
+    },
+    {
+      "experiment_id": "graphgrpo_formal_final_seed103_v1_20261011",
+      "experiment_config": "training_logs/results/graphgrpo_formal_final_seed103_v1_20261011/experiment_config.json",
+      "best_checkpoint": "training_logs/results/graphgrpo_formal_final_seed103_v1_20261011/checkpoints/best.pt",
+      "best_checkpoint_sha256": "c871bc573784f082f86fbd83a2e436a7480519d21cf68943baafa249a2fa44b9",
+      "best_checkpoint_meta": {
+        "epoch": 3,
+        "val_makespan_gap": 10.58285272378078,
+        "train_mean_reward": -15471.109774417884,
+        "train_mean_makespan_gap": 14.226226174133176,
+        "epsilon": null,
+        "checkpoint_path": "/Users/hangyesheng/workspace/研三上/柔性制造模拟/skyengine/training_logs/results/graphgrpo_formal_final_seed103_v1_20261011/checkpoints/best.pt",
+        "checkpoint_sha256": "c871bc573784f082f86fbd83a2e436a7480519d21cf68943baafa249a2fa44b9",
+        "timestamp": "2026-10-11 20:53:07"
+      }
+    },
+    {
+      "experiment_id": "hgs_formal_final_seed101_v1_20261011",
+      "experiment_config": "training_logs/results/hgs_formal_final_seed101_v1_20261011/experiment_config.json",
+      "best_checkpoint": "training_logs/results/hgs_formal_final_seed101_v1_20261011/checkpoints/best.pt",
+      "best_checkpoint_sha256": "622dd2088f85ac1da16cdb0f444697992e072ceab6278b2fe41f7685b96647be",
+      "best_checkpoint_meta": {
+        "epoch": 1,
+        "val_makespan_gap": 13.273652820421825,
+        "train_mean_reward": -858.5555555555555,
+        "train_mean_makespan_gap": 14.883105403894326,
+        "epsilon": null,
+        "checkpoint_path": "/Users/hangyesheng/workspace/研三上/柔性制造模拟/skyengine/training_logs/results/hgs_formal_final_seed101_v1_20261011/checkpoints/best.pt",
+        "checkpoint_sha256": "622dd2088f85ac1da16cdb0f444697992e072ceab6278b2fe41f7685b96647be",
+        "timestamp": "2026-10-11 21:19:39"
+      }
+    },
+    {
+      "experiment_id": "hgs_formal_final_seed102_v1_20261011",
+      "experiment_config": "training_logs/results/hgs_formal_final_seed102_v1_20261011/experiment_config.json",
+      "best_checkpoint": "training_logs/results/hgs_formal_final_seed102_v1_20261011/checkpoints/best.pt",
+      "best_checkpoint_sha256": "309cf9e8f76b7c39147ed3515e03116a8eff119cfcffeb921beeaa759e82cfbd",
+      "best_checkpoint_meta": {
+        "epoch": 4,
+        "val_makespan_gap": 10.23107954605773,
+        "train_mean_reward": -850.3333333333334,
+        "train_mean_makespan_gap": 14.605307741865195,
+        "epsilon": null,
+        "checkpoint_path": "/Users/hangyesheng/workspace/研三上/柔性制造模拟/skyengine/training_logs/results/hgs_formal_final_seed102_v1_20261011/checkpoints/best.pt",
+        "checkpoint_sha256": "309cf9e8f76b7c39147ed3515e03116a8eff119cfcffeb921beeaa759e82cfbd",
+        "timestamp": "2026-10-11 21:22:28"
+      }
+    },
+    {
+      "experiment_id": "hgs_formal_final_seed103_v1_20261011",
+      "experiment_config": "training_logs/results/hgs_formal_final_seed103_v1_20261011/experiment_config.json",
+      "best_checkpoint": "training_logs/results/hgs_formal_final_seed103_v1_20261011/checkpoints/best.pt",
+      "best_checkpoint_sha256": "a51d737d284fd90528209a03307360ee00bc778b247e08f2b9a26ce142b002ae",
+      "best_checkpoint_meta": {
+        "epoch": 0,
+        "val_makespan_gap": 8.523934933183634,
+        "train_mean_reward": -838.7777777777778,
+        "train_mean_makespan_gap": 14.514993476563022,
+        "epsilon": null,
+        "checkpoint_path": "/Users/hangyesheng/workspace/研三上/柔性制造模拟/skyengine/training_logs/results/hgs_formal_final_seed103_v1_20261011/checkpoints/best.pt",
+        "checkpoint_sha256": "a51d737d284fd90528209a03307360ee00bc778b247e08f2b9a26ce142b002ae",
+        "timestamp": "2026-10-11 21:22:52"
+      }
+    },
+    {
+      "experiment_id": "graphgrpo_ablation_fixedgnn_final_seed101_v1_20261012",
+      "experiment_config": "training_logs/results/graphgrpo_ablation_fixedgnn_final_seed101_v1_20261012/experiment_config.json",
+      "best_checkpoint": "training_logs/results/graphgrpo_ablation_fixedgnn_final_seed101_v1_20261012/checkpoints/best.pt",
+      "best_checkpoint_sha256": "9f2d837532d3cd12e4df0dc53e30fce31c0168368d824e0eeb98c7b1447e6c80",
+      "best_checkpoint_meta": {
+        "epoch": 4,
+        "val_makespan_gap": 11.383902476071016,
+        "train_mean_reward": -13701.493117605964,
+        "train_mean_makespan_gap": 15.004852082251375,
+        "epsilon": null,
+        "checkpoint_path": "/Users/hangyesheng/workspace/研三上/柔性制造模拟/skyengine/training_logs/results/graphgrpo_ablation_fixedgnn_final_seed101_v1_20261012/checkpoints/best.pt",
+        "checkpoint_sha256": "9f2d837532d3cd12e4df0dc53e30fce31c0168368d824e0eeb98c7b1447e6c80",
+        "timestamp": "2026-10-12 00:12:51"
+      }
+    },
+    {
+      "experiment_id": "graphgrpo_ablation_fixedgnn_final_seed102_v1_20261012",
+      "experiment_config": "training_logs/results/graphgrpo_ablation_fixedgnn_final_seed102_v1_20261012/experiment_config.json",
+      "best_checkpoint": "training_logs/results/graphgrpo_ablation_fixedgnn_final_seed102_v1_20261012/checkpoints/best.pt",
+      "best_checkpoint_sha256": "5f7004f7f05f6f394e3d7a94e1cbfe3724b124f0e60f1e19b80c85b67f383ce9",
+      "best_checkpoint_meta": {
+        "epoch": 4,
+        "val_makespan_gap": 11.978519882402173,
+        "train_mean_reward": -11772.186548188236,
+        "train_mean_makespan_gap": 15.84961420778719,
+        "epsilon": null,
+        "checkpoint_path": "/Users/hangyesheng/workspace/研三上/柔性制造模拟/skyengine/training_logs/results/graphgrpo_ablation_fixedgnn_final_seed102_v1_20261012/checkpoints/best.pt",
+        "checkpoint_sha256": "5f7004f7f05f6f394e3d7a94e1cbfe3724b124f0e60f1e19b80c85b67f383ce9",
+        "timestamp": "2026-10-12 00:12:49"
+      }
+    },
+    {
+      "experiment_id": "graphgrpo_ablation_fixedgnn_final_seed103_v1_20261012",
+      "experiment_config": "training_logs/results/graphgrpo_ablation_fixedgnn_final_seed103_v1_20261012/experiment_config.json",
+      "best_checkpoint": "training_logs/results/graphgrpo_ablation_fixedgnn_final_seed103_v1_20261012/checkpoints/best.pt",
+      "best_checkpoint_sha256": "d590ac7637cec1af84903c8c200c37b886eeb3b3caa9878aa0af94da8febcc1b",
+      "best_checkpoint_meta": {
+        "epoch": 0,
+        "val_makespan_gap": 10.790821480397582,
+        "train_mean_reward": -16716.59199420963,
+        "train_mean_makespan_gap": 14.629445716743005,
+        "epsilon": null,
+        "checkpoint_path": "/Users/hangyesheng/workspace/研三上/柔性制造模拟/skyengine/training_logs/results/graphgrpo_ablation_fixedgnn_final_seed103_v1_20261012/checkpoints/best.pt",
+        "checkpoint_sha256": "d590ac7637cec1af84903c8c200c37b886eeb3b3caa9878aa0af94da8febcc1b",
+        "timestamp": "2026-10-12 00:10:29"
+      }
+    },
+    {
+      "experiment_id": "graphgrpo_ablation_flat_final_seed101_v1_20261012",
+      "experiment_config": "training_logs/results/graphgrpo_ablation_flat_final_seed101_v1_20261012/experiment_config.json",
+      "best_checkpoint": "training_logs/results/graphgrpo_ablation_flat_final_seed101_v1_20261012/checkpoints/best.pt",
+      "best_checkpoint_sha256": "e67ba7a476c414accc28b8b3f6bae07016da594cb4391865c43458803c840e96",
+      "best_checkpoint_meta": {
+        "epoch": 4,
+        "val_makespan_gap": 10.362073545423334,
+        "train_mean_reward": -16824.16181121134,
+        "train_mean_makespan_gap": 15.630569297451537,
+        "epsilon": null,
+        "checkpoint_path": "/Users/hangyesheng/workspace/研三上/柔性制造模拟/skyengine/training_logs/results/graphgrpo_ablation_flat_final_seed101_v1_20261012/checkpoints/best.pt",
+        "checkpoint_sha256": "e67ba7a476c414accc28b8b3f6bae07016da594cb4391865c43458803c840e96",
+        "timestamp": "2026-10-12 09:18:13"
+      }
+    },
+    {
+      "experiment_id": "graphgrpo_ablation_flat_final_seed102_v1_20261012",
+      "experiment_config": "training_logs/results/graphgrpo_ablation_flat_final_seed102_v1_20261012/experiment_config.json",
+      "best_checkpoint": "training_logs/results/graphgrpo_ablation_flat_final_seed102_v1_20261012/checkpoints/best.pt",
+      "best_checkpoint_sha256": "8937070919cbb96cc3d76ae62ba36535061216ee8bc9f8e42280eaead2e10bdb",
+      "best_checkpoint_meta": {
+        "epoch": 3,
+        "val_makespan_gap": 10.175499394710199,
+        "train_mean_reward": -11921.574192288175,
+        "train_mean_makespan_gap": 15.49471724620692,
+        "epsilon": null,
+        "checkpoint_path": "/Users/hangyesheng/workspace/研三上/柔性制造模拟/skyengine/training_logs/results/graphgrpo_ablation_flat_final_seed102_v1_20261012/checkpoints/best.pt",
+        "checkpoint_sha256": "8937070919cbb96cc3d76ae62ba36535061216ee8bc9f8e42280eaead2e10bdb",
+        "timestamp": "2026-10-12 09:17:45"
+      }
+    },
+    {
+      "experiment_id": "graphgrpo_ablation_flat_final_seed103_v1_20261012",
+      "experiment_config": "training_logs/results/graphgrpo_ablation_flat_final_seed103_v1_20261012/experiment_config.json",
+      "best_checkpoint": "training_logs/results/graphgrpo_ablation_flat_final_seed103_v1_20261012/checkpoints/best.pt",
+      "best_checkpoint_sha256": "ba6720204452e321713b1360bbbec395a7ab5c0423fa10ec9c444447076d628f",
+      "best_checkpoint_meta": {
+        "epoch": 4,
+        "val_makespan_gap": 10.213089425516573,
+        "train_mean_reward": -14025.68257991397,
+        "train_mean_makespan_gap": 15.116768030904986,
+        "epsilon": null,
+        "checkpoint_path": "/Users/hangyesheng/workspace/研三上/柔性制造模拟/skyengine/training_logs/results/graphgrpo_ablation_flat_final_seed103_v1_20261012/checkpoints/best.pt",
+        "checkpoint_sha256": "ba6720204452e321713b1360bbbec395a7ab5c0423fa10ec9c444447076d628f",
+        "timestamp": "2026-10-12 09:18:07"
+      }
+    },
+    {
+      "experiment_id": "graphgrpo_ablation_timeonly_final_seed101_v1_20261012",
+      "experiment_config": "training_logs/results/graphgrpo_ablation_timeonly_final_seed101_v1_20261012/experiment_config.json",
+      "best_checkpoint": "training_logs/results/graphgrpo_ablation_timeonly_final_seed101_v1_20261012/checkpoints/best.pt",
+      "best_checkpoint_sha256": "43a141ad6d2027743d0bcc1de4c23e9c1bb460a4ce8320742471288413d0a951",
+      "best_checkpoint_meta": {
+        "epoch": 4,
+        "val_makespan_gap": 10.758923635257275,
+        "train_mean_reward": -2821.4083333333338,
+        "train_mean_makespan_gap": 14.43341969483477,
+        "epsilon": null,
+        "checkpoint_path": "/Users/hangyesheng/workspace/研三上/柔性制造模拟/skyengine/training_logs/results/graphgrpo_ablation_timeonly_final_seed101_v1_20261012/checkpoints/best.pt",
+        "checkpoint_sha256": "43a141ad6d2027743d0bcc1de4c23e9c1bb460a4ce8320742471288413d0a951",
+        "timestamp": "2026-10-12 09:23:07"
+      }
+    },
+    {
+      "experiment_id": "graphgrpo_ablation_timeonly_final_seed102_v1_20261012",
+      "experiment_config": "training_logs/results/graphgrpo_ablation_timeonly_final_seed102_v1_20261012/experiment_config.json",
+      "best_checkpoint": "training_logs/results/graphgrpo_ablation_timeonly_final_seed102_v1_20261012/checkpoints/best.pt",
+      "best_checkpoint_sha256": "768984506819259a96ee882d2f07654d452d13079e8e8a92140697c145cf1f2f",
+      "best_checkpoint_meta": {
+        "epoch": 2,
+        "val_makespan_gap": 11.071172327995791,
+        "train_mean_reward": -2848.355,
+        "train_mean_makespan_gap": 14.856443440874484,
+        "epsilon": null,
+        "checkpoint_path": "/Users/hangyesheng/workspace/研三上/柔性制造模拟/skyengine/training_logs/results/graphgrpo_ablation_timeonly_final_seed102_v1_20261012/checkpoints/best.pt",
+        "checkpoint_sha256": "768984506819259a96ee882d2f07654d452d13079e8e8a92140697c145cf1f2f",
+        "timestamp": "2026-10-12 09:21:34"
+      }
+    },
+    {
+      "experiment_id": "graphgrpo_ablation_timeonly_final_seed103_v1_20261012",
+      "experiment_config": "training_logs/results/graphgrpo_ablation_timeonly_final_seed103_v1_20261012/experiment_config.json",
+      "best_checkpoint": "training_logs/results/graphgrpo_ablation_timeonly_final_seed103_v1_20261012/checkpoints/best.pt",
+      "best_checkpoint_sha256": "fa0dc41881da3321638de70ecefcf2a5d381788713b720dee8b48deb123f20e2",
+      "best_checkpoint_meta": {
+        "epoch": 1,
+        "val_makespan_gap": 11.407569149853936,
+        "train_mean_reward": -2855.593333333333,
+        "train_mean_makespan_gap": 15.85615941508388,
+        "epsilon": null,
+        "checkpoint_path": "/Users/hangyesheng/workspace/研三上/柔性制造模拟/skyengine/training_logs/results/graphgrpo_ablation_timeonly_final_seed103_v1_20261012/checkpoints/best.pt",
+        "checkpoint_sha256": "fa0dc41881da3321638de70ecefcf2a5d381788713b720dee8b48deb123f20e2",
+        "timestamp": "2026-10-12 09:20:52"
+      }
+    },
+    {
+      "experiment_id": "graphgrpo_ablation_firstagv_final_seed101_v1_20261012",
+      "experiment_config": "training_logs/results/graphgrpo_ablation_firstagv_final_seed101_v1_20261012/experiment_config.json",
+      "best_checkpoint": "training_logs/results/graphgrpo_ablation_firstagv_final_seed101_v1_20261012/checkpoints/best.pt",
+      "best_checkpoint_sha256": "04acd371d069ed959467dd0463f1ea2888eb628fd061d87b413d8291c002dbf4",
+      "best_checkpoint_meta": {
+        "epoch": 3,
+        "val_makespan_gap": 12.452010032283289,
+        "train_mean_reward": -14993.338067472932,
+        "train_mean_makespan_gap": 14.542061771082665,
+        "epsilon": null,
+        "checkpoint_path": "/Users/hangyesheng/workspace/研三上/柔性制造模拟/skyengine/training_logs/results/graphgrpo_ablation_firstagv_final_seed101_v1_20261012/checkpoints/best.pt",
+        "checkpoint_sha256": "04acd371d069ed959467dd0463f1ea2888eb628fd061d87b413d8291c002dbf4",
+        "timestamp": "2026-10-12 09:27:14"
+      }
+    },
+    {
+      "experiment_id": "graphgrpo_ablation_firstagv_final_seed102_v1_20261012",
+      "experiment_config": "training_logs/results/graphgrpo_ablation_firstagv_final_seed102_v1_20261012/experiment_config.json",
+      "best_checkpoint": "training_logs/results/graphgrpo_ablation_firstagv_final_seed102_v1_20261012/checkpoints/best.pt",
+      "best_checkpoint_sha256": "4cc90cda2f4d35a7688aecee8fec1039ea71beba0aa64deacba330dd2b487595",
+      "best_checkpoint_meta": {
+        "epoch": 1,
+        "val_makespan_gap": 10.650001452415543,
+        "train_mean_reward": -14846.080167993628,
+        "train_mean_makespan_gap": 14.951720620086697,
+        "epsilon": null,
+        "checkpoint_path": "/Users/hangyesheng/workspace/研三上/柔性制造模拟/skyengine/training_logs/results/graphgrpo_ablation_firstagv_final_seed102_v1_20261012/checkpoints/best.pt",
+        "checkpoint_sha256": "4cc90cda2f4d35a7688aecee8fec1039ea71beba0aa64deacba330dd2b487595",
+        "timestamp": "2026-10-12 09:25:47"
+      }
+    },
+    {
+      "experiment_id": "graphgrpo_ablation_firstagv_final_seed103_v1_20261012",
+      "experiment_config": "training_logs/results/graphgrpo_ablation_firstagv_final_seed103_v1_20261012/experiment_config.json",
+      "best_checkpoint": "training_logs/results/graphgrpo_ablation_firstagv_final_seed103_v1_20261012/checkpoints/best.pt",
+      "best_checkpoint_sha256": "c3b7804f3f0cdcfdc7f3fb68793f0f270313ea3827250c122a8deee609cbca98",
+      "best_checkpoint_meta": {
+        "epoch": 4,
+        "val_makespan_gap": 11.396462779022732,
+        "train_mean_reward": -13430.686423826968,
+        "train_mean_makespan_gap": 16.016573941159976,
+        "epsilon": null,
+        "checkpoint_path": "/Users/hangyesheng/workspace/研三上/柔性制造模拟/skyengine/training_logs/results/graphgrpo_ablation_firstagv_final_seed103_v1_20261012/checkpoints/best.pt",
+        "checkpoint_sha256": "c3b7804f3f0cdcfdc7f3fb68793f0f270313ea3827250c122a8deee609cbca98",
+        "timestamp": "2026-10-12 09:28:08"
+      }
+    },
+    {
+      "experiment_id": "graphgrpo_ablation_lb_fixedgnn_seed101_v1_20261012",
+      "experiment_config": "training_logs/results/graphgrpo_ablation_lb_fixedgnn_seed101_v1_20261012/experiment_config.json",
+      "best_checkpoint": "training_logs/results/graphgrpo_ablation_lb_fixedgnn_seed101_v1_20261012/checkpoints/best.pt",
+      "best_checkpoint_sha256": "5cfa35f4fdf13d2f4e4f715e448d967f19d998c90ea1c9c443f50b5e4276f712",
+      "best_checkpoint_meta": {
+        "epoch": 0,
+        "val_makespan_gap": 10.493851032562457,
+        "train_mean_reward": -864.6666666666666,
+        "train_mean_makespan_gap": 15.1953185055791,
+        "epsilon": null,
+        "checkpoint_path": "/Users/hangyesheng/workspace/研三上/柔性制造模拟/skyengine/training_logs/results/graphgrpo_ablation_lb_fixedgnn_seed101_v1_20261012/checkpoints/best.pt",
+        "checkpoint_sha256": "5cfa35f4fdf13d2f4e4f715e448d967f19d998c90ea1c9c443f50b5e4276f712",
+        "timestamp": "2026-10-12 16:02:40"
+      }
+    },
+    {
+      "experiment_id": "graphgrpo_ablation_lb_fixedgnn_seed102_v1_20261012",
+      "experiment_config": "training_logs/results/graphgrpo_ablation_lb_fixedgnn_seed102_v1_20261012/experiment_config.json",
+      "best_checkpoint": "training_logs/results/graphgrpo_ablation_lb_fixedgnn_seed102_v1_20261012/checkpoints/best.pt",
+      "best_checkpoint_sha256": "1ad088e2bbf98922e6c6cdcbe6f68cf98c231def03c8e29c9cb37ba8413c017f",
+      "best_checkpoint_meta": {
+        "epoch": 4,
+        "val_makespan_gap": 11.304961766473278,
+        "train_mean_reward": -823.1111111111111,
+        "train_mean_makespan_gap": 13.604096008925701,
+        "epsilon": null,
+        "checkpoint_path": "/Users/hangyesheng/workspace/研三上/柔性制造模拟/skyengine/training_logs/results/graphgrpo_ablation_lb_fixedgnn_seed102_v1_20261012/checkpoints/best.pt",
+        "checkpoint_sha256": "1ad088e2bbf98922e6c6cdcbe6f68cf98c231def03c8e29c9cb37ba8413c017f",
+        "timestamp": "2026-10-12 16:08:45"
+      }
+    },
+    {
+      "experiment_id": "graphgrpo_ablation_lb_fixedgnn_seed103_v1_20261012",
+      "experiment_config": "training_logs/results/graphgrpo_ablation_lb_fixedgnn_seed103_v1_20261012/experiment_config.json",
+      "best_checkpoint": "training_logs/results/graphgrpo_ablation_lb_fixedgnn_seed103_v1_20261012/checkpoints/best.pt",
+      "best_checkpoint_sha256": "4fafe5bb29e645e4ad05c409ed15c8a34d52a5542838f2b9930d9d89c610718b",
+      "best_checkpoint_meta": {
+        "epoch": 1,
+        "val_makespan_gap": 11.478842855287965,
+        "train_mean_reward": -886.7777777777778,
+        "train_mean_makespan_gap": 14.700750284670752,
+        "epsilon": null,
+        "checkpoint_path": "/Users/hangyesheng/workspace/研三上/柔性制造模拟/skyengine/training_logs/results/graphgrpo_ablation_lb_fixedgnn_seed103_v1_20261012/checkpoints/best.pt",
+        "checkpoint_sha256": "4fafe5bb29e645e4ad05c409ed15c8a34d52a5542838f2b9930d9d89c610718b",
+        "timestamp": "2026-10-12 16:06:52"
+      }
+    },
+    {
+      "experiment_id": "graphgrpo_ablation_lb_flat_seed101_v1_20261012",
+      "experiment_config": "training_logs/results/graphgrpo_ablation_lb_flat_seed101_v1_20261012/experiment_config.json",
+      "best_checkpoint": "training_logs/results/graphgrpo_ablation_lb_flat_seed101_v1_20261012/checkpoints/best.pt",
+      "best_checkpoint_sha256": "4ae5c4da203bd30c9c295501ec88611fd2d5f3c7e8d72c9d34c8c14ae4d1ce69",
+      "best_checkpoint_meta": {
+        "epoch": 2,
+        "val_makespan_gap": 9.860406767346479,
+        "train_mean_reward": -892.8888888888889,
+        "train_mean_makespan_gap": 15.566165052679635,
+        "epsilon": null,
+        "checkpoint_path": "/Users/hangyesheng/workspace/研三上/柔性制造模拟/skyengine/training_logs/results/graphgrpo_ablation_lb_flat_seed101_v1_20261012/checkpoints/best.pt",
+        "checkpoint_sha256": "4ae5c4da203bd30c9c295501ec88611fd2d5f3c7e8d72c9d34c8c14ae4d1ce69",
+        "timestamp": "2026-10-12 16:05:50"
+      }
+    },
+    {
+      "experiment_id": "graphgrpo_ablation_lb_flat_seed102_v1_20261012",
+      "experiment_config": "training_logs/results/graphgrpo_ablation_lb_flat_seed102_v1_20261012/experiment_config.json",
+      "best_checkpoint": "training_logs/results/graphgrpo_ablation_lb_flat_seed102_v1_20261012/checkpoints/best.pt",
+      "best_checkpoint_sha256": "b00e3fe48a00a517318c88e63c212591b22047227457a9cf908b89c784873d79",
+      "best_checkpoint_meta": {
+        "epoch": 2,
+        "val_makespan_gap": 10.709992280615547,
+        "train_mean_reward": -876.5555555555555,
+        "train_mean_makespan_gap": 15.96975656767517,
+        "epsilon": null,
+        "checkpoint_path": "/Users/hangyesheng/workspace/研三上/柔性制造模拟/skyengine/training_logs/results/graphgrpo_ablation_lb_flat_seed102_v1_20261012/checkpoints/best.pt",
+        "checkpoint_sha256": "b00e3fe48a00a517318c88e63c212591b22047227457a9cf908b89c784873d79",
+        "timestamp": "2026-10-12 16:09:05"
+      }
+    },
+    {
+      "experiment_id": "graphgrpo_ablation_lb_flat_seed103_v1_20261012",
+      "experiment_config": "training_logs/results/graphgrpo_ablation_lb_flat_seed103_v1_20261012/experiment_config.json",
+      "best_checkpoint": "training_logs/results/graphgrpo_ablation_lb_flat_seed103_v1_20261012/checkpoints/best.pt",
+      "best_checkpoint_sha256": "976257ea8250b6f92b11de5336c0622955d85b3b53126f189c85c612acaaeabf",
+      "best_checkpoint_meta": {
+        "epoch": 0,
+        "val_makespan_gap": 12.647912657212316,
+        "train_mean_reward": -895.1111111111111,
+        "train_mean_makespan_gap": 15.66316820041203,
+        "epsilon": null,
+        "checkpoint_path": "/Users/hangyesheng/workspace/研三上/柔性制造模拟/skyengine/training_logs/results/graphgrpo_ablation_lb_flat_seed103_v1_20261012/checkpoints/best.pt",
+        "checkpoint_sha256": "976257ea8250b6f92b11de5336c0622955d85b3b53126f189c85c612acaaeabf",
+        "timestamp": "2026-10-12 16:08:05"
+      }
+    },
+    {
+      "experiment_id": "graphgrpo_ablation_lb_firstagv_seed101_v1_20261012",
+      "experiment_config": "training_logs/results/graphgrpo_ablation_lb_firstagv_seed101_v1_20261012/experiment_config.json",
+      "best_checkpoint": "training_logs/results/graphgrpo_ablation_lb_firstagv_seed101_v1_20261012/checkpoints/best.pt",
+      "best_checkpoint_sha256": "109410f82a2a733f936c657746fc550b485f6966d72bdddce8296535664ae9ff",
+      "best_checkpoint_meta": {
+        "epoch": 4,
+        "val_makespan_gap": 12.042882889693297,
+        "train_mean_reward": -850.5555555555555,
+        "train_mean_makespan_gap": 14.645373970514319,
+        "epsilon": null,
+        "checkpoint_path": "/Users/hangyesheng/workspace/研三上/柔性制造模拟/skyengine/training_logs/results/graphgrpo_ablation_lb_firstagv_seed101_v1_20261012/checkpoints/best.pt",
+        "checkpoint_sha256": "109410f82a2a733f936c657746fc550b485f6966d72bdddce8296535664ae9ff",
+        "timestamp": "2026-10-12 16:08:20"
+      }
+    },
+    {
+      "experiment_id": "graphgrpo_ablation_lb_firstagv_seed102_v1_20261012",
+      "experiment_config": "training_logs/results/graphgrpo_ablation_lb_firstagv_seed102_v1_20261012/experiment_config.json",
+      "best_checkpoint": "training_logs/results/graphgrpo_ablation_lb_firstagv_seed102_v1_20261012/checkpoints/best.pt",
+      "best_checkpoint_sha256": "ba6b594414cdd4a7a52bbb1fb9afa47f903e5632516988f2147cbb35a05217ea",
+      "best_checkpoint_meta": {
+        "epoch": 2,
+        "val_makespan_gap": 11.817852741863062,
+        "train_mean_reward": -889.2222222222222,
+        "train_mean_makespan_gap": 15.199795060660673,
+        "epsilon": null,
+        "checkpoint_path": "/Users/hangyesheng/workspace/研三上/柔性制造模拟/skyengine/training_logs/results/graphgrpo_ablation_lb_firstagv_seed102_v1_20261012/checkpoints/best.pt",
+        "checkpoint_sha256": "ba6b594414cdd4a7a52bbb1fb9afa47f903e5632516988f2147cbb35a05217ea",
+        "timestamp": "2026-10-12 16:12:39"
+      }
+    },
+    {
+      "experiment_id": "graphgrpo_ablation_lb_firstagv_seed103_v1_20261012",
+      "experiment_config": "training_logs/results/graphgrpo_ablation_lb_firstagv_seed103_v1_20261012/experiment_config.json",
+      "best_checkpoint": "training_logs/results/graphgrpo_ablation_lb_firstagv_seed103_v1_20261012/checkpoints/best.pt",
+      "best_checkpoint_sha256": "421ceb0158e1db6394d7d3c189b8fde4979d2543e8f16d0a5913815b4d01c5fa",
+      "best_checkpoint_meta": {
+        "epoch": 4,
+        "val_makespan_gap": 9.438577696706936,
+        "train_mean_reward": -851.1111111111111,
+        "train_mean_makespan_gap": 14.524750381026033,
+        "epsilon": null,
+        "checkpoint_path": "/Users/hangyesheng/workspace/研三上/柔性制造模拟/skyengine/training_logs/results/graphgrpo_ablation_lb_firstagv_seed103_v1_20261012/checkpoints/best.pt",
+        "checkpoint_sha256": "421ceb0158e1db6394d7d3c189b8fde4979d2543e8f16d0a5913815b4d01c5fa",
+        "timestamp": "2026-10-12 16:14:12"
+      }
+    },
+    {
+      "experiment_id": "graphgrpo_ablation_timeonly_frozen_seed101_v1_20261012",
+      "experiment_config": "training_logs/results/graphgrpo_ablation_timeonly_frozen_seed101_v1_20261012/experiment_config.json",
+      "best_checkpoint": "training_logs/results/graphgrpo_ablation_timeonly_frozen_seed101_v1_20261012/checkpoints/best.pt",
+      "best_checkpoint_sha256": "b11636a8e145cc339000fde6f1a3a80a2974d0e0b87db9aa6f5ce005f6b05904",
+      "best_checkpoint_meta": {
+        "epoch": 0,
+        "val_makespan_gap": 10.25434199334642,
+        "train_mean_reward": -2780.206666666667,
+        "train_mean_makespan_gap": 14.498918835992392,
+        "epsilon": null,
+        "checkpoint_path": "/Users/hangyesheng/workspace/研三上/柔性制造模拟/skyengine/training_logs/results/graphgrpo_ablation_timeonly_frozen_seed101_v1_20261012/checkpoints/best.pt",
+        "checkpoint_sha256": "b11636a8e145cc339000fde6f1a3a80a2974d0e0b87db9aa6f5ce005f6b05904",
+        "timestamp": "2026-10-12 16:05:04"
+      }
+    },
+    {
+      "experiment_id": "graphgrpo_ablation_timeonly_frozen_seed102_v1_20261012",
+      "experiment_config": "training_logs/results/graphgrpo_ablation_timeonly_frozen_seed102_v1_20261012/experiment_config.json",
+      "best_checkpoint": "training_logs/results/graphgrpo_ablation_timeonly_frozen_seed102_v1_20261012/checkpoints/best.pt",
+      "best_checkpoint_sha256": "4154318a3c890dfa50a32b698b74f16331188f10d5bb2481c16ed2806e472662",
+      "best_checkpoint_meta": {
+        "epoch": 3,
+        "val_makespan_gap": 12.067379948522658,
+        "train_mean_reward": -2954.244444444444,
+        "train_mean_makespan_gap": 15.7323345911181,
+        "epsilon": null,
+        "checkpoint_path": "/Users/hangyesheng/workspace/研三上/柔性制造模拟/skyengine/training_logs/results/graphgrpo_ablation_timeonly_frozen_seed102_v1_20261012/checkpoints/best.pt",
+        "checkpoint_sha256": "4154318a3c890dfa50a32b698b74f16331188f10d5bb2481c16ed2806e472662",
+        "timestamp": "2026-10-12 16:13:42"
+      }
+    },
+    {
+      "experiment_id": "graphgrpo_ablation_timeonly_frozen_seed103_v1_20261012",
+      "experiment_config": "training_logs/results/graphgrpo_ablation_timeonly_frozen_seed103_v1_20261012/experiment_config.json",
+      "best_checkpoint": "training_logs/results/graphgrpo_ablation_timeonly_frozen_seed103_v1_20261012/checkpoints/best.pt",
+      "best_checkpoint_sha256": "0839d02f60f9b771794954b93bdf0fd7aa4ecb5c33d5b34c711ef9dc3a5444de",
+      "best_checkpoint_meta": {
+        "epoch": 1,
+        "val_makespan_gap": 12.18882370323499,
+        "train_mean_reward": -2751.048333333333,
+        "train_mean_makespan_gap": 15.116577507680141,
+        "epsilon": null,
+        "checkpoint_path": "/Users/hangyesheng/workspace/研三上/柔性制造模拟/skyengine/training_logs/results/graphgrpo_ablation_timeonly_frozen_seed103_v1_20261012/checkpoints/best.pt",
+        "checkpoint_sha256": "0839d02f60f9b771794954b93bdf0fd7aa4ecb5c33d5b34c711ef9dc3a5444de",
+        "timestamp": "2026-10-12 16:11:55"
+      }
+    },
+    {
+      "experiment_id": "graphgrpo_frozen_lb_seed101_v1_20261012",
+      "experiment_config": "training_logs/results/graphgrpo_frozen_lb_seed101_v1_20261012/experiment_config.json",
+      "best_checkpoint": "training_logs/results/graphgrpo_frozen_lb_seed101_v1_20261012/checkpoints/best.pt",
+      "best_checkpoint_sha256": "196b717a5ac8dfa13bcac803b9c4d238d810578b43498c03ad3cde2ed49ff33c",
+      "best_checkpoint_meta": {
+        "epoch": 4,
+        "val_makespan_gap": 12.101710268881197,
+        "train_mean_reward": -852.8888888888889,
+        "train_mean_makespan_gap": 13.795521987088115,
+        "epsilon": null,
+        "checkpoint_path": "/Users/hangyesheng/workspace/研三上/柔性制造模拟/skyengine/training_logs/results/graphgrpo_frozen_lb_seed101_v1_20261012/checkpoints/best.pt",
+        "checkpoint_sha256": "196b717a5ac8dfa13bcac803b9c4d238d810578b43498c03ad3cde2ed49ff33c",
+        "timestamp": "2026-10-12 14:52:36"
+      }
+    },
+    {
+      "experiment_id": "graphgrpo_frozen_lb_seed102_v1_20261012",
+      "experiment_config": "training_logs/results/graphgrpo_frozen_lb_seed102_v1_20261012/experiment_config.json",
+      "best_checkpoint": "training_logs/results/graphgrpo_frozen_lb_seed102_v1_20261012/checkpoints/best.pt",
+      "best_checkpoint_sha256": "a219cd02d9a442e147b9b409aaa7df5e2ca64509a62ff36e6b9da340a34e51c0",
+      "best_checkpoint_meta": {
+        "epoch": 4,
+        "val_makespan_gap": 11.271368503254868,
+        "train_mean_reward": -863.6666666666666,
+        "train_mean_makespan_gap": 14.606820788232815,
+        "epsilon": null,
+        "checkpoint_path": "/Users/hangyesheng/workspace/研三上/柔性制造模拟/skyengine/training_logs/results/graphgrpo_frozen_lb_seed102_v1_20261012/checkpoints/best.pt",
+        "checkpoint_sha256": "a219cd02d9a442e147b9b409aaa7df5e2ca64509a62ff36e6b9da340a34e51c0",
+        "timestamp": "2026-10-12 14:52:34"
+      }
+    },
+    {
+      "experiment_id": "graphgrpo_frozen_lb_seed103_v1_20261012",
+      "experiment_config": "training_logs/results/graphgrpo_frozen_lb_seed103_v1_20261012/experiment_config.json",
+      "best_checkpoint": "training_logs/results/graphgrpo_frozen_lb_seed103_v1_20261012/checkpoints/best.pt",
+      "best_checkpoint_sha256": "1492789d9e31990c4ae8e8d18624f198b50ce2475ce08c7fddd7bfc431e32cba",
+      "best_checkpoint_meta": {
+        "epoch": 0,
+        "val_makespan_gap": 10.712476202842138,
+        "train_mean_reward": -856.2222222222222,
+        "train_mean_makespan_gap": 14.883554884088515,
+        "epsilon": null,
+        "checkpoint_path": "/Users/hangyesheng/workspace/研三上/柔性制造模拟/skyengine/training_logs/results/graphgrpo_frozen_lb_seed103_v1_20261012/checkpoints/best.pt",
+        "checkpoint_sha256": "1492789d9e31990c4ae8e8d18624f198b50ce2475ce08c7fddd7bfc431e32cba",
+        "timestamp": "2026-10-12 14:49:16"
+      }
+    },
+    {
+      "experiment_id": "graphgrpo_frozen_lb_seed104_v1_20261012",
+      "experiment_config": "training_logs/results/graphgrpo_frozen_lb_seed104_v1_20261012/experiment_config.json",
+      "best_checkpoint": "training_logs/results/graphgrpo_frozen_lb_seed104_v1_20261012/checkpoints/best.pt",
+      "best_checkpoint_sha256": "af1b8bb095ad68d5b80065659a00c6d3d113c7cd8c91b32491e819005edc99dd",
+      "best_checkpoint_meta": {
+        "epoch": 3,
+        "val_makespan_gap": 9.691026766793511,
+        "train_mean_reward": -880.5555555555555,
+        "train_mean_makespan_gap": 14.785425118902872,
+        "epsilon": null,
+        "checkpoint_path": "/Users/hangyesheng/workspace/研三上/柔性制造模拟/skyengine/training_logs/results/graphgrpo_frozen_lb_seed104_v1_20261012/checkpoints/best.pt",
+        "checkpoint_sha256": "af1b8bb095ad68d5b80065659a00c6d3d113c7cd8c91b32491e819005edc99dd",
+        "timestamp": "2026-10-12 20:51:57"
+      }
+    },
+    {
+      "experiment_id": "graphgrpo_frozen_lb_seed105_v1_20261012",
+      "experiment_config": "training_logs/results/graphgrpo_frozen_lb_seed105_v1_20261012/experiment_config.json",
+      "best_checkpoint": "training_logs/results/graphgrpo_frozen_lb_seed105_v1_20261012/checkpoints/best.pt",
+      "best_checkpoint_sha256": "8300c92a4194e2e932ece7fd650ff2003680f8d3ada3063ca43b6fc354013189",
+      "best_checkpoint_meta": {
+        "epoch": 1,
+        "val_makespan_gap": 11.99279076921677,
+        "train_mean_reward": -892.2222222222222,
+        "train_mean_makespan_gap": 15.324086536002872,
+        "epsilon": null,
+        "checkpoint_path": "/Users/hangyesheng/workspace/研三上/柔性制造模拟/skyengine/training_logs/results/graphgrpo_frozen_lb_seed105_v1_20261012/checkpoints/best.pt",
+        "checkpoint_sha256": "8300c92a4194e2e932ece7fd650ff2003680f8d3ada3063ca43b6fc354013189",
+        "timestamp": "2026-10-12 20:50:26"
+      }
+    },
+    {
+      "experiment_id": "graphgrpo_frozen_ms_seed101_v1_20261012",
+      "experiment_config": "training_logs/results/graphgrpo_frozen_ms_seed101_v1_20261012/experiment_config.json",
+      "best_checkpoint": "training_logs/results/graphgrpo_frozen_ms_seed101_v1_20261012/checkpoints/best.pt",
+      "best_checkpoint_sha256": "39cdbdba8c020d9597201f7b3cda75f4804877b6219ea831375b0a6372a40109",
+      "best_checkpoint_meta": {
+        "epoch": 2,
+        "val_makespan_gap": 10.602425452293282,
+        "train_mean_reward": -909.4444444444445,
+        "train_mean_makespan_gap": 15.181185059402587,
+        "epsilon": null,
+        "checkpoint_path": "/Users/hangyesheng/workspace/研三上/柔性制造模拟/skyengine/training_logs/results/graphgrpo_frozen_ms_seed101_v1_20261012/checkpoints/best.pt",
+        "checkpoint_sha256": "39cdbdba8c020d9597201f7b3cda75f4804877b6219ea831375b0a6372a40109",
+        "timestamp": "2026-10-12 15:16:50"
+      }
+    },
+    {
+      "experiment_id": "graphgrpo_frozen_ms_seed102_v1_20261012",
+      "experiment_config": "training_logs/results/graphgrpo_frozen_ms_seed102_v1_20261012/experiment_config.json",
+      "best_checkpoint": "training_logs/results/graphgrpo_frozen_ms_seed102_v1_20261012/checkpoints/best.pt",
+      "best_checkpoint_sha256": "6cd8c66a8ebb2b0f278242ea50b8c0319cc6e6a03d4779927003aaa92e479ea2",
+      "best_checkpoint_meta": {
+        "epoch": 0,
+        "val_makespan_gap": 12.001187597607865,
+        "train_mean_reward": -906.4444444444445,
+        "train_mean_makespan_gap": 15.184911681431478,
+        "epsilon": null,
+        "checkpoint_path": "/Users/hangyesheng/workspace/研三上/柔性制造模拟/skyengine/training_logs/results/graphgrpo_frozen_ms_seed102_v1_20261012/checkpoints/best.pt",
+        "checkpoint_sha256": "6cd8c66a8ebb2b0f278242ea50b8c0319cc6e6a03d4779927003aaa92e479ea2",
+        "timestamp": "2026-10-12 15:15:10"
+      }
+    },
+    {
+      "experiment_id": "graphgrpo_frozen_ms_seed103_v1_20261012",
+      "experiment_config": "training_logs/results/graphgrpo_frozen_ms_seed103_v1_20261012/experiment_config.json",
+      "best_checkpoint": "training_logs/results/graphgrpo_frozen_ms_seed103_v1_20261012/checkpoints/best.pt",
+      "best_checkpoint_sha256": "d60858fee92da68b3d9dc897f6841976b32168096703db2e9293e62294abfee2",
+      "best_checkpoint_meta": {
+        "epoch": 2,
+        "val_makespan_gap": 7.964565493849865,
+        "train_mean_reward": -933.8888888888889,
+        "train_mean_makespan_gap": 15.55366010413828,
+        "epsilon": null,
+        "checkpoint_path": "/Users/hangyesheng/workspace/研三上/柔性制造模拟/skyengine/training_logs/results/graphgrpo_frozen_ms_seed103_v1_20261012/checkpoints/best.pt",
+        "checkpoint_sha256": "d60858fee92da68b3d9dc897f6841976b32168096703db2e9293e62294abfee2",
+        "timestamp": "2026-10-12 15:16:54"
       }
     }
   ],
@@ -1197,6 +1875,828 @@
       "experiment_config": "benchmark_results/ortools_formal_seed601_test_uncertain_v1_20261010/experiment_config.json",
       "results": "benchmark_results/ortools_formal_seed601_test_uncertain_v1_20261010/results.jsonl",
       "results_sha256": "8d1f0936f4985c3d81da3151c94672de3afe7d7c2c4d8d751f2eba03e44b6bbb"
+    },
+    {
+      "experiment_id": "graphppo_ablation_seed101_test_base_v2_20261010",
+      "experiment_config": "benchmark_results/graphppo_ablation_seed101_test_base_v2_20261010/experiment_config.json",
+      "results": "benchmark_results/graphppo_ablation_seed101_test_base_v2_20261010/results.jsonl",
+      "results_sha256": "e1d3d4f02bc07cebdb26e9731c4be4a091a33f96e3d17fcdbf2f015543b87471"
+    },
+    {
+      "experiment_id": "graphppo_ablation_seed101_test_event_v2_20261010",
+      "experiment_config": "benchmark_results/graphppo_ablation_seed101_test_event_v2_20261010/experiment_config.json",
+      "results": "benchmark_results/graphppo_ablation_seed101_test_event_v2_20261010/results.jsonl",
+      "results_sha256": "5be1fa1d7a3d753474b24379c60e6ec752fd03b056494dfe1a3db6a6a7c33629"
+    },
+    {
+      "experiment_id": "graphppo_ablation_seed102_test_base_v2_20261010",
+      "experiment_config": "benchmark_results/graphppo_ablation_seed102_test_base_v2_20261010/experiment_config.json",
+      "results": "benchmark_results/graphppo_ablation_seed102_test_base_v2_20261010/results.jsonl",
+      "results_sha256": "0a77bac5e4ea72c8333c96e7a622d4ad222aa1571c809a1e8f3e4661b0e68cbe"
+    },
+    {
+      "experiment_id": "graphppo_ablation_seed102_test_event_v2_20261010",
+      "experiment_config": "benchmark_results/graphppo_ablation_seed102_test_event_v2_20261010/experiment_config.json",
+      "results": "benchmark_results/graphppo_ablation_seed102_test_event_v2_20261010/results.jsonl",
+      "results_sha256": "a805f3451c99848b09105baae45c5dffe13e1eaebccb52ed2a17db1964e7164a"
+    },
+    {
+      "experiment_id": "graphppo_ablation_seed103_test_base_v2_20261010",
+      "experiment_config": "benchmark_results/graphppo_ablation_seed103_test_base_v2_20261010/experiment_config.json",
+      "results": "benchmark_results/graphppo_ablation_seed103_test_base_v2_20261010/results.jsonl",
+      "results_sha256": "c2fc0cbac78a9ec2af9b7300fecae2063272df34072fcc385befe8005c0859a5"
+    },
+    {
+      "experiment_id": "graphppo_ablation_seed103_test_event_v2_20261010",
+      "experiment_config": "benchmark_results/graphppo_ablation_seed103_test_event_v2_20261010/experiment_config.json",
+      "results": "benchmark_results/graphppo_ablation_seed103_test_event_v2_20261010/results.jsonl",
+      "results_sha256": "ee4b08b98e67b6ef9760baf79f1afb50ac4f9a5cd4e61f475fb062395fc8d70b"
+    },
+    {
+      "experiment_id": "graphgrpo_formal_machine_only_seed101_v1_20261011",
+      "experiment_config": "benchmark_results/graphgrpo_formal_machine_only_seed101_v1_20261011/experiment_config.json",
+      "results": "benchmark_results/graphgrpo_formal_machine_only_seed101_v1_20261011/results.jsonl",
+      "results_sha256": "4d9fb011a03fb858a435d8221b5d0b747e6d1916f1ba7a5da0e3d3f4b55b62bd"
+    },
+    {
+      "experiment_id": "graphgrpo_formal_machine_only_seed102_v1_20261011",
+      "experiment_config": "benchmark_results/graphgrpo_formal_machine_only_seed102_v1_20261011/experiment_config.json",
+      "results": "benchmark_results/graphgrpo_formal_machine_only_seed102_v1_20261011/results.jsonl",
+      "results_sha256": "cdaa817b108b30089876263413ad6f4257d00a0e7fc3a82d9a6e6592b545da69"
+    },
+    {
+      "experiment_id": "graphgrpo_formal_machine_only_seed103_v1_20261011",
+      "experiment_config": "benchmark_results/graphgrpo_formal_machine_only_seed103_v1_20261011/experiment_config.json",
+      "results": "benchmark_results/graphgrpo_formal_machine_only_seed103_v1_20261011/results.jsonl",
+      "results_sha256": "e7e3d061ba86ff417664d41a92f3c0cd8bb0d5eafc439a62e18374d064fa2498"
+    },
+    {
+      "experiment_id": "graphgrpo_formal_agv_only_seed101_v1_20261011",
+      "experiment_config": "benchmark_results/graphgrpo_formal_agv_only_seed101_v1_20261011/experiment_config.json",
+      "results": "benchmark_results/graphgrpo_formal_agv_only_seed101_v1_20261011/results.jsonl",
+      "results_sha256": "5e261997ed3d40c63db97b17c6fe88f02e1710548d84fca996b2b7dd2ffd3fe1"
+    },
+    {
+      "experiment_id": "graphgrpo_formal_agv_only_seed102_v1_20261011",
+      "experiment_config": "benchmark_results/graphgrpo_formal_agv_only_seed102_v1_20261011/experiment_config.json",
+      "results": "benchmark_results/graphgrpo_formal_agv_only_seed102_v1_20261011/results.jsonl",
+      "results_sha256": "bbee9a1039907c3ed1d7a364950a311afb6ab800c2d6269f21371316dfabed5a"
+    },
+    {
+      "experiment_id": "graphgrpo_formal_agv_only_seed103_v1_20261011",
+      "experiment_config": "benchmark_results/graphgrpo_formal_agv_only_seed103_v1_20261011/experiment_config.json",
+      "results": "benchmark_results/graphgrpo_formal_agv_only_seed103_v1_20261011/results.jsonl",
+      "results_sha256": "7e10bed947478c5dea412138d81cb60cca0aa410718380b22ec24af117a7391f"
+    },
+    {
+      "experiment_id": "graphgrpo_formal_job_add_only_seed101_v1_20261011",
+      "experiment_config": "benchmark_results/graphgrpo_formal_job_add_only_seed101_v1_20261011/experiment_config.json",
+      "results": "benchmark_results/graphgrpo_formal_job_add_only_seed101_v1_20261011/results.jsonl",
+      "results_sha256": "e4f05a0425aaea162a5a46003513bbb3ef640a7e4af11b0f1c4dbe3c0ce2873d"
+    },
+    {
+      "experiment_id": "graphgrpo_formal_job_add_only_seed102_v1_20261011",
+      "experiment_config": "benchmark_results/graphgrpo_formal_job_add_only_seed102_v1_20261011/experiment_config.json",
+      "results": "benchmark_results/graphgrpo_formal_job_add_only_seed102_v1_20261011/results.jsonl",
+      "results_sha256": "221e6658dadbc0f7eccac8c7feb38e54080020a509b480687a46c07b134bd1ac"
+    },
+    {
+      "experiment_id": "graphgrpo_formal_job_add_only_seed103_v1_20261011",
+      "experiment_config": "benchmark_results/graphgrpo_formal_job_add_only_seed103_v1_20261011/experiment_config.json",
+      "results": "benchmark_results/graphgrpo_formal_job_add_only_seed103_v1_20261011/results.jsonl",
+      "results_sha256": "3d9f9e2c109b6f148d550166f9e631ea319e2b27a92e6d3845233747f9ff509a"
+    },
+    {
+      "experiment_id": "graphgrpo_formal_final_seed101_test_base_v1_20261011",
+      "experiment_config": "benchmark_results/graphgrpo_formal_final_seed101_test_base_v1_20261011/experiment_config.json",
+      "results": "benchmark_results/graphgrpo_formal_final_seed101_test_base_v1_20261011/results.jsonl",
+      "results_sha256": "880b4e9be45624f1511bdedff5bc4941f3ece3a521b4ea85101a1f6519798fa3"
+    },
+    {
+      "experiment_id": "graphgrpo_formal_final_seed101_test_event_v1_20261011",
+      "experiment_config": "benchmark_results/graphgrpo_formal_final_seed101_test_event_v1_20261011/experiment_config.json",
+      "results": "benchmark_results/graphgrpo_formal_final_seed101_test_event_v1_20261011/results.jsonl",
+      "results_sha256": "4a12b745c3c1f7fee9646e97f56eb90a625fdd71c363ee52f9426109c1b8bd3b"
+    },
+    {
+      "experiment_id": "graphgrpo_formal_final_seed102_test_base_v1_20261011",
+      "experiment_config": "benchmark_results/graphgrpo_formal_final_seed102_test_base_v1_20261011/experiment_config.json",
+      "results": "benchmark_results/graphgrpo_formal_final_seed102_test_base_v1_20261011/results.jsonl",
+      "results_sha256": "19fccea3eae06197af6c646cffad194f9ec2354b384ad558d1f0a9d089e864bb"
+    },
+    {
+      "experiment_id": "graphgrpo_formal_final_seed102_test_event_v1_20261011",
+      "experiment_config": "benchmark_results/graphgrpo_formal_final_seed102_test_event_v1_20261011/experiment_config.json",
+      "results": "benchmark_results/graphgrpo_formal_final_seed102_test_event_v1_20261011/results.jsonl",
+      "results_sha256": "32e4b2525762eb0aad8a98fab55c7a77eb1c26ed8b7062bb2577edfbb2a10d7f"
+    },
+    {
+      "experiment_id": "graphgrpo_formal_final_seed103_test_base_v1_20261011",
+      "experiment_config": "benchmark_results/graphgrpo_formal_final_seed103_test_base_v1_20261011/experiment_config.json",
+      "results": "benchmark_results/graphgrpo_formal_final_seed103_test_base_v1_20261011/results.jsonl",
+      "results_sha256": "4d952f13c610d5dc9fd07d089bdd9dea0c9b6f204d47f44ad7a648c2c81efb5a"
+    },
+    {
+      "experiment_id": "graphgrpo_formal_final_seed103_test_event_v1_20261011",
+      "experiment_config": "benchmark_results/graphgrpo_formal_final_seed103_test_event_v1_20261011/experiment_config.json",
+      "results": "benchmark_results/graphgrpo_formal_final_seed103_test_event_v1_20261011/results.jsonl",
+      "results_sha256": "e6a5fe1d9143f8757f8f1f166747339ba9996d1719d3669712c2572fc7d68174"
+    },
+    {
+      "experiment_id": "hgs_formal_final_seed101_test_base_v1_20261011",
+      "experiment_config": "benchmark_results/hgs_formal_final_seed101_test_base_v1_20261011/experiment_config.json",
+      "results": "benchmark_results/hgs_formal_final_seed101_test_base_v1_20261011/results.jsonl",
+      "results_sha256": "8fa80cc1b4ffa60c596d34d8c0870acf27b465f23fd1570dea907943ad9479fa"
+    },
+    {
+      "experiment_id": "hgs_formal_final_seed101_test_event_v1_20261011",
+      "experiment_config": "benchmark_results/hgs_formal_final_seed101_test_event_v1_20261011/experiment_config.json",
+      "results": "benchmark_results/hgs_formal_final_seed101_test_event_v1_20261011/results.jsonl",
+      "results_sha256": "46d6874fbd6b839c72caebcb3c6c412a2e888cccf3790a9fed27e95fde774174"
+    },
+    {
+      "experiment_id": "hgs_formal_final_seed102_test_base_v1_20261011",
+      "experiment_config": "benchmark_results/hgs_formal_final_seed102_test_base_v1_20261011/experiment_config.json",
+      "results": "benchmark_results/hgs_formal_final_seed102_test_base_v1_20261011/results.jsonl",
+      "results_sha256": "838032d2e2e1efb704ed982665a706e1805c59c2ddd75051fe134c7a6b8ccda7"
+    },
+    {
+      "experiment_id": "hgs_formal_final_seed102_test_event_v1_20261011",
+      "experiment_config": "benchmark_results/hgs_formal_final_seed102_test_event_v1_20261011/experiment_config.json",
+      "results": "benchmark_results/hgs_formal_final_seed102_test_event_v1_20261011/results.jsonl",
+      "results_sha256": "57efd440b68aec24493c413255b9b95a4b60e8c9323cfac5e783dfc3d44343e5"
+    },
+    {
+      "experiment_id": "hgs_formal_final_seed103_test_base_v1_20261011",
+      "experiment_config": "benchmark_results/hgs_formal_final_seed103_test_base_v1_20261011/experiment_config.json",
+      "results": "benchmark_results/hgs_formal_final_seed103_test_base_v1_20261011/results.jsonl",
+      "results_sha256": "6a5f85401868bc38827f07dcd8676846b1d75a29ee92fb90897211e9073585be"
+    },
+    {
+      "experiment_id": "hgs_formal_final_seed103_test_event_v2_20261011",
+      "experiment_config": "benchmark_results/hgs_formal_final_seed103_test_event_v2_20261011/experiment_config.json",
+      "results": "benchmark_results/hgs_formal_final_seed103_test_event_v2_20261011/results.jsonl",
+      "results_sha256": "3fc53972267006703c33a9f8a908f230b24e5914dd9cb42fe2862d1c03f0d296"
+    },
+    {
+      "experiment_id": "graphgrpo_formal_final_machine_only_seed101_v2_20261011",
+      "experiment_config": "benchmark_results/graphgrpo_formal_final_machine_only_seed101_v2_20261011/experiment_config.json",
+      "results": "benchmark_results/graphgrpo_formal_final_machine_only_seed101_v2_20261011/results.jsonl",
+      "results_sha256": "ee962d1a6b71b06ee87a5ee68cc8109dd46e47357bfcd7751e4921714d46eb08"
+    },
+    {
+      "experiment_id": "graphgrpo_formal_final_machine_only_seed102_v2_20261011",
+      "experiment_config": "benchmark_results/graphgrpo_formal_final_machine_only_seed102_v2_20261011/experiment_config.json",
+      "results": "benchmark_results/graphgrpo_formal_final_machine_only_seed102_v2_20261011/results.jsonl",
+      "results_sha256": "8fc203335f2d63e796bd2f3bb6e034b82f6f014dbc0b0a229ba51e384e61afe5"
+    },
+    {
+      "experiment_id": "graphgrpo_formal_final_machine_only_seed103_v2_20261011",
+      "experiment_config": "benchmark_results/graphgrpo_formal_final_machine_only_seed103_v2_20261011/experiment_config.json",
+      "results": "benchmark_results/graphgrpo_formal_final_machine_only_seed103_v2_20261011/results.jsonl",
+      "results_sha256": "5732fd12ddbc14fa31f0747da89aecf1115537bb16a4854d85d9811d927a4a2b"
+    },
+    {
+      "experiment_id": "graphgrpo_formal_final_agv_only_seed101_v2_20261011",
+      "experiment_config": "benchmark_results/graphgrpo_formal_final_agv_only_seed101_v2_20261011/experiment_config.json",
+      "results": "benchmark_results/graphgrpo_formal_final_agv_only_seed101_v2_20261011/results.jsonl",
+      "results_sha256": "664d6665aa48d166e5e771f8d6eb50eab884fe9f20e2a7524d49255ba915beb2"
+    },
+    {
+      "experiment_id": "graphgrpo_formal_final_agv_only_seed102_v2_20261011",
+      "experiment_config": "benchmark_results/graphgrpo_formal_final_agv_only_seed102_v2_20261011/experiment_config.json",
+      "results": "benchmark_results/graphgrpo_formal_final_agv_only_seed102_v2_20261011/results.jsonl",
+      "results_sha256": "4194240e154c81528e439e40cd8d72978984e19b152a18e8c320412d6e1073ae"
+    },
+    {
+      "experiment_id": "graphgrpo_formal_final_agv_only_seed103_v2_20261011",
+      "experiment_config": "benchmark_results/graphgrpo_formal_final_agv_only_seed103_v2_20261011/experiment_config.json",
+      "results": "benchmark_results/graphgrpo_formal_final_agv_only_seed103_v2_20261011/results.jsonl",
+      "results_sha256": "f16b26f03e8ccfc65725a75332115637b9c12aea1e52471f48c51abdb63e0875"
+    },
+    {
+      "experiment_id": "graphgrpo_formal_final_job_add_only_seed101_v2_20261011",
+      "experiment_config": "benchmark_results/graphgrpo_formal_final_job_add_only_seed101_v2_20261011/experiment_config.json",
+      "results": "benchmark_results/graphgrpo_formal_final_job_add_only_seed101_v2_20261011/results.jsonl",
+      "results_sha256": "438c2f0abea2644fd5e7b4efb4be4a7bb4e1d6f20223fea18b946e09be508d12"
+    },
+    {
+      "experiment_id": "graphgrpo_formal_final_job_add_only_seed102_v2_20261011",
+      "experiment_config": "benchmark_results/graphgrpo_formal_final_job_add_only_seed102_v2_20261011/experiment_config.json",
+      "results": "benchmark_results/graphgrpo_formal_final_job_add_only_seed102_v2_20261011/results.jsonl",
+      "results_sha256": "ee5aa3ed15019d55c9ee0d0236302575648d164122fdeb67825478d5115892e5"
+    },
+    {
+      "experiment_id": "graphgrpo_formal_final_job_add_only_seed103_v2_20261011",
+      "experiment_config": "benchmark_results/graphgrpo_formal_final_job_add_only_seed103_v2_20261011/experiment_config.json",
+      "results": "benchmark_results/graphgrpo_formal_final_job_add_only_seed103_v2_20261011/results.jsonl",
+      "results_sha256": "d483c3ba008f418acbf91d9c35266b702f7355f104ec57c3ae1e942ec6a48372"
+    },
+    {
+      "experiment_id": "graphgrpo_ablation_fixedgnn_final_seed101_test_base_v1_20261012",
+      "experiment_config": "benchmark_results/graphgrpo_ablation_fixedgnn_final_seed101_test_base_v1_20261012/experiment_config.json",
+      "results": "benchmark_results/graphgrpo_ablation_fixedgnn_final_seed101_test_base_v1_20261012/results.jsonl",
+      "results_sha256": "8051061a2372e0d5772209e2cbe66d20c0b4bbd4dc7c33ef34e0fd4d479c062a"
+    },
+    {
+      "experiment_id": "graphgrpo_ablation_fixedgnn_final_seed101_test_event_v1_20261012",
+      "experiment_config": "benchmark_results/graphgrpo_ablation_fixedgnn_final_seed101_test_event_v1_20261012/experiment_config.json",
+      "results": "benchmark_results/graphgrpo_ablation_fixedgnn_final_seed101_test_event_v1_20261012/results.jsonl",
+      "results_sha256": "aa00e8007a87ec5a52a89a85fdb003acfc4a488fbd1fec29ac62b0c0dd14c803"
+    },
+    {
+      "experiment_id": "graphgrpo_ablation_fixedgnn_final_seed102_test_base_v1_20261012",
+      "experiment_config": "benchmark_results/graphgrpo_ablation_fixedgnn_final_seed102_test_base_v1_20261012/experiment_config.json",
+      "results": "benchmark_results/graphgrpo_ablation_fixedgnn_final_seed102_test_base_v1_20261012/results.jsonl",
+      "results_sha256": "380af7cca4e6fb460e207aa2310c68cc7f30fe06b31b80a61f12abfb7bf8b97f"
+    },
+    {
+      "experiment_id": "graphgrpo_ablation_fixedgnn_final_seed102_test_event_v1_20261012",
+      "experiment_config": "benchmark_results/graphgrpo_ablation_fixedgnn_final_seed102_test_event_v1_20261012/experiment_config.json",
+      "results": "benchmark_results/graphgrpo_ablation_fixedgnn_final_seed102_test_event_v1_20261012/results.jsonl",
+      "results_sha256": "4d4bc82762f47a35fde2dd9fb10d6f2eb2cddc64900d8bde15d102e7ef0039b4"
+    },
+    {
+      "experiment_id": "graphgrpo_ablation_fixedgnn_final_seed103_test_base_v1_20261012",
+      "experiment_config": "benchmark_results/graphgrpo_ablation_fixedgnn_final_seed103_test_base_v1_20261012/experiment_config.json",
+      "results": "benchmark_results/graphgrpo_ablation_fixedgnn_final_seed103_test_base_v1_20261012/results.jsonl",
+      "results_sha256": "ff955ceba116c5a32da2292e346cf05bb78e47a7e376b9d7497084f5939316d9"
+    },
+    {
+      "experiment_id": "graphgrpo_ablation_fixedgnn_final_seed103_test_event_v1_20261012",
+      "experiment_config": "benchmark_results/graphgrpo_ablation_fixedgnn_final_seed103_test_event_v1_20261012/experiment_config.json",
+      "results": "benchmark_results/graphgrpo_ablation_fixedgnn_final_seed103_test_event_v1_20261012/results.jsonl",
+      "results_sha256": "6d9b778fa79bcb4d1bf02b54e0e7ffa3a745ffd022e36b3c73785f8b63595331"
+    },
+    {
+      "experiment_id": "graphgrpo_ablation_flat_final_seed101_test_base_v1_20261012",
+      "experiment_config": "benchmark_results/graphgrpo_ablation_flat_final_seed101_test_base_v1_20261012/experiment_config.json",
+      "results": "benchmark_results/graphgrpo_ablation_flat_final_seed101_test_base_v1_20261012/results.jsonl",
+      "results_sha256": "e0786dc475960c534dd4b6178af75f5546545ed48898c9eafdf4c84d1931fa90"
+    },
+    {
+      "experiment_id": "graphgrpo_ablation_flat_final_seed101_test_event_v1_20261012",
+      "experiment_config": "benchmark_results/graphgrpo_ablation_flat_final_seed101_test_event_v1_20261012/experiment_config.json",
+      "results": "benchmark_results/graphgrpo_ablation_flat_final_seed101_test_event_v1_20261012/results.jsonl",
+      "results_sha256": "44596e3814c7fb12b19d88f0b6b9813b3732ce8ab12e1459147b671921cc719d"
+    },
+    {
+      "experiment_id": "graphgrpo_ablation_flat_final_seed102_test_base_v1_20261012",
+      "experiment_config": "benchmark_results/graphgrpo_ablation_flat_final_seed102_test_base_v1_20261012/experiment_config.json",
+      "results": "benchmark_results/graphgrpo_ablation_flat_final_seed102_test_base_v1_20261012/results.jsonl",
+      "results_sha256": "111e987c8bc6cad24872231fab2ee54cd674fe4e09b2edf45a215cd61add29ec"
+    },
+    {
+      "experiment_id": "graphgrpo_ablation_flat_final_seed102_test_event_v1_20261012",
+      "experiment_config": "benchmark_results/graphgrpo_ablation_flat_final_seed102_test_event_v1_20261012/experiment_config.json",
+      "results": "benchmark_results/graphgrpo_ablation_flat_final_seed102_test_event_v1_20261012/results.jsonl",
+      "results_sha256": "ef01fe8db3d95c7075420b038a1dfbe430c571cda513dc9e7a96f80a08688168"
+    },
+    {
+      "experiment_id": "graphgrpo_ablation_flat_final_seed103_test_base_v1_20261012",
+      "experiment_config": "benchmark_results/graphgrpo_ablation_flat_final_seed103_test_base_v1_20261012/experiment_config.json",
+      "results": "benchmark_results/graphgrpo_ablation_flat_final_seed103_test_base_v1_20261012/results.jsonl",
+      "results_sha256": "b720764e19e68826a0abf4355dd4af2cfcb9e8dd08e91608a4ad030778f0f9da"
+    },
+    {
+      "experiment_id": "graphgrpo_ablation_flat_final_seed103_test_event_v1_20261012",
+      "experiment_config": "benchmark_results/graphgrpo_ablation_flat_final_seed103_test_event_v1_20261012/experiment_config.json",
+      "results": "benchmark_results/graphgrpo_ablation_flat_final_seed103_test_event_v1_20261012/results.jsonl",
+      "results_sha256": "fbc184a7d46fc987bad87b623decda0d9c29f78936b1c5b83de2eb85b150c31f"
+    },
+    {
+      "experiment_id": "graphgrpo_ablation_timeonly_final_seed101_test_base_v1_20261012",
+      "experiment_config": "benchmark_results/graphgrpo_ablation_timeonly_final_seed101_test_base_v1_20261012/experiment_config.json",
+      "results": "benchmark_results/graphgrpo_ablation_timeonly_final_seed101_test_base_v1_20261012/results.jsonl",
+      "results_sha256": "99b6899cce3974ec2ebb5acab0776683e324b3e536acbadb02d4d986f2dd3032"
+    },
+    {
+      "experiment_id": "graphgrpo_ablation_timeonly_final_seed101_test_event_v1_20261012",
+      "experiment_config": "benchmark_results/graphgrpo_ablation_timeonly_final_seed101_test_event_v1_20261012/experiment_config.json",
+      "results": "benchmark_results/graphgrpo_ablation_timeonly_final_seed101_test_event_v1_20261012/results.jsonl",
+      "results_sha256": "952db2f4a2e074b4f92181d341a46aa7f230fa50811083a8b7d57679c47438fa"
+    },
+    {
+      "experiment_id": "graphgrpo_ablation_timeonly_final_seed102_test_base_v1_20261012",
+      "experiment_config": "benchmark_results/graphgrpo_ablation_timeonly_final_seed102_test_base_v1_20261012/experiment_config.json",
+      "results": "benchmark_results/graphgrpo_ablation_timeonly_final_seed102_test_base_v1_20261012/results.jsonl",
+      "results_sha256": "5f6dd277c2be4eda31b0343304c84292ab64f6033f6d93cf2211790cb01aca9c"
+    },
+    {
+      "experiment_id": "graphgrpo_ablation_timeonly_final_seed102_test_event_v1_20261012",
+      "experiment_config": "benchmark_results/graphgrpo_ablation_timeonly_final_seed102_test_event_v1_20261012/experiment_config.json",
+      "results": "benchmark_results/graphgrpo_ablation_timeonly_final_seed102_test_event_v1_20261012/results.jsonl",
+      "results_sha256": "f71ab8286cbcfa55836950748e0de6f87d852b17b91e293ab9f9d9b6362106d3"
+    },
+    {
+      "experiment_id": "graphgrpo_ablation_timeonly_final_seed103_test_base_v1_20261012",
+      "experiment_config": "benchmark_results/graphgrpo_ablation_timeonly_final_seed103_test_base_v1_20261012/experiment_config.json",
+      "results": "benchmark_results/graphgrpo_ablation_timeonly_final_seed103_test_base_v1_20261012/results.jsonl",
+      "results_sha256": "e73b18cb70046a00b1fbb73fdbd1d596ea42acd2fef96d5c792f2c70b29e1100"
+    },
+    {
+      "experiment_id": "graphgrpo_ablation_timeonly_final_seed103_test_event_v1_20261012",
+      "experiment_config": "benchmark_results/graphgrpo_ablation_timeonly_final_seed103_test_event_v1_20261012/experiment_config.json",
+      "results": "benchmark_results/graphgrpo_ablation_timeonly_final_seed103_test_event_v1_20261012/results.jsonl",
+      "results_sha256": "be6dc22bbefdb12b28d42a7f305ce732ff89d114b3003467cd4b858eef15ce8b"
+    },
+    {
+      "experiment_id": "graphgrpo_ablation_firstagv_final_seed101_test_base_v1_20261012",
+      "experiment_config": "benchmark_results/graphgrpo_ablation_firstagv_final_seed101_test_base_v1_20261012/experiment_config.json",
+      "results": "benchmark_results/graphgrpo_ablation_firstagv_final_seed101_test_base_v1_20261012/results.jsonl",
+      "results_sha256": "63ba9989b6feef5fcd60c17f4473d7e501ccd96670f4aa36b05d816bfe8a26df"
+    },
+    {
+      "experiment_id": "graphgrpo_ablation_firstagv_final_seed101_test_event_v1_20261012",
+      "experiment_config": "benchmark_results/graphgrpo_ablation_firstagv_final_seed101_test_event_v1_20261012/experiment_config.json",
+      "results": "benchmark_results/graphgrpo_ablation_firstagv_final_seed101_test_event_v1_20261012/results.jsonl",
+      "results_sha256": "56610e4413b7053966bc6ead890c036eb83127248810541a61f65751674f15fb"
+    },
+    {
+      "experiment_id": "graphgrpo_ablation_firstagv_final_seed102_test_base_v1_20261012",
+      "experiment_config": "benchmark_results/graphgrpo_ablation_firstagv_final_seed102_test_base_v1_20261012/experiment_config.json",
+      "results": "benchmark_results/graphgrpo_ablation_firstagv_final_seed102_test_base_v1_20261012/results.jsonl",
+      "results_sha256": "d6a75768a122efa426f73b0f2cecf326ae476ce20070e8a22ef4965bf55e2ae0"
+    },
+    {
+      "experiment_id": "graphgrpo_ablation_firstagv_final_seed102_test_event_v1_20261012",
+      "experiment_config": "benchmark_results/graphgrpo_ablation_firstagv_final_seed102_test_event_v1_20261012/experiment_config.json",
+      "results": "benchmark_results/graphgrpo_ablation_firstagv_final_seed102_test_event_v1_20261012/results.jsonl",
+      "results_sha256": "d57acbcfd369b573a4ba239e05bfd40869a97e609cacd06949514cf4ec072972"
+    },
+    {
+      "experiment_id": "graphgrpo_ablation_firstagv_final_seed103_test_base_v1_20261012",
+      "experiment_config": "benchmark_results/graphgrpo_ablation_firstagv_final_seed103_test_base_v1_20261012/experiment_config.json",
+      "results": "benchmark_results/graphgrpo_ablation_firstagv_final_seed103_test_base_v1_20261012/results.jsonl",
+      "results_sha256": "3204616d5343e7807d4b5269a0a6e5b8c7a5f3941d0592b7114250f5255ca3ab"
+    },
+    {
+      "experiment_id": "graphgrpo_ablation_firstagv_final_seed103_test_event_v1_20261012",
+      "experiment_config": "benchmark_results/graphgrpo_ablation_firstagv_final_seed103_test_event_v1_20261012/experiment_config.json",
+      "results": "benchmark_results/graphgrpo_ablation_firstagv_final_seed103_test_event_v1_20261012/results.jsonl",
+      "results_sha256": "686294acade16a700630ef43d770e962574deecfb8794b9cfc19c89dac7ebd27"
+    },
+    {
+      "experiment_id": "graphgrpo_ablation_lb_fixedgnn_seed101_test_base_v1_20261012",
+      "experiment_config": "benchmark_results/graphgrpo_ablation_lb_fixedgnn_seed101_test_base_v1_20261012/experiment_config.json",
+      "results": "benchmark_results/graphgrpo_ablation_lb_fixedgnn_seed101_test_base_v1_20261012/results.jsonl",
+      "results_sha256": "4f5f987f74696afebe062c75da27fcd3f012f93684fe1dfcc9ee9368843816df"
+    },
+    {
+      "experiment_id": "graphgrpo_ablation_lb_fixedgnn_seed101_test_event_v1_20261012",
+      "experiment_config": "benchmark_results/graphgrpo_ablation_lb_fixedgnn_seed101_test_event_v1_20261012/experiment_config.json",
+      "results": "benchmark_results/graphgrpo_ablation_lb_fixedgnn_seed101_test_event_v1_20261012/results.jsonl",
+      "results_sha256": "e3e301be924982b02c7c76048e8c89a10674e61b86757cb11d16e621049748bf"
+    },
+    {
+      "experiment_id": "graphgrpo_ablation_lb_fixedgnn_seed102_test_base_v1_20261012",
+      "experiment_config": "benchmark_results/graphgrpo_ablation_lb_fixedgnn_seed102_test_base_v1_20261012/experiment_config.json",
+      "results": "benchmark_results/graphgrpo_ablation_lb_fixedgnn_seed102_test_base_v1_20261012/results.jsonl",
+      "results_sha256": "0491793d9b6b010d0ace9b1f30449c16733105e472084843b4bf12301d66b0d9"
+    },
+    {
+      "experiment_id": "graphgrpo_ablation_lb_fixedgnn_seed102_test_event_v1_20261012",
+      "experiment_config": "benchmark_results/graphgrpo_ablation_lb_fixedgnn_seed102_test_event_v1_20261012/experiment_config.json",
+      "results": "benchmark_results/graphgrpo_ablation_lb_fixedgnn_seed102_test_event_v1_20261012/results.jsonl",
+      "results_sha256": "d270316949b7911d95f75dab14f04dd6411d01acb331254f5c6f4abfae415171"
+    },
+    {
+      "experiment_id": "graphgrpo_ablation_lb_fixedgnn_seed103_test_base_v1_20261012",
+      "experiment_config": "benchmark_results/graphgrpo_ablation_lb_fixedgnn_seed103_test_base_v1_20261012/experiment_config.json",
+      "results": "benchmark_results/graphgrpo_ablation_lb_fixedgnn_seed103_test_base_v1_20261012/results.jsonl",
+      "results_sha256": "60b35e0efdba9eed748ff460f57899cb620d5cc6a0f7415a55552bb3c6dbafd5"
+    },
+    {
+      "experiment_id": "graphgrpo_ablation_lb_fixedgnn_seed103_test_event_v1_20261012",
+      "experiment_config": "benchmark_results/graphgrpo_ablation_lb_fixedgnn_seed103_test_event_v1_20261012/experiment_config.json",
+      "results": "benchmark_results/graphgrpo_ablation_lb_fixedgnn_seed103_test_event_v1_20261012/results.jsonl",
+      "results_sha256": "3d737faa494485d1eb58b2168ec6a7b246bb7d09e4b013477efae08394f942cd"
+    },
+    {
+      "experiment_id": "graphgrpo_ablation_lb_flat_seed101_test_base_v1_20261012",
+      "experiment_config": "benchmark_results/graphgrpo_ablation_lb_flat_seed101_test_base_v1_20261012/experiment_config.json",
+      "results": "benchmark_results/graphgrpo_ablation_lb_flat_seed101_test_base_v1_20261012/results.jsonl",
+      "results_sha256": "d6f99e5f6b4245ca9869fb74dc611250d6e2421e5f5686903ae649a590a5dd09"
+    },
+    {
+      "experiment_id": "graphgrpo_ablation_lb_flat_seed101_test_event_v1_20261012",
+      "experiment_config": "benchmark_results/graphgrpo_ablation_lb_flat_seed101_test_event_v1_20261012/experiment_config.json",
+      "results": "benchmark_results/graphgrpo_ablation_lb_flat_seed101_test_event_v1_20261012/results.jsonl",
+      "results_sha256": "1df3624b5ad140864f1af71b6b5596f5677f19eea641b843813e96a54acbe388"
+    },
+    {
+      "experiment_id": "graphgrpo_ablation_lb_flat_seed102_test_base_v1_20261012",
+      "experiment_config": "benchmark_results/graphgrpo_ablation_lb_flat_seed102_test_base_v1_20261012/experiment_config.json",
+      "results": "benchmark_results/graphgrpo_ablation_lb_flat_seed102_test_base_v1_20261012/results.jsonl",
+      "results_sha256": "65259c9c779ba749ea255f8d3bb2ea666b3123c9aec0b44c3aa3495429f7357a"
+    },
+    {
+      "experiment_id": "graphgrpo_ablation_lb_flat_seed102_test_event_v1_20261012",
+      "experiment_config": "benchmark_results/graphgrpo_ablation_lb_flat_seed102_test_event_v1_20261012/experiment_config.json",
+      "results": "benchmark_results/graphgrpo_ablation_lb_flat_seed102_test_event_v1_20261012/results.jsonl",
+      "results_sha256": "95dff8b1bd6a8dd44298ce6150431d515717f7a561ffe5634268f213db00d2f3"
+    },
+    {
+      "experiment_id": "graphgrpo_ablation_lb_flat_seed103_test_base_v1_20261012",
+      "experiment_config": "benchmark_results/graphgrpo_ablation_lb_flat_seed103_test_base_v1_20261012/experiment_config.json",
+      "results": "benchmark_results/graphgrpo_ablation_lb_flat_seed103_test_base_v1_20261012/results.jsonl",
+      "results_sha256": "0887d40d45c94d031041a2b8a27b16fc0424165ac3a8e28665a353822bdd0160"
+    },
+    {
+      "experiment_id": "graphgrpo_ablation_lb_flat_seed103_test_event_v1_20261012",
+      "experiment_config": "benchmark_results/graphgrpo_ablation_lb_flat_seed103_test_event_v1_20261012/experiment_config.json",
+      "results": "benchmark_results/graphgrpo_ablation_lb_flat_seed103_test_event_v1_20261012/results.jsonl",
+      "results_sha256": "47edae8459e571d6135288a6070ac9640f33e0f39a3215a947c3eee3bffa88a9"
+    },
+    {
+      "experiment_id": "graphgrpo_ablation_lb_firstagv_seed101_test_base_v1_20261012",
+      "experiment_config": "benchmark_results/graphgrpo_ablation_lb_firstagv_seed101_test_base_v1_20261012/experiment_config.json",
+      "results": "benchmark_results/graphgrpo_ablation_lb_firstagv_seed101_test_base_v1_20261012/results.jsonl",
+      "results_sha256": "a94fd15019060879f4646a06f792bb21fee81fe6ae1468500d2a368a9908f47b"
+    },
+    {
+      "experiment_id": "graphgrpo_ablation_lb_firstagv_seed101_test_event_v1_20261012",
+      "experiment_config": "benchmark_results/graphgrpo_ablation_lb_firstagv_seed101_test_event_v1_20261012/experiment_config.json",
+      "results": "benchmark_results/graphgrpo_ablation_lb_firstagv_seed101_test_event_v1_20261012/results.jsonl",
+      "results_sha256": "c41f9c7e95f20da790e051690d1f72fb3633a4ccff04ea2982a20b87296f1af0"
+    },
+    {
+      "experiment_id": "graphgrpo_ablation_lb_firstagv_seed102_test_base_v1_20261012",
+      "experiment_config": "benchmark_results/graphgrpo_ablation_lb_firstagv_seed102_test_base_v1_20261012/experiment_config.json",
+      "results": "benchmark_results/graphgrpo_ablation_lb_firstagv_seed102_test_base_v1_20261012/results.jsonl",
+      "results_sha256": "fd0a22b9d0d70455daaa95ab14c1dc5f603383e46a6eb74384826a748fcaa5cb"
+    },
+    {
+      "experiment_id": "graphgrpo_ablation_lb_firstagv_seed102_test_event_v1_20261012",
+      "experiment_config": "benchmark_results/graphgrpo_ablation_lb_firstagv_seed102_test_event_v1_20261012/experiment_config.json",
+      "results": "benchmark_results/graphgrpo_ablation_lb_firstagv_seed102_test_event_v1_20261012/results.jsonl",
+      "results_sha256": "e8f2a7bab5d7a28518b4ee5b62d61777f4fee79589db36be9c4977cf83642634"
+    },
+    {
+      "experiment_id": "graphgrpo_ablation_lb_firstagv_seed103_test_base_v1_20261012",
+      "experiment_config": "benchmark_results/graphgrpo_ablation_lb_firstagv_seed103_test_base_v1_20261012/experiment_config.json",
+      "results": "benchmark_results/graphgrpo_ablation_lb_firstagv_seed103_test_base_v1_20261012/results.jsonl",
+      "results_sha256": "5259b8fe0d78a28749f63894222fd609b5993741b5143e92d58092c67585ea09"
+    },
+    {
+      "experiment_id": "graphgrpo_ablation_lb_firstagv_seed103_test_event_v1_20261012",
+      "experiment_config": "benchmark_results/graphgrpo_ablation_lb_firstagv_seed103_test_event_v1_20261012/experiment_config.json",
+      "results": "benchmark_results/graphgrpo_ablation_lb_firstagv_seed103_test_event_v1_20261012/results.jsonl",
+      "results_sha256": "6b5268b0c82bffe29769b8fd80bb6feba081a3d2f95e3f0d694f09ef15a0144a"
+    },
+    {
+      "experiment_id": "graphgrpo_ablation_timeonly_frozen_seed101_test_base_v1_20261012",
+      "experiment_config": "benchmark_results/graphgrpo_ablation_timeonly_frozen_seed101_test_base_v1_20261012/experiment_config.json",
+      "results": "benchmark_results/graphgrpo_ablation_timeonly_frozen_seed101_test_base_v1_20261012/results.jsonl",
+      "results_sha256": "eabb3d14beb17d488d721383232c66ccda8f040befcfed13923d4757cfdf5568"
+    },
+    {
+      "experiment_id": "graphgrpo_ablation_timeonly_frozen_seed101_test_event_v1_20261012",
+      "experiment_config": "benchmark_results/graphgrpo_ablation_timeonly_frozen_seed101_test_event_v1_20261012/experiment_config.json",
+      "results": "benchmark_results/graphgrpo_ablation_timeonly_frozen_seed101_test_event_v1_20261012/results.jsonl",
+      "results_sha256": "f778183d4e0c50965ffede7cc7785d81793aac4ce12f78328aaa1dd078f399d2"
+    },
+    {
+      "experiment_id": "graphgrpo_ablation_timeonly_frozen_seed102_test_base_v1_20261012",
+      "experiment_config": "benchmark_results/graphgrpo_ablation_timeonly_frozen_seed102_test_base_v1_20261012/experiment_config.json",
+      "results": "benchmark_results/graphgrpo_ablation_timeonly_frozen_seed102_test_base_v1_20261012/results.jsonl",
+      "results_sha256": "e1e1111612d7a1c08f3fccf8e1e17ff298954cb49cb1da101aa3198399054da5"
+    },
+    {
+      "experiment_id": "graphgrpo_ablation_timeonly_frozen_seed102_test_event_v1_20261012",
+      "experiment_config": "benchmark_results/graphgrpo_ablation_timeonly_frozen_seed102_test_event_v1_20261012/experiment_config.json",
+      "results": "benchmark_results/graphgrpo_ablation_timeonly_frozen_seed102_test_event_v1_20261012/results.jsonl",
+      "results_sha256": "3235a4d8d9d8d9856511fffb00f46e2dae8e723e3a38a3a4540af9dbb0812d9c"
+    },
+    {
+      "experiment_id": "graphgrpo_ablation_timeonly_frozen_seed103_test_base_v1_20261012",
+      "experiment_config": "benchmark_results/graphgrpo_ablation_timeonly_frozen_seed103_test_base_v1_20261012/experiment_config.json",
+      "results": "benchmark_results/graphgrpo_ablation_timeonly_frozen_seed103_test_base_v1_20261012/results.jsonl",
+      "results_sha256": "00de736be7197ea06aac5d9c4e1a0cf3f6fc48d4de5397962ba8664ba50c9de3"
+    },
+    {
+      "experiment_id": "graphgrpo_ablation_timeonly_frozen_seed103_test_event_v1_20261012",
+      "experiment_config": "benchmark_results/graphgrpo_ablation_timeonly_frozen_seed103_test_event_v1_20261012/experiment_config.json",
+      "results": "benchmark_results/graphgrpo_ablation_timeonly_frozen_seed103_test_event_v1_20261012/results.jsonl",
+      "results_sha256": "1e70ab1976bfacb2e81e49d7626e2b8a47cabadcc6b29209ff46104c46ed13e2"
+    },
+    {
+      "experiment_id": "graphgrpo_frozen_lb_test_seed601_clean_v2_20261012",
+      "experiment_config": "benchmark_results/graphgrpo_frozen_lb_test_seed601_clean_v2_20261012/experiment_config.json",
+      "results": "benchmark_results/graphgrpo_frozen_lb_test_seed601_clean_v2_20261012/results.jsonl",
+      "results_sha256": "1fde24f68206ab84af61f156294398ee589a4e7a1fc8b85b939b5d3d31cd1955"
+    },
+    {
+      "experiment_id": "graphgrpo_frozen_lb_test_seed601_uncertain_v2_20261012",
+      "experiment_config": "benchmark_results/graphgrpo_frozen_lb_test_seed601_uncertain_v2_20261012/experiment_config.json",
+      "results": "benchmark_results/graphgrpo_frozen_lb_test_seed601_uncertain_v2_20261012/results.jsonl",
+      "results_sha256": "f4b4ee8075ce7973a70a827eda9ed73ac096a082a5955d46db36102add55b02a"
+    },
+    {
+      "experiment_id": "graphgrpo_frozen_lb_test_seed602_clean_v2_20261012",
+      "experiment_config": "benchmark_results/graphgrpo_frozen_lb_test_seed602_clean_v2_20261012/experiment_config.json",
+      "results": "benchmark_results/graphgrpo_frozen_lb_test_seed602_clean_v2_20261012/results.jsonl",
+      "results_sha256": "7fe859134f3a1191b17edc5c5bf8957ea9d218312b0bd6bd10c0563309111b5f"
+    },
+    {
+      "experiment_id": "graphgrpo_frozen_lb_test_seed602_uncertain_v2_20261012",
+      "experiment_config": "benchmark_results/graphgrpo_frozen_lb_test_seed602_uncertain_v2_20261012/experiment_config.json",
+      "results": "benchmark_results/graphgrpo_frozen_lb_test_seed602_uncertain_v2_20261012/results.jsonl",
+      "results_sha256": "9b83b5eca08012944ed81011361c1c363b2883b50d78d5b0c0df8831c5cd5764"
+    },
+    {
+      "experiment_id": "graphgrpo_frozen_lb_test_seed603_clean_v2_20261012",
+      "experiment_config": "benchmark_results/graphgrpo_frozen_lb_test_seed603_clean_v2_20261012/experiment_config.json",
+      "results": "benchmark_results/graphgrpo_frozen_lb_test_seed603_clean_v2_20261012/results.jsonl",
+      "results_sha256": "2089e8e09506d81026a7ef70dba2c9db921e39a2e064e65f79e0da820339a0ab"
+    },
+    {
+      "experiment_id": "graphgrpo_frozen_lb_test_seed603_uncertain_v2_20261012",
+      "experiment_config": "benchmark_results/graphgrpo_frozen_lb_test_seed603_uncertain_v2_20261012/experiment_config.json",
+      "results": "benchmark_results/graphgrpo_frozen_lb_test_seed603_uncertain_v2_20261012/results.jsonl",
+      "results_sha256": "292a498fc583a4c544585237630e58f30fd78fe9d06e7b4bc7578fffd0f52148"
+    },
+    {
+      "experiment_id": "graphgrpo_frozen_ms_test_seed601_clean_v1_20261012",
+      "experiment_config": "benchmark_results/graphgrpo_frozen_ms_test_seed601_clean_v1_20261012/experiment_config.json",
+      "results": "benchmark_results/graphgrpo_frozen_ms_test_seed601_clean_v1_20261012/results.jsonl",
+      "results_sha256": "fc483cd56e3438b1c2f795b0b408a319ea23e8e954493dea803be0f5f81c62e6"
+    },
+    {
+      "experiment_id": "graphgrpo_frozen_ms_test_seed601_uncertain_v1_20261012",
+      "experiment_config": "benchmark_results/graphgrpo_frozen_ms_test_seed601_uncertain_v1_20261012/experiment_config.json",
+      "results": "benchmark_results/graphgrpo_frozen_ms_test_seed601_uncertain_v1_20261012/results.jsonl",
+      "results_sha256": "5941a58ad862e3e6c6f4eaab0f58d6ade76701dc4fafe0cbcbd176200267e312"
+    },
+    {
+      "experiment_id": "graphgrpo_frozen_ms_test_seed602_clean_v1_20261012",
+      "experiment_config": "benchmark_results/graphgrpo_frozen_ms_test_seed602_clean_v1_20261012/experiment_config.json",
+      "results": "benchmark_results/graphgrpo_frozen_ms_test_seed602_clean_v1_20261012/results.jsonl",
+      "results_sha256": "7e8fb86b5e0d348a8ae7dd4f1054b54ec576b952a8c7d2e8f8b9d9d8ffb6ede7"
+    },
+    {
+      "experiment_id": "graphgrpo_frozen_ms_test_seed602_uncertain_v1_20261012",
+      "experiment_config": "benchmark_results/graphgrpo_frozen_ms_test_seed602_uncertain_v1_20261012/experiment_config.json",
+      "results": "benchmark_results/graphgrpo_frozen_ms_test_seed602_uncertain_v1_20261012/results.jsonl",
+      "results_sha256": "9fa2d993567b7172773bf2662b39bda90e32ee52c33b262d52ec47051c4f39eb"
+    },
+    {
+      "experiment_id": "graphgrpo_frozen_ms_test_seed603_clean_v1_20261012",
+      "experiment_config": "benchmark_results/graphgrpo_frozen_ms_test_seed603_clean_v1_20261012/experiment_config.json",
+      "results": "benchmark_results/graphgrpo_frozen_ms_test_seed603_clean_v1_20261012/results.jsonl",
+      "results_sha256": "3e31f43ddf8e1ecbee2a20e98e4543b8068f0540ea35b284e4da80b8c0cc08d1"
+    },
+    {
+      "experiment_id": "graphgrpo_frozen_ms_test_seed603_uncertain_v1_20261012",
+      "experiment_config": "benchmark_results/graphgrpo_frozen_ms_test_seed603_uncertain_v1_20261012/experiment_config.json",
+      "results": "benchmark_results/graphgrpo_frozen_ms_test_seed603_uncertain_v1_20261012/results.jsonl",
+      "results_sha256": "ecb04dde01ccf11ee146e375b89251cae60eb23c4a47bb3de9b450c1a3af596c"
+    },
+    {
+      "experiment_id": "graphgrpo_frozen_lb_test_seed601_machine_only_v1_20261012",
+      "experiment_config": "benchmark_results/graphgrpo_frozen_lb_test_seed601_machine_only_v1_20261012/experiment_config.json",
+      "results": "benchmark_results/graphgrpo_frozen_lb_test_seed601_machine_only_v1_20261012/results.jsonl",
+      "results_sha256": "eabec4f14414f6ffafb615942c16cb8b501633d0413b09f1bc85fee62ec027b4"
+    },
+    {
+      "experiment_id": "graphgrpo_frozen_lb_test_seed601_agv_only_v1_20261012",
+      "experiment_config": "benchmark_results/graphgrpo_frozen_lb_test_seed601_agv_only_v1_20261012/experiment_config.json",
+      "results": "benchmark_results/graphgrpo_frozen_lb_test_seed601_agv_only_v1_20261012/results.jsonl",
+      "results_sha256": "01f1b505b5c0165b3251f6cb393c3a8975286a9d855e92d6996cc1bff1d2a148"
+    },
+    {
+      "experiment_id": "graphgrpo_frozen_lb_test_seed601_job_add_only_v1_20261012",
+      "experiment_config": "benchmark_results/graphgrpo_frozen_lb_test_seed601_job_add_only_v1_20261012/experiment_config.json",
+      "results": "benchmark_results/graphgrpo_frozen_lb_test_seed601_job_add_only_v1_20261012/results.jsonl",
+      "results_sha256": "cfc3f242fee9dd8152961991c13c20ace1552e9efd8ca9fec5258ff04b34fa52"
+    },
+    {
+      "experiment_id": "graphgrpo_frozen_lb_test_seed602_machine_only_v1_20261012",
+      "experiment_config": "benchmark_results/graphgrpo_frozen_lb_test_seed602_machine_only_v1_20261012/experiment_config.json",
+      "results": "benchmark_results/graphgrpo_frozen_lb_test_seed602_machine_only_v1_20261012/results.jsonl",
+      "results_sha256": "993f04b7f28a6ee1913b6ee19d6e3b1493261d9665e8d9c45bac67149368a798"
+    },
+    {
+      "experiment_id": "graphgrpo_frozen_lb_test_seed602_agv_only_v1_20261012",
+      "experiment_config": "benchmark_results/graphgrpo_frozen_lb_test_seed602_agv_only_v1_20261012/experiment_config.json",
+      "results": "benchmark_results/graphgrpo_frozen_lb_test_seed602_agv_only_v1_20261012/results.jsonl",
+      "results_sha256": "6054ef1b9e00a365eb126ab54f1e64f5ff351b6e8bc8109f015d3b6b4e918f5e"
+    },
+    {
+      "experiment_id": "graphgrpo_frozen_lb_test_seed602_job_add_only_v1_20261012",
+      "experiment_config": "benchmark_results/graphgrpo_frozen_lb_test_seed602_job_add_only_v1_20261012/experiment_config.json",
+      "results": "benchmark_results/graphgrpo_frozen_lb_test_seed602_job_add_only_v1_20261012/results.jsonl",
+      "results_sha256": "4d79f8593ed31805f2a63a610c1b735cb20cde4929afc399e1743010c74eff00"
+    },
+    {
+      "experiment_id": "graphgrpo_frozen_lb_test_seed603_machine_only_v1_20261012",
+      "experiment_config": "benchmark_results/graphgrpo_frozen_lb_test_seed603_machine_only_v1_20261012/experiment_config.json",
+      "results": "benchmark_results/graphgrpo_frozen_lb_test_seed603_machine_only_v1_20261012/results.jsonl",
+      "results_sha256": "7952bfcb185869f5fb07c8f41e2fd1162e8fea089f87e3823fd4490fa416ceee"
+    },
+    {
+      "experiment_id": "graphgrpo_frozen_lb_test_seed603_agv_only_v1_20261012",
+      "experiment_config": "benchmark_results/graphgrpo_frozen_lb_test_seed603_agv_only_v1_20261012/experiment_config.json",
+      "results": "benchmark_results/graphgrpo_frozen_lb_test_seed603_agv_only_v1_20261012/results.jsonl",
+      "results_sha256": "b895a95ff0c8b7467f4a9b18605c4108f034e972b408b1367cb653003b31c0e2"
+    },
+    {
+      "experiment_id": "graphgrpo_frozen_lb_test_seed603_job_add_only_v1_20261012",
+      "experiment_config": "benchmark_results/graphgrpo_frozen_lb_test_seed603_job_add_only_v1_20261012/experiment_config.json",
+      "results": "benchmark_results/graphgrpo_frozen_lb_test_seed603_job_add_only_v1_20261012/results.jsonl",
+      "results_sha256": "8dbaec5113caa595f1beb13f98a01dc1d2c7395f8a352995f7ff23b2d7da1a12"
+    },
+    {
+      "experiment_id": "graphgrpo_frozen_lb_test_model101_seed602_clean_v3_20261012",
+      "experiment_config": "benchmark_results/graphgrpo_frozen_lb_test_model101_seed602_clean_v3_20261012/experiment_config.json",
+      "results": "benchmark_results/graphgrpo_frozen_lb_test_model101_seed602_clean_v3_20261012/results.jsonl",
+      "results_sha256": "4a0fc7e6ad57779e384f683c4e7e32b1514f4f3dea5b51e1ed725255f46684d4"
+    },
+    {
+      "experiment_id": "graphgrpo_frozen_lb_test_model101_seed602_uncertain_v3_20261012",
+      "experiment_config": "benchmark_results/graphgrpo_frozen_lb_test_model101_seed602_uncertain_v3_20261012/experiment_config.json",
+      "results": "benchmark_results/graphgrpo_frozen_lb_test_model101_seed602_uncertain_v3_20261012/results.jsonl",
+      "results_sha256": "d10ec30b838892e0fa4fb7db21174fa6d70e9f6253eed4efb350d68dc0281e78"
+    },
+    {
+      "experiment_id": "graphgrpo_frozen_lb_test_model101_seed603_clean_v3_20261012",
+      "experiment_config": "benchmark_results/graphgrpo_frozen_lb_test_model101_seed603_clean_v3_20261012/experiment_config.json",
+      "results": "benchmark_results/graphgrpo_frozen_lb_test_model101_seed603_clean_v3_20261012/results.jsonl",
+      "results_sha256": "139427a255a8b9c7300893cc5dadd783a83cd1af6350e1e2610bd0c19febc4f0"
+    },
+    {
+      "experiment_id": "graphgrpo_frozen_lb_test_model101_seed603_uncertain_v3_20261012",
+      "experiment_config": "benchmark_results/graphgrpo_frozen_lb_test_model101_seed603_uncertain_v3_20261012/experiment_config.json",
+      "results": "benchmark_results/graphgrpo_frozen_lb_test_model101_seed603_uncertain_v3_20261012/results.jsonl",
+      "results_sha256": "dd2f65676afabb52f6c3ca0c6ccf18be5d09f690150d2a08262b48071d6b3c41"
+    },
+    {
+      "experiment_id": "graphgrpo_frozen_lb_test_m102_t601_clean_v3_20261012",
+      "experiment_config": "benchmark_results/graphgrpo_frozen_lb_test_m102_t601_clean_v3_20261012/experiment_config.json",
+      "results": "benchmark_results/graphgrpo_frozen_lb_test_m102_t601_clean_v3_20261012/results.jsonl",
+      "results_sha256": "7d8df5b9cffe45956dc71d7f7a67aa929797fcea308a2e70c07a9b9f39009a0d"
+    },
+    {
+      "experiment_id": "graphgrpo_frozen_lb_test_m102_t601_event_v3_20261012",
+      "experiment_config": "benchmark_results/graphgrpo_frozen_lb_test_m102_t601_event_v3_20261012/experiment_config.json",
+      "results": "benchmark_results/graphgrpo_frozen_lb_test_m102_t601_event_v3_20261012/results.jsonl",
+      "results_sha256": "edb1ac10ee181b9ba81ce848d4243843632a50d15f31f108ffed01c6d5d1c2b3"
+    },
+    {
+      "experiment_id": "graphgrpo_frozen_lb_test_m102_t603_clean_v3_20261012",
+      "experiment_config": "benchmark_results/graphgrpo_frozen_lb_test_m102_t603_clean_v3_20261012/experiment_config.json",
+      "results": "benchmark_results/graphgrpo_frozen_lb_test_m102_t603_clean_v3_20261012/results.jsonl",
+      "results_sha256": "7239e7f65cc18093991471c0aceff1ad4e88ec85ecd8d6b2d59b5e25b99e5a61"
+    },
+    {
+      "experiment_id": "graphgrpo_frozen_lb_test_m102_t603_event_v3_20261012",
+      "experiment_config": "benchmark_results/graphgrpo_frozen_lb_test_m102_t603_event_v3_20261012/experiment_config.json",
+      "results": "benchmark_results/graphgrpo_frozen_lb_test_m102_t603_event_v3_20261012/results.jsonl",
+      "results_sha256": "1da661033efc8a14cc38242ad6b2dea8bb80ac50940ea4af191b9e7ef3cd8c22"
+    },
+    {
+      "experiment_id": "graphgrpo_frozen_lb_test_m103_t601_clean_v3_20261012",
+      "experiment_config": "benchmark_results/graphgrpo_frozen_lb_test_m103_t601_clean_v3_20261012/experiment_config.json",
+      "results": "benchmark_results/graphgrpo_frozen_lb_test_m103_t601_clean_v3_20261012/results.jsonl",
+      "results_sha256": "6aaa358cdda4e509eec364067aee3667195ee098b1bb189d44de8d3a38b75376"
+    },
+    {
+      "experiment_id": "graphgrpo_frozen_lb_test_m103_t601_event_v3_20261012",
+      "experiment_config": "benchmark_results/graphgrpo_frozen_lb_test_m103_t601_event_v3_20261012/experiment_config.json",
+      "results": "benchmark_results/graphgrpo_frozen_lb_test_m103_t601_event_v3_20261012/results.jsonl",
+      "results_sha256": "0874e70d0efda0bb5043df32e05e2d365893488f31a849d584a116b977cedc68"
+    },
+    {
+      "experiment_id": "graphgrpo_frozen_lb_test_m103_t602_clean_v3_20261012",
+      "experiment_config": "benchmark_results/graphgrpo_frozen_lb_test_m103_t602_clean_v3_20261012/experiment_config.json",
+      "results": "benchmark_results/graphgrpo_frozen_lb_test_m103_t602_clean_v3_20261012/results.jsonl",
+      "results_sha256": "c5e96f88a413eed4a117e724985f50dd20c4b7501f0ef9c2f9bc8802774f0492"
+    },
+    {
+      "experiment_id": "graphgrpo_frozen_lb_test_m103_t602_event_v3_20261012",
+      "experiment_config": "benchmark_results/graphgrpo_frozen_lb_test_m103_t602_event_v3_20261012/experiment_config.json",
+      "results": "benchmark_results/graphgrpo_frozen_lb_test_m103_t602_event_v3_20261012/results.jsonl",
+      "results_sha256": "ee1be778cf68c1386841b82c1750f746748e5f7e6eb3475e559ba5646f399939"
+    },
+    {
+      "experiment_id": "graphgrpo_frozen_lb_test_seed104_clean_v2_20261012",
+      "experiment_config": "benchmark_results/graphgrpo_frozen_lb_test_seed104_clean_v2_20261012/experiment_config.json",
+      "results": "benchmark_results/graphgrpo_frozen_lb_test_seed104_clean_v2_20261012/results.jsonl",
+      "results_sha256": "f4437e9865cbe8408ee6b82e2dd4bd15701c7a3836242dc7df8e5fdfec93e4ad"
+    },
+    {
+      "experiment_id": "graphgrpo_frozen_lb_test_seed104_uncertain_v2_20261012",
+      "experiment_config": "benchmark_results/graphgrpo_frozen_lb_test_seed104_uncertain_v2_20261012/experiment_config.json",
+      "results": "benchmark_results/graphgrpo_frozen_lb_test_seed104_uncertain_v2_20261012/results.jsonl",
+      "results_sha256": "749b7bbe0ef722313ef7f0105bd787bafd46838072d3a095c806b3dcf00c36c3"
+    },
+    {
+      "experiment_id": "graphgrpo_frozen_lb_test_seed105_clean_v2_20261012",
+      "experiment_config": "benchmark_results/graphgrpo_frozen_lb_test_seed105_clean_v2_20261012/experiment_config.json",
+      "results": "benchmark_results/graphgrpo_frozen_lb_test_seed105_clean_v2_20261012/results.jsonl",
+      "results_sha256": "617edcdbeec3a5a2ca821a0ed5439e3c69c0325590e467b3bd1e02d356662a25"
+    },
+    {
+      "experiment_id": "graphgrpo_frozen_lb_test_seed105_uncertain_v2_20261012",
+      "experiment_config": "benchmark_results/graphgrpo_frozen_lb_test_seed105_uncertain_v2_20261012/experiment_config.json",
+      "results": "benchmark_results/graphgrpo_frozen_lb_test_seed105_uncertain_v2_20261012/results.jsonl",
+      "results_sha256": "5f58f9bf8324337fd5a4a99d4dff35c83dc11373f7e82f2e6648179bec472ef6"
+    },
+    {
+      "experiment_id": "hgs_formal_cross_m101_t602_base_v1_20261012",
+      "experiment_config": "benchmark_results/hgs_formal_cross_m101_t602_base_v1_20261012/experiment_config.json",
+      "results": "benchmark_results/hgs_formal_cross_m101_t602_base_v1_20261012/results.jsonl",
+      "results_sha256": "c87db94c1a509c6d9528cab104d6df3039408f39648d423fa59170ecf3b4bb9c"
+    },
+    {
+      "experiment_id": "hgs_formal_cross_m101_t602_event_v1_20261012",
+      "experiment_config": "benchmark_results/hgs_formal_cross_m101_t602_event_v1_20261012/experiment_config.json",
+      "results": "benchmark_results/hgs_formal_cross_m101_t602_event_v1_20261012/results.jsonl",
+      "results_sha256": "1d92b1fa67ca0531ec483af1d75f8667d2dff8620a9cb139fc03e7c27dd4e7a0"
+    },
+    {
+      "experiment_id": "hgs_formal_cross_m101_t603_base_v1_20261012",
+      "experiment_config": "benchmark_results/hgs_formal_cross_m101_t603_base_v1_20261012/experiment_config.json",
+      "results": "benchmark_results/hgs_formal_cross_m101_t603_base_v1_20261012/results.jsonl",
+      "results_sha256": "542c5177831150f9400c0f421fdce421335cd8e897fcacbf19862a21e8f588fb"
+    },
+    {
+      "experiment_id": "hgs_formal_cross_m101_t603_event_v1_20261012",
+      "experiment_config": "benchmark_results/hgs_formal_cross_m101_t603_event_v1_20261012/experiment_config.json",
+      "results": "benchmark_results/hgs_formal_cross_m101_t603_event_v1_20261012/results.jsonl",
+      "results_sha256": "c82b6e8c0ff9268daac181bcd2b400d8d30ca145297f945ca523aa748990bced"
+    },
+    {
+      "experiment_id": "hgs_formal_cross_m102_t601_base_v1_20261012",
+      "experiment_config": "benchmark_results/hgs_formal_cross_m102_t601_base_v1_20261012/experiment_config.json",
+      "results": "benchmark_results/hgs_formal_cross_m102_t601_base_v1_20261012/results.jsonl",
+      "results_sha256": "6e4dc5fdb30e0ce46225ce482a29b5f4799a666c5a611df0d347ba46d4fb29da"
+    },
+    {
+      "experiment_id": "hgs_formal_cross_m102_t601_event_v1_20261012",
+      "experiment_config": "benchmark_results/hgs_formal_cross_m102_t601_event_v1_20261012/experiment_config.json",
+      "results": "benchmark_results/hgs_formal_cross_m102_t601_event_v1_20261012/results.jsonl",
+      "results_sha256": "69cb0f7941afee1337fde48abe1013c3699e6f63ee0d66c02703f2d7de5e678a"
+    },
+    {
+      "experiment_id": "hgs_formal_cross_m102_t603_base_v1_20261012",
+      "experiment_config": "benchmark_results/hgs_formal_cross_m102_t603_base_v1_20261012/experiment_config.json",
+      "results": "benchmark_results/hgs_formal_cross_m102_t603_base_v1_20261012/results.jsonl",
+      "results_sha256": "2c5ce253f80fcac4f7959f23579ef24dd79fe889cc05322f8adc44cd581f2e31"
+    },
+    {
+      "experiment_id": "hgs_formal_cross_m102_t603_event_v1_20261012",
+      "experiment_config": "benchmark_results/hgs_formal_cross_m102_t603_event_v1_20261012/experiment_config.json",
+      "results": "benchmark_results/hgs_formal_cross_m102_t603_event_v1_20261012/results.jsonl",
+      "results_sha256": "e54ec51922dd6105c50feaea5fa95c9387eb18eb0a54c3306880556d29c4572c"
+    },
+    {
+      "experiment_id": "hgs_formal_cross_m103_t601_base_v1_20261012",
+      "experiment_config": "benchmark_results/hgs_formal_cross_m103_t601_base_v1_20261012/experiment_config.json",
+      "results": "benchmark_results/hgs_formal_cross_m103_t601_base_v1_20261012/results.jsonl",
+      "results_sha256": "1cded66a4784e2e701e57d10f981ea247782d4fef137ebbc730bdf2e96f2fbb1"
+    },
+    {
+      "experiment_id": "hgs_formal_cross_m103_t601_event_v1_20261012",
+      "experiment_config": "benchmark_results/hgs_formal_cross_m103_t601_event_v1_20261012/experiment_config.json",
+      "results": "benchmark_results/hgs_formal_cross_m103_t601_event_v1_20261012/results.jsonl",
+      "results_sha256": "df47525e293ccd3106b986798bcdcd0c616718903f835ccf7e6031df8f4ef5cc"
+    },
+    {
+      "experiment_id": "hgs_formal_cross_m103_t602_base_v1_20261012",
+      "experiment_config": "benchmark_results/hgs_formal_cross_m103_t602_base_v1_20261012/experiment_config.json",
+      "results": "benchmark_results/hgs_formal_cross_m103_t602_base_v1_20261012/results.jsonl",
+      "results_sha256": "e1c575660e96bbd07784ec863a1345b1f20f9a77dd3698b909a6520ce57c9ad4"
+    },
+    {
+      "experiment_id": "hgs_formal_cross_m103_t602_event_v1_20261012",
+      "experiment_config": "benchmark_results/hgs_formal_cross_m103_t602_event_v1_20261012/experiment_config.json",
+      "results": "benchmark_results/hgs_formal_cross_m103_t602_event_v1_20261012/results.jsonl",
+      "results_sha256": "33069eb478ce4fd986fc5b2467984fd0333c9b8d902e1c611ae73d95604d5bb9"
+    },
+    {
+      "experiment_id": "ortools_formal_cross_t602_base_v1_20261012",
+      "experiment_config": "benchmark_results/ortools_formal_cross_t602_base_v1_20261012/experiment_config.json",
+      "results": "benchmark_results/ortools_formal_cross_t602_base_v1_20261012/results.jsonl",
+      "results_sha256": "413962437ee97390ce19020b175f78155d9c5f0e5f2640e84134b91393160fc6"
+    },
+    {
+      "experiment_id": "ortools_formal_cross_t602_event_v1_20261012",
+      "experiment_config": "benchmark_results/ortools_formal_cross_t602_event_v1_20261012/experiment_config.json",
+      "results": "benchmark_results/ortools_formal_cross_t602_event_v1_20261012/results.jsonl",
+      "results_sha256": "f22e0c1aff0503e3a5fcbd00f28f3383f8aaa80fca1c28d0c8c55149a87fec7c"
+    },
+    {
+      "experiment_id": "ortools_formal_cross_t603_base_v1_20261012",
+      "experiment_config": "benchmark_results/ortools_formal_cross_t603_base_v1_20261012/experiment_config.json",
+      "results": "benchmark_results/ortools_formal_cross_t603_base_v1_20261012/results.jsonl",
+      "results_sha256": "a142fecda6e5121706157568e71b35b8700f9119156c9ebc41b2490b2d2a864a"
+    },
+    {
+      "experiment_id": "ortools_formal_cross_t603_event_v1_20261012",
+      "experiment_config": "benchmark_results/ortools_formal_cross_t603_event_v1_20261012/experiment_config.json",
+      "results": "benchmark_results/ortools_formal_cross_t603_event_v1_20261012/results.jsonl",
+      "results_sha256": "d23ff9b6a6c00f216a5065344130e54ff230ddffff11cc3f045c871ae02dea31"
     }
   ],
   "event_files": [
@@ -1223,6 +2723,452 @@
     {
       "path": "dataset/uncertain-events/default/kacem/k4_agv_events.json",
       "sha256": "b633e08d394b91aa94946a28c7148a781e16ebb6de7d088a791ac80583e4f106"
+    },
+    {
+      "path": "dataset/uncertain-events/machine_only/brandimarte/mk11_agv_events.json",
+      "sha256": "e92e6551c2cdff477e8fc13ec8ce98dcaf58beca45c7651bca7d7bc058d4245a"
+    },
+    {
+      "path": "dataset/uncertain-events/machine_only/brandimarte/mk12_agv_events.json",
+      "sha256": "e2f7ae7c955597f0230cf8219cdb813b17e57133bdef40fdefeec3ac1fb4e4e8"
+    },
+    {
+      "path": "dataset/uncertain-events/machine_only/brandimarte/mk13_agv_events.json",
+      "sha256": "1fd53d5da99bd3ec8ea7ed8da98cdf5f2b997daa29529d7e0854b023e925c6a9"
+    },
+    {
+      "path": "dataset/uncertain-events/machine_only/brandimarte/mk14_agv_events.json",
+      "sha256": "10ef16ea8269e4676137e8aa9409505e9bd9ef780f46de49d6a77042b5046d04"
+    },
+    {
+      "path": "dataset/uncertain-events/machine_only/brandimarte/mk15_agv_events.json",
+      "sha256": "bc4cf3fe32d01996d509ca207c4d564cd1a80fcc7c0a8b2091417e914042c628"
+    },
+    {
+      "path": "dataset/uncertain-events/machine_only/kacem/k4_agv_events.json",
+      "sha256": "d1932a628219969f016e8cbf2d9674a93734d430a62295743317a15b64b87235"
+    },
+    {
+      "path": "dataset/uncertain-events/agv_only/brandimarte/mk11_agv_events.json",
+      "sha256": "fc92ea2f06435a9449f0a994d1f028ac2ee63c80f8cfe18180b5a67933baec1a"
+    },
+    {
+      "path": "dataset/uncertain-events/agv_only/brandimarte/mk12_agv_events.json",
+      "sha256": "ff8357211f5843ed20030512e03e4dd119e161dfe5dbaa01b3b1062c56caf6b5"
+    },
+    {
+      "path": "dataset/uncertain-events/agv_only/brandimarte/mk13_agv_events.json",
+      "sha256": "4b162085568b4f8fa5e543d618118c58658e399e074e00e4e71c0fb59474b98f"
+    },
+    {
+      "path": "dataset/uncertain-events/agv_only/brandimarte/mk14_agv_events.json",
+      "sha256": "f5509ed764fe3e12dafdf33778d22fb7e6b6888768c7cf79d6e5a60094cf1c98"
+    },
+    {
+      "path": "dataset/uncertain-events/agv_only/brandimarte/mk15_agv_events.json",
+      "sha256": "672594b3cf1656bf3c2e8e7928c8a5b896b44f5eac26cf77f44c52261d60b961"
+    },
+    {
+      "path": "dataset/uncertain-events/agv_only/kacem/k4_agv_events.json",
+      "sha256": "b41cbf87189bbf02ffb132d22538a3925df4301c41642669327dab31a2464ee0"
+    },
+    {
+      "path": "dataset/uncertain-events/job_add_only/brandimarte/mk11_agv_events.json",
+      "sha256": "b3f781f61e08ff1955586d97b3b97af3e31179719f82fad89548f95880c4e97b"
+    },
+    {
+      "path": "dataset/uncertain-events/job_add_only/brandimarte/mk12_agv_events.json",
+      "sha256": "a5131b1579e17b9edd60339dd248ba4a3ff4f06a68f01e48ba90bd905adee6f0"
+    },
+    {
+      "path": "dataset/uncertain-events/job_add_only/brandimarte/mk13_agv_events.json",
+      "sha256": "4509d9d7a786338a14da72f997c3fa6476fc71e9380c450524bca1cebbd850c1"
+    },
+    {
+      "path": "dataset/uncertain-events/job_add_only/brandimarte/mk14_agv_events.json",
+      "sha256": "edec8e5ba2c94aa7fff4d9a916ba74c194cf0800654746ae64ab844fd6a9e490"
+    },
+    {
+      "path": "dataset/uncertain-events/job_add_only/brandimarte/mk15_agv_events.json",
+      "sha256": "0e94eaf6d5d8926265415cdeb97524fcb5c5652316e2b185623c6d1406bec39a"
+    },
+    {
+      "path": "dataset/uncertain-events/job_add_only/kacem/k4_agv_events.json",
+      "sha256": "c5a13e3c17c35080d06e72d358b3d0d1a6bb7cccea340ebf078678a291a0bb40"
+    }
+  ],
+  "summary_files": [
+    {
+      "path": "benchmark_plots/formal_main_summary_v4.csv",
+      "sha256": "9e406ae2f12b39007d7512f1e0199279d9d8139d422cbbf010922bf6df8460de"
+    },
+    {
+      "path": "benchmark_plots/formal_main_instance_summary_v4.csv",
+      "sha256": "2815b556f674fe335519f3f689a6ffef5b0acecac100018290f244f84ab6fdd0"
+    },
+    {
+      "path": "benchmark_plots/formal_main_status_summary_v4.csv",
+      "sha256": "a8efdf8c580909ae79a2cef6bae34a0163a821e6e8ff479b4fe91ccb4e37f94a"
+    },
+    {
+      "path": "benchmark_plots/formal_main_runtime_summary_v4.csv",
+      "sha256": "e099477cf7adaf6c77f65a2efb5ae6ba78e42b4a0850dcbf7c876955c77b141f"
+    },
+    {
+      "path": "benchmark_plots/formal_main_comparison_v4.csv",
+      "sha256": "1ad1a02a7ac5895d9cbe137b5e2636f99ae989ae2b55a70d475464bcafdda33e"
+    },
+    {
+      "path": "benchmark_plots/formal_main_paired_statistics_v4.csv",
+      "sha256": "1c620dafa0d5b2367b7eb3207308baab7e047a8af910804500cfc1553d1789d7"
+    },
+    {
+      "path": "benchmark_plots/formal_main_paired_comparisons_v4.csv",
+      "sha256": "bd93027e5065a94a5da7ee579d9532a2c0893fe84bce60b528dd3125f88452ac"
+    },
+    {
+      "path": "benchmark_plots/formal_main_graphgrpo_final_v4_pair.csv",
+      "sha256": "d9070402c47246b8bd514467c9d13685e8929050d5edc39c51850b4b31f5c41b"
+    },
+    {
+      "path": "benchmark_plots/formal_main_hgs_final_v4_pair.csv",
+      "sha256": "7a0a092f770e6897336ba829ea40e6982ca974325e1208bbb90ebc870545fdcb"
+    },
+    {
+      "path": "benchmark_plots/formal_main_ortools_v4_pair.csv",
+      "sha256": "0ae6627967981dc9bca363c7725f432206685b88396a47c5cadeb477354eec83"
+    },
+    {
+      "path": "benchmark_plots/formal_ablation_comparison_v1.csv",
+      "sha256": "ff2154b8414fe173240804d5d968005f5ec08576d2f2a66bdae81ab7a2206d95"
+    },
+    {
+      "path": "benchmark_plots/formal_ablation_paired_statistics_v1.csv",
+      "sha256": "44c2d36695635871a67ce93bf5e28c81907ecdab8c015c442ce93ea72475669a"
+    },
+    {
+      "path": "benchmark_plots/formal_ablation_paired_comparisons_v1.csv",
+      "sha256": "c54f091d7b689b6ed0fefda89ef5d666acc23331229b2b1ef501bdc7409cd935"
+    },
+    {
+      "path": "benchmark_plots/formal_graphgrpo_ablation_fixedgnn_final_seed101_103_pair_v1_stats.csv",
+      "sha256": "f838ae3beea9e89db7cdcdbb6ecc1c684f3f50ec901a80e5b05555279f4e13f6"
+    },
+    {
+      "path": "benchmark_plots/formal_graphgrpo_ablation_flat_final_seed101_103_pair_v1_stats.csv",
+      "sha256": "67cfbff689b617c8d6785091d987c3421c19eab0c694131e5f3519dfa2c6fa15"
+    },
+    {
+      "path": "benchmark_plots/formal_graphgrpo_ablation_timeonly_final_seed101_103_pair_v1_stats.csv",
+      "sha256": "f95ebc57ae5290167099387c2baa6cb15d2cfa60d5bc0018532981f9e1c119d1"
+    },
+    {
+      "path": "benchmark_plots/formal_graphgrpo_ablation_firstagv_final_seed101_103_pair_v1_stats.csv",
+      "sha256": "b3c6f5c98a2d656427e8f25887ee80c5626ad409d484fe0550c28a634ced891c"
+    },
+    {
+      "path": "benchmark_plots/formal_ablation_frozen_comparison_v1.csv",
+      "sha256": "b08cd1843a4468b77415c62e0827ccc22caf9b71265af59c71677fc850033a17"
+    },
+    {
+      "path": "benchmark_plots/formal_ablation_frozen_paired_statistics_v1.csv",
+      "sha256": "84c7a9dff920f692fef430d806e54e40d0a0071ccb58b188050f2c1219544e0b"
+    },
+    {
+      "path": "benchmark_plots/formal_ablation_frozen_paired_comparisons_v1.csv",
+      "sha256": "eda944a82525495ab41ed35ff5f9256381c2d8d6c18803499d59751008d3c93f"
+    },
+    {
+      "path": "benchmark_plots/formal_graphgrpo_ablation_lb_fixedgnn_seed601_603_pair_v1.csv",
+      "sha256": "dfbaf967b9ec02a26338771ce0aa5013872e2bf7ff4a8aca34dcb4230394cc16"
+    },
+    {
+      "path": "benchmark_plots/formal_graphgrpo_ablation_lb_fixedgnn_seed601_603_pair_v1_stats.csv",
+      "sha256": "7d7281e1b588d2196016af1a1f328a90f0ee16ac938f7a801b9d57b1021bff9e"
+    },
+    {
+      "path": "benchmark_plots/formal_graphgrpo_ablation_lb_fixedgnn_seed601_603_pair_v1_event_stats.csv",
+      "sha256": "5d868daf469f9fcfb34f488f53200d631dfb01bd2831a3499fce6d72a917c503"
+    },
+    {
+      "path": "benchmark_plots/formal_graphgrpo_ablation_lb_fixedgnn_seed601_603_pair_v1_event_presence_stats.csv",
+      "sha256": "9d2706e073aadf2f7c7b337f4c587f35155380266d6718ea52dc55e8e892575d"
+    },
+    {
+      "path": "benchmark_plots/formal_graphgrpo_ablation_lb_flat_seed601_603_pair_v1.csv",
+      "sha256": "fb52049f369dd11e3a80f39385dc180b9bef47ad3f65506aef1a1109946dc128"
+    },
+    {
+      "path": "benchmark_plots/formal_graphgrpo_ablation_lb_flat_seed601_603_pair_v1_stats.csv",
+      "sha256": "e6db87eb2bc609656e85b6b8a72c8277b3eeed53e52d9215db0b4fa0857e88dd"
+    },
+    {
+      "path": "benchmark_plots/formal_graphgrpo_ablation_lb_flat_seed601_603_pair_v1_event_stats.csv",
+      "sha256": "1e57c7e25809d2678a46ed7b515cc1e3f7258fee294c3377a6f5bc7e5150f158"
+    },
+    {
+      "path": "benchmark_plots/formal_graphgrpo_ablation_lb_flat_seed601_603_pair_v1_event_presence_stats.csv",
+      "sha256": "262a43e071c5c626701bd38ea63b4dfdade9ec071ae7fb80d5d95be06ed04cb8"
+    },
+    {
+      "path": "benchmark_plots/formal_graphgrpo_ablation_lb_firstagv_seed601_603_pair_v1.csv",
+      "sha256": "2c0d87dc61c6936b08797d20f49af1cbdc80b32c20fef3ceadd79958ba342391"
+    },
+    {
+      "path": "benchmark_plots/formal_graphgrpo_ablation_lb_firstagv_seed601_603_pair_v1_stats.csv",
+      "sha256": "f8b6bc45e1d4edd33d24db77e575c8a89c35ee3dc00d72f2eb42b31fa8f6768c"
+    },
+    {
+      "path": "benchmark_plots/formal_graphgrpo_ablation_lb_firstagv_seed601_603_pair_v1_event_stats.csv",
+      "sha256": "232eceec104ac5209d7b8daf94cacfc7dea0c3f3a093386646a6dd6067ff78db"
+    },
+    {
+      "path": "benchmark_plots/formal_graphgrpo_ablation_lb_firstagv_seed601_603_pair_v1_event_presence_stats.csv",
+      "sha256": "80d86352ceaca92f741b956048bda2ab8f7d03b5cb9259f4b32a70c10fe3bfb2"
+    },
+    {
+      "path": "benchmark_plots/formal_graphgrpo_ablation_timeonly_frozen_seed601_603_pair_v1.csv",
+      "sha256": "2105112f904539b7e96f208f1363a15198934209258be7665cb6943e89ebdbf9"
+    },
+    {
+      "path": "benchmark_plots/formal_graphgrpo_ablation_timeonly_frozen_seed601_603_pair_v1_stats.csv",
+      "sha256": "accc9788eb8a6d9473270f67cee942d90f571cbb3f69db2dae65e1d900364274"
+    },
+    {
+      "path": "benchmark_plots/formal_graphgrpo_ablation_timeonly_frozen_seed601_603_pair_v1_event_stats.csv",
+      "sha256": "f20e73bec18cdd6010189a0c3388bb3e4d0110a8377b0779fd53c77e7479183f"
+    },
+    {
+      "path": "benchmark_plots/formal_graphgrpo_ablation_timeonly_frozen_seed601_603_pair_v1_event_presence_stats.csv",
+      "sha256": "9d248ed4221c223dc61d9baf518a00daeac43d45f2f1f21418cb72929e8aa32a"
+    },
+    {
+      "path": "benchmark_plots/formal_graphgrpo_final_machine_only_seed101_103_pair_v2_stats.csv",
+      "sha256": "4f05725c4b874396b34ce3447f8a0bcc3ccf43c225612fbc057971a14086eb63"
+    },
+    {
+      "path": "benchmark_plots/formal_graphgrpo_final_agv_only_seed101_103_pair_v2_stats.csv",
+      "sha256": "492dddc10672cd94779d1573bb124e9a3085d03497ad2c71840783b53d57706e"
+    },
+    {
+      "path": "benchmark_plots/formal_graphgrpo_final_job_add_only_seed101_103_pair_v2_stats.csv",
+      "sha256": "527574f5739e34d651885607976e34e5f747b239dafbf5e100201c121cd4cb11"
+    },
+    {
+      "path": "benchmark_plots/formal_main_frozen_comparison_v1.csv",
+      "sha256": "ee2d9370dfdd5bbceb28f9c8aae807c7c529eaf234cf67c509bb599c9c8d08b2"
+    },
+    {
+      "path": "benchmark_plots/formal_main_frozen_instance_v1.csv",
+      "sha256": "df4cc7413199f6f9caf697326580eb93a0f8fc5aa169bb4448182ecdff9ff971"
+    },
+    {
+      "path": "benchmark_plots/formal_main_frozen_status_v1.csv",
+      "sha256": "91965269456467ce0f03e0bb37ffa279a26860a3a95adb4fa1eaa88c8703ba38"
+    },
+    {
+      "path": "benchmark_plots/formal_main_frozen_runtime_v1.csv",
+      "sha256": "c0a7a9f19a0682df93f895262a7ff4dc8234020d498704b2936b939510107644"
+    },
+    {
+      "path": "benchmark_plots/formal_main_frozen_paired_comparison_v1.csv",
+      "sha256": "086aeaf78b6fffb4dc111dfda0fa5f5b70099ffd67401ef76f5617ea7c02e02d"
+    },
+    {
+      "path": "benchmark_plots/formal_main_frozen_event_comparison_v1.csv",
+      "sha256": "da4009e33ebd62ef2a4fa0ca89af8b15f302419d0eb35de9246e72c01bc7e5eb"
+    },
+    {
+      "path": "benchmark_plots/formal_main_frozen_event_presence_comparison_v1.csv",
+      "sha256": "b4dc1339a82f17f1caa2dd01d308adf5f374ad9af365c3918ea2b11aab28825d"
+    },
+    {
+      "path": "benchmark_plots/formal_test_instance_metadata_v1.csv",
+      "sha256": "37779b8b5b29f8f05cfdac90b327ee04d65b534faa7dfc8114bdbaef375a41f7"
+    },
+    {
+      "path": "benchmark_plots/formal_graphgrpo_frozen_lb_seed601_603_pair_v2.csv",
+      "sha256": "f579a00ea617f5654c7430243a23ecb285197374c79fc2b3f6a4c6fb2b481cc3"
+    },
+    {
+      "path": "benchmark_plots/formal_graphgrpo_frozen_lb_seed601_603_pair_v2_stats.csv",
+      "sha256": "b66aa86e02dc187faed80fc38c76fc552741de6b47991942b70f01fff6515fe0"
+    },
+    {
+      "path": "benchmark_plots/formal_graphgrpo_frozen_lb_seed601_603_pair_v2_event_stats.csv",
+      "sha256": "b8808055b97d21eeb0aac69d92e0b7e840c9394eb4568ba786707a3d89d3dfcd"
+    },
+    {
+      "path": "benchmark_plots/formal_graphgrpo_frozen_lb_seed601_603_pair_v2_event_presence_stats.csv",
+      "sha256": "8b89b6da5cc0033a220f28da8f00e9c6634fe134a770699b0712d159419cc5dc"
+    },
+    {
+      "path": "benchmark_plots/formal_graphgrpo_makespan_delta_seed601_603_pair_v1.csv",
+      "sha256": "64a0d07268b792837f23812f16e5f6faa41de1a849d5fb27ddc558a405ae26fc"
+    },
+    {
+      "path": "benchmark_plots/formal_graphgrpo_makespan_delta_seed601_603_pair_v1_stats.csv",
+      "sha256": "e5aa3c8a31fc1f562b8e136ff4c3b7f302364857df57a8934c3fe14a69310ae6"
+    },
+    {
+      "path": "benchmark_plots/formal_graphgrpo_makespan_delta_seed601_603_pair_v1_event_stats.csv",
+      "sha256": "3ae242a3792ceba51c0dbb3f20e9c626f0fd3df2f96053a74db70ef870ecb7d5"
+    },
+    {
+      "path": "benchmark_plots/formal_graphgrpo_makespan_delta_seed601_603_pair_v1_event_presence_stats.csv",
+      "sha256": "2bf8320e1498b0ac714238df04cd8abe4719189d0805499016904d48151cbca8"
+    },
+    {
+      "path": "benchmark_plots/formal_graphgrpo_frozen_machine_only_seed601_603_pair_v1.csv",
+      "sha256": "79719030b2a262b02dcc7fdabaf148561699939bf61aef4e9a5a4be9f5606e67"
+    },
+    {
+      "path": "benchmark_plots/formal_graphgrpo_frozen_machine_only_seed601_603_pair_v1_stats.csv",
+      "sha256": "de8133d501e0ccc631359114a414e4b7abca4c3ff92538e380d93b6625606b0b"
+    },
+    {
+      "path": "benchmark_plots/formal_graphgrpo_frozen_machine_only_seed601_603_pair_v1_event_stats.csv",
+      "sha256": "8aaf0b3b68bcd984a3915b98f217138262be3c1b6b5b1c6854cd688b78a1aef1"
+    },
+    {
+      "path": "benchmark_plots/formal_graphgrpo_frozen_machine_only_seed601_603_pair_v1_event_presence_stats.csv",
+      "sha256": "1f03a3f2b3d2105d418f070d4beeb252fb79accfbb560a36dd8266296c684791"
+    },
+    {
+      "path": "benchmark_plots/formal_graphgrpo_frozen_agv_only_seed601_603_pair_v1.csv",
+      "sha256": "78d31cf2b02a5fde4806c74199f2c286f12fbcd0671e44a2d4774cd740fcf0e7"
+    },
+    {
+      "path": "benchmark_plots/formal_graphgrpo_frozen_agv_only_seed601_603_pair_v1_stats.csv",
+      "sha256": "c55aa548a58984d0345852fd01327fc1786ff978f19fbf2b58134a3aab43cb26"
+    },
+    {
+      "path": "benchmark_plots/formal_graphgrpo_frozen_agv_only_seed601_603_pair_v1_event_stats.csv",
+      "sha256": "50c27d77142949f7f1d368eddd9298b47a682033547c2e13f98fc1d8fb0295c7"
+    },
+    {
+      "path": "benchmark_plots/formal_graphgrpo_frozen_agv_only_seed601_603_pair_v1_event_presence_stats.csv",
+      "sha256": "d26e596a4f307d69f3ecfb113aeb7a1fda1eca76fdca51da87f674de9478aafc"
+    },
+    {
+      "path": "benchmark_plots/formal_graphgrpo_frozen_job_add_only_seed601_603_pair_v1.csv",
+      "sha256": "30f9a5bb590d292e6fdbb48d564aac9ddcc085e191cb1cb66eaca72eacdc22fc"
+    },
+    {
+      "path": "benchmark_plots/formal_graphgrpo_frozen_job_add_only_seed601_603_pair_v1_stats.csv",
+      "sha256": "2f52a92f5abfc4652e6022f528bd48fed485b04a1498157aa8a0d85ee55613a0"
+    },
+    {
+      "path": "benchmark_plots/formal_graphgrpo_frozen_job_add_only_seed601_603_pair_v1_event_stats.csv",
+      "sha256": "e64913a74d714760bff33219a1fe62810b1f8c2545aba5e6d1daa203393915dc"
+    },
+    {
+      "path": "benchmark_plots/formal_graphgrpo_frozen_job_add_only_seed601_603_pair_v1_event_presence_stats.csv",
+      "sha256": "2b35884e1d9bc1af339b023f429b4d0d6f9974f09f215110ed622c0d568d31bf"
+    },
+    {
+      "path": "benchmark_plots/formal_graphgrpo_frozen_lb_five_seed_pairs_v1.csv",
+      "sha256": "c43486df1fde51fad210621efcdf734ffb6335a86c1769eb3add0fc90d611a79"
+    },
+    {
+      "path": "benchmark_plots/formal_graphgrpo_frozen_lb_five_seed_by_training_seed_v1.csv",
+      "sha256": "8abae46bd8244f373640cc74cdc4de4e710e02975db7bd35c715f41097942b81"
+    },
+    {
+      "path": "benchmark_plots/formal_graphgrpo_frozen_lb_five_seed_by_instance_v1.csv",
+      "sha256": "46834f15afa917c37c6691dab2ab4fca12e194a87b8d71c0488806542afd7e22"
+    },
+    {
+      "path": "benchmark_plots/formal_graphgrpo_frozen_lb_five_seed_paired_statistics_v1.csv",
+      "sha256": "27be9a993afbf9679034c1aec1004454b73917c80b0b80426be7fe00fd3534dd"
+    },
+    {
+      "path": "benchmark_plots/formal_graphgrpo_frozen_lb_three_seed_pair_balanced_v2.csv",
+      "sha256": "61e703e199707e84d016d529b219dc02af6a20d1e1a28e1cee4c7b206e8e7e8d"
+    },
+    {
+      "path": "benchmark_plots/formal_graphgrpo_frozen_lb_three_seed_pair_balanced_v2_stats.csv",
+      "sha256": "684f069d6fc000e2217c850351188ddad691ae8e4f0327929268a41b27ff6c4c"
+    },
+    {
+      "path": "benchmark_plots/formal_graphgrpo_frozen_lb_three_seed_pair_balanced_v2_event_stats.csv",
+      "sha256": "cbf60967e59d8dabfc7fd9c2f8e5f340c1003cf21f284f5418af80abd7ab8a12"
+    },
+    {
+      "path": "benchmark_plots/formal_graphgrpo_frozen_lb_three_seed_pair_balanced_v2_event_presence_stats.csv",
+      "sha256": "18df4d60840d2aba952597b15b731b7639b2198e6b69f8c97531529f5f4732f5"
+    },
+    {
+      "path": "benchmark_plots/formal_hgs_adapted_three_seed_pair_balanced_v2.csv",
+      "sha256": "ad0652883684bf3771c083a6180661b765b2b2511249a7a242cac60b560b6a89"
+    },
+    {
+      "path": "benchmark_plots/formal_hgs_adapted_three_seed_pair_balanced_v2_stats.csv",
+      "sha256": "76de534006312b66ca898111569c186c5a68263f0de53819e00d019247e18ba3"
+    },
+    {
+      "path": "benchmark_plots/formal_hgs_adapted_three_seed_pair_balanced_v2_event_stats.csv",
+      "sha256": "c39c9bcfcd749ebe0a70080ab7e9f39f38d2120ed8fea4a062b91c5e6e8a38cd"
+    },
+    {
+      "path": "benchmark_plots/formal_hgs_adapted_three_seed_pair_balanced_v2_event_presence_stats.csv",
+      "sha256": "92f13f50b75df9f933b37eb7a50570eed41692bddbaeb683413fe3f903df7501"
+    },
+    {
+      "path": "benchmark_plots/formal_ortools_three_seed_pair_balanced_v2.csv",
+      "sha256": "7df8de6d9b2685477a298da970bb7bd9d677c344ad66ebc74e5508ad4f8e763f"
+    },
+    {
+      "path": "benchmark_plots/formal_ortools_three_seed_pair_balanced_v2_stats.csv",
+      "sha256": "c9652f3928925934778d3adaee2c887f934137cee69c3388c3a0399bcf060482"
+    },
+    {
+      "path": "benchmark_plots/formal_ortools_three_seed_pair_balanced_v2_event_stats.csv",
+      "sha256": "50ae5ba1bcd037c7584e6a1ba8a6b882b20f49952d8fb98b3b4a04ccbb9f84b2"
+    },
+    {
+      "path": "benchmark_plots/formal_ortools_three_seed_pair_balanced_v2_event_presence_stats.csv",
+      "sha256": "007f14ee2e3db1bc48cd64a75267ff8da736b4eb204aeb3f8e9ecccb4acff3c9"
+    },
+    {
+      "path": "benchmark_plots/formal_main_frozen_balanced_comparison_v2.csv",
+      "sha256": "9c062188a98ae8a8ba4400c03c06d50150341f7b6a4cf93482264817d19726af"
+    },
+    {
+      "path": "benchmark_plots/formal_main_frozen_balanced_instance_v2.csv",
+      "sha256": "b4e4ac2b0bb5938c157eb0e6ef375d4ea7f382714c052698bb430847598221e9"
+    },
+    {
+      "path": "benchmark_plots/formal_main_frozen_balanced_status_v2.csv",
+      "sha256": "15ea33b2af51aca0a79ac4b892869ea1397ec0fdd3857f7f5e3b6c2b833ecf62"
+    },
+    {
+      "path": "benchmark_plots/formal_main_frozen_balanced_runtime_v2.csv",
+      "sha256": "e6730e6a25084df8a21456eba071db347a3d008b871919cb62827baa279bd8f9"
+    },
+    {
+      "path": "benchmark_plots/formal_main_frozen_balanced_paired_comparison_v2.csv",
+      "sha256": "d5fd1fe10e5fbd811f7ed52044ce97987357989631ba0bb31548eb541015d8df"
+    },
+    {
+      "path": "benchmark_plots/formal_main_frozen_balanced_event_comparison_v2.csv",
+      "sha256": "7c0369fd6aebc420860a7b02d9f91644bf101fa63339fc4dcff35560790a02b8"
+    },
+    {
+      "path": "benchmark_plots/formal_main_frozen_balanced_event_presence_v2.csv",
+      "sha256": "a97399b4f9537c8c35a2e7b9c7770bcc2775c3ee43a54f8d09803c91683389b9"
+    },
+    {
+      "path": "benchmark_plots/formal_main_frozen_balanced_paired_statistics_v2.csv",
+      "sha256": "84449d153b64eb4f363176b793a138dc631e281616d51cd9b847942b1c8b6852"
+    },
+    {
+      "path": "benchmark_plots/formal_main_frozen_balanced_test_conditions_v2.csv",
+      "sha256": "454543ed1834380ffe7c26ed83296886aed8eccdb47425872a693ff2fdee5f8a"
+    },
+    {
+      "path": "benchmark_plots/formal_main_frozen_balanced_paired_differences_v2.csv",
+      "sha256": "a425730a58de626aaa7b6a5177ca0f2ff915007679a4372a188d7e355f10fa39"
     }
   ],
   "source_and_dependency_hashes": [
@@ -1232,15 +3178,15 @@
     },
     {
       "path": "scripts/auto_train_loop.py",
-      "sha256": "5186653d4512838de06118eb7417348a0f63683fce70828258e5f4f479e3a113"
+      "sha256": "64a436e038c336a1e05f321756e58f9673b0052d6618d353ce70f42941df7013"
     },
     {
       "path": "scripts/run_benchmark.py",
-      "sha256": "2ef58daf2c7d6e1ba8d609be3347bfe00ede1e1139deb038a50bb23f777a7c0e"
+      "sha256": "03f86f32c3811731fccd328a6bcbf35d64e5a71f6c66a67aa8c8b77ffd8ff1f5"
     },
     {
       "path": "scripts/summarize_formal_results.py",
-      "sha256": "c219e70413ab7da43feefffa433da639f27e33aa3493d318ec598a5541ac76df"
+      "sha256": "718d2f2bca2bc42c4305faf8ea55df4c7450491cbbd9bc96a3007d866689c14f"
     },
     {
       "path": "scripts/compare_formal_methods.py",
@@ -1251,8 +3197,48 @@
       "sha256": "94e084e6d9791b288d6db4475cc1551c11ed7c9aa32f932d143ddad27f10d4e0"
     },
     {
+      "path": "scripts/build_formal_summary.py",
+      "sha256": "d5a6de307beed67fa9efd55cd9e62e0380404bfa443ccb506ca839b4a0d48b6e"
+    },
+    {
+      "path": "scripts/build_balanced_graphgrpo_summary.py",
+      "sha256": "293f79cceb29dddaede2b350d2ccbb2f0c1c14853568b61b55ab9d9eb1f4ae52"
+    },
+    {
+      "path": "scripts/analyze_balanced_main_methods.py",
+      "sha256": "1b725431f2e30bfaffc5851ca5d1001c15b0a8e2f4282b47514e09a331ce400a"
+    },
+    {
+      "path": "scripts/check_thesis_final.py",
+      "sha256": "e36d8481e772b0ec3ad3db9014ac368ec939250ed1381fe8fc14c4fdb7ad807e"
+    },
+    {
+      "path": "scripts/build_thesis_integrated.py",
+      "sha256": "b582a119199b2ef74da71e40101c95822d23ab917bd32a441c7a6e1861e01e30"
+    },
+    {
+      "path": "scripts/summarize_test_instance_metadata.py",
+      "sha256": "8ae48d3e3323b4d5c91ec0531c5cf1ab4a535ef37b4a6b402d5d339f866929c8"
+    },
+    {
+      "path": "scripts/build_thesis_integrated.py",
+      "sha256": "b582a119199b2ef74da71e40101c95822d23ab917bd32a441c7a6e1861e01e30"
+    },
+    {
+      "path": "executor/packet_factory/call_back/callback_manager/CallbackManager.py",
+      "sha256": "06ccb6ad3cd0fad3588550cc578ad7a528e63b7ed7fc477dbe199e5731715d8a"
+    },
+    {
+      "path": "executor/packet_factory/lifecycle/initializer/env_initializer.py",
+      "sha256": "a18a4284726b110d61d76c0e4228d1f0418a1ce4553e31a4d77cf34988f45b01"
+    },
+    {
+      "path": "executor/packet_factory/packet_factory/packet_factory_env/packet_factory_env.py",
+      "sha256": "2398dad03ae3ef38ac989d034255e9051b7febcd6951f5d1350353ab6ab09251"
+    },
+    {
       "path": "executor/packet_factory/packet_factory/Agent/GraphGRPOAgent.py",
-      "sha256": "65562aa803b407f7fb1ccbcd90a87483bb4f8ade261d82d2cd4718283f2fe695"
+      "sha256": "e9560ffdcce489519aeb2e43a23f1ff825afeba58ce221555fbffe9b78e473d0"
     },
     {
       "path": "pyproject.toml",
