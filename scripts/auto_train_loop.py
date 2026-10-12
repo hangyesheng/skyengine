@@ -263,8 +263,34 @@ def parse_args():
         help='GraphGRPO 状态编码器；flat 用于去图关系消融，默认沿用 YAML/模型'
     )
     parser.add_argument(
-        '--reward-mode', choices=['composite', 'time_only'], default=None,
-        help='GraphGRPO 奖励模式；time_only 用于移除资源塑形项的消融，默认沿用 YAML/模型'
+        '--reward-mode',
+        choices=['lower_bound_delta', 'resource_bound_delta', 'makespan_delta',
+                 'composite', 'time_only'],
+        default=None,
+        help=('GraphGRPO 奖励模式；lower_bound_delta 为加工下界差分，'
+              'resource_bound_delta 纳入路网运输下界，composite 与 time_only 用于消融，'
+              'makespan_delta 为无固定系数的时间增量代价，'
+              '默认沿用 YAML/模型')
+    )
+    parser.add_argument(
+        '--lr-gnn', type=float, default=None,
+        help='覆盖图编码器学习率；仅对 GraphGRPOAgent 生效'
+    )
+    parser.add_argument(
+        '--lr-actor', type=float, default=None,
+        help='覆盖三个策略头学习率；仅对 GraphGRPOAgent 生效'
+    )
+    parser.add_argument(
+        '--clip-epsilon', type=float, default=None,
+        help='覆盖裁剪策略系数；取值范围为 (0, 1]，仅对 GraphGRPOAgent 生效'
+    )
+    parser.add_argument(
+        '--entropy-coeff', type=float, default=None,
+        help='覆盖熵正则系数；必须为非负数，仅对 GraphGRPOAgent 生效'
+    )
+    parser.add_argument(
+        '--grpo-epochs', type=int, default=None,
+        help='覆盖每次更新的策略优化轮数；必须为正整数，仅对 GraphGRPOAgent 生效'
     )
     parser.add_argument(
         '--agv-selection-mode', choices=['policy', 'first_available'], default=None,
@@ -710,7 +736,12 @@ def build_config(agent_key: str, instance_config: dict,
                  device: Optional[str] = None,
                  state_encoder_mode: Optional[str] = None,
                  reward_mode: Optional[str] = None,
-                 agv_selection_mode: Optional[str] = None) -> dict:
+                 agv_selection_mode: Optional[str] = None,
+                 lr_gnn: Optional[float] = None,
+                 lr_actor: Optional[float] = None,
+                 clip_epsilon: Optional[float] = None,
+                 entropy_coeff: Optional[float] = None,
+                 grpo_epochs: Optional[int] = None) -> dict:
     """构建完整的 bootstrap 配置（带缓存）
 
     从 config/agents/{agent_key}.yaml 加载 Agent 超参数，
@@ -724,7 +755,7 @@ def build_config(agent_key: str, instance_config: dict,
         device: 可选的计算设备覆盖（'auto'/'cpu'/'cuda'），优先于 agent YAML 中的 device 配置；
             None 表示不覆盖，沿用 YAML 中的 device
         state_encoder_mode: GraphGRPO 的 `graph` 或 `flat` 状态编码消融覆盖
-        reward_mode: GraphGRPO 的 `composite` 或 `time_only` 奖励消融覆盖
+        reward_mode: GraphGRPO 的 `lower_bound_delta`、`resource_bound_delta`、`makespan_delta`、`composite` 或 `time_only` 奖励覆盖
     """
     global _cached_base_template
 
@@ -752,6 +783,15 @@ def build_config(agent_key: str, instance_config: dict,
         config["simulation"]["agent"]["reward_mode"] = reward_mode
     if agv_selection_mode is not None:
         config["simulation"]["agent"]["agv_selection_mode"] = agv_selection_mode
+    for key, value in {
+        "lr_gnn": lr_gnn,
+        "lr_actor": lr_actor,
+        "clip_epsilon": clip_epsilon,
+        "entropy_coeff": entropy_coeff,
+        "grpo_epochs": grpo_epochs,
+    }.items():
+        if value is not None:
+            config["simulation"]["agent"][key] = value
 
     # 训练模式：始终使用 backend + training
     config["simulation"]["ui_mode"] = "backend"
@@ -921,6 +961,11 @@ def initialize_training(agent_key: str,
                         state_encoder_mode: Optional[str] = None,
                         reward_mode: Optional[str] = None,
                         agv_selection_mode: Optional[str] = None,
+                        lr_gnn: Optional[float] = None,
+                        lr_actor: Optional[float] = None,
+                        clip_epsilon: Optional[float] = None,
+                        entropy_coeff: Optional[float] = None,
+                        grpo_epochs: Optional[int] = None,
                         model_path: Optional[str] = None,
                         load_model: bool = True) -> object:
     """一次性初始化：加载配置、扫描组件、创建 Agent
@@ -962,6 +1007,8 @@ def initialize_training(agent_key: str,
         agent_key, instance_config, base_yaml_path=base_yaml_path,
         device=device, state_encoder_mode=state_encoder_mode,
         reward_mode=reward_mode, agv_selection_mode=agv_selection_mode,
+        lr_gnn=lr_gnn, lr_actor=lr_actor, clip_epsilon=clip_epsilon,
+        entropy_coeff=entropy_coeff, grpo_epochs=grpo_epochs,
     )
     if model_path is not None:
         config["simulation"]["agent"]["model_path"] = model_path
@@ -1495,10 +1542,22 @@ def compute_epoch_metrics(train_results: List[dict], val_results: List[dict],
         epsilon = agent.epsilon
 
     loss_metrics = {}
+    reward_diagnostics = {}
     if agent is not None and hasattr(agent, 'get_training_metrics'):
         agent_metrics = agent.get_training_metrics()
         loss_metrics = {k: v for k, v in agent_metrics.items()
                         if 'loss' in k.lower() and isinstance(v, (int, float))}
+        reward_diagnostics = {
+            k: v for k, v in agent_metrics.items()
+            if k in {
+                'reward_mode', 'raw_reward_sum', 'raw_reward_count',
+                'initial_lower_bound', 'final_lower_bound',
+                'initial_makespan', 'final_makespan',
+                'makespan_reward_sum', 'makespan_reward_count',
+                'reward_normalizer_mean', 'reward_normalizer_var',
+                'reward_normalizer_count',
+            }
+        }
 
     n_train_completed = len(train_rewards)
     n_val_completed = len(val_gaps)
@@ -1522,6 +1581,7 @@ def compute_epoch_metrics(train_results: List[dict], val_results: List[dict],
         # Agent 指标
         'epsilon': epsilon,
         'loss_metrics': loss_metrics,
+        'reward_diagnostics': reward_diagnostics,
     }
 
     return result
@@ -1701,8 +1761,21 @@ def main():
     if args.train_gnn is not None and args.agent != 'GraphGRPOAgent':
         raise ValueError("--train-gnn/--no-train-gnn 当前只支持 GraphGRPOAgent")
     if (args.state_encoder_mode is not None or args.reward_mode is not None
-            or args.agv_selection_mode is not None) and args.agent != 'GraphGRPOAgent':
+            or args.agv_selection_mode is not None or args.lr_gnn is not None
+            or args.lr_actor is not None or args.clip_epsilon is not None
+            or args.entropy_coeff is not None or args.grpo_epochs is not None) \
+            and args.agent != 'GraphGRPOAgent':
         raise ValueError("GraphGRPO 消融开关当前只支持 GraphGRPOAgent")
+    if args.lr_gnn is not None and args.lr_gnn <= 0:
+        raise ValueError("--lr-gnn 必须为正数")
+    if args.lr_actor is not None and args.lr_actor <= 0:
+        raise ValueError("--lr-actor 必须为正数")
+    if args.clip_epsilon is not None and not (0 < args.clip_epsilon <= 1):
+        raise ValueError("--clip-epsilon 必须满足 0 < clip_epsilon <= 1")
+    if args.entropy_coeff is not None and args.entropy_coeff < 0:
+        raise ValueError("--entropy-coeff 必须为非负数")
+    if args.grpo_epochs is not None and args.grpo_epochs < 1:
+        raise ValueError("--grpo-epochs 必须为正整数")
 
     # 设置日志级别
     setup_logging(args.log_level, args.backend_log_level)
@@ -1773,6 +1846,15 @@ def main():
     logger.info(f"早停耐心度: {args.early_stop_patience}")
     logger.info(f"训练间隔: 每 {args.train_interval} 步")
     logger.info(f"严格组采样: {args.strict_group_size} 条独立 rollout/组")
+    if args.agent == 'GraphGRPOAgent':
+        logger.info(
+            "GraphGRPO 超参数覆盖: "
+            f"lr_gnn={args.lr_gnn if args.lr_gnn is not None else 'YAML/模型'}, "
+            f"lr_actor={args.lr_actor if args.lr_actor is not None else 'YAML/模型'}, "
+            f"clip={args.clip_epsilon if args.clip_epsilon is not None else 'YAML/模型'}, "
+            f"entropy={args.entropy_coeff if args.entropy_coeff is not None else 'YAML/模型'}, "
+            f"epochs={args.grpo_epochs if args.grpo_epochs is not None else 'YAML/模型'}"
+        )
     logger.info(f"训练 episode 超时: {args.episode_timeout}s，验证 episode 超时: {args.val_episode_timeout}s")
     logger.info(f"死锁检测: 连续 {args.no_progress_limit} 步 timeline 无推进即终止 episode")
     logger.info(f"数据集: {len(train_files)} 训练, {len(val_files)} 验证"
@@ -1806,6 +1888,11 @@ def main():
         "state_encoder_mode_override": args.state_encoder_mode,
         "reward_mode_override": args.reward_mode,
         "agv_selection_mode_override": args.agv_selection_mode,
+        "lr_gnn_override": args.lr_gnn,
+        "lr_actor_override": args.lr_actor,
+        "clip_epsilon_override": args.clip_epsilon,
+        "entropy_coeff_override": args.entropy_coeff,
+        "grpo_epochs_override": args.grpo_epochs,
         "episode_timeout": args.episode_timeout,
         "val_episode_timeout": args.val_episode_timeout,
         "no_progress_limit": args.no_progress_limit,
@@ -1850,6 +1937,11 @@ def main():
         state_encoder_mode=args.state_encoder_mode,
         reward_mode=args.reward_mode,
         agv_selection_mode=args.agv_selection_mode,
+        lr_gnn=args.lr_gnn,
+        lr_actor=args.lr_actor,
+        clip_epsilon=args.clip_epsilon,
+        entropy_coeff=args.entropy_coeff,
+        grpo_epochs=args.grpo_epochs,
         model_path=initial_model_path,
         load_model=load_initial_model,
     )
@@ -1858,6 +1950,20 @@ def main():
     if args.strict_group_size > 1:
         agent.strict_group_sampling = True
         agent.defer_updates = True
+    # Explicit CLI values must take precedence over hyperparameters restored
+    # from an existing checkpoint.  Update optimizer parameter groups as well
+    # so the recorded values match the actual training step.
+    if any(value is not None for value in (
+            args.lr_gnn, args.lr_actor, args.clip_epsilon,
+            args.entropy_coeff, args.grpo_epochs)):
+        if hasattr(agent, 'set_learning_rates'):
+            agent.set_learning_rates(args.lr_gnn, args.lr_actor)
+        if args.clip_epsilon is not None:
+            agent.clip_epsilon = args.clip_epsilon
+        if args.entropy_coeff is not None:
+            agent.entropy_coeff = args.entropy_coeff
+        if args.grpo_epochs is not None:
+            agent.grpo_epochs = args.grpo_epochs
     # All checkpoints from this training run are kept with the experiment
     # rather than silently overwriting the shared default model.
     agent.model_path = str(checkpoint_path)
@@ -1868,6 +1974,11 @@ def main():
     config_snapshot['state_encoder_mode'] = getattr(agent, 'state_encoder_mode', None)
     config_snapshot['reward_mode'] = getattr(agent, 'reward_mode', None)
     config_snapshot['agv_selection_mode'] = getattr(agent, 'agv_selection_mode', None)
+    config_snapshot['lr_gnn'] = getattr(agent, 'lr_gnn', None)
+    config_snapshot['lr_actor'] = getattr(agent, 'lr_actor', None)
+    config_snapshot['clip_epsilon'] = getattr(agent, 'clip_epsilon', None)
+    config_snapshot['entropy_coeff'] = getattr(agent, 'entropy_coeff', None)
+    config_snapshot['grpo_epochs'] = getattr(agent, 'grpo_epochs', None)
     config_snapshot['uncertain_scenario'] = args.uncertain_scenario
     config_snapshot['agent_config'] = load_agent_config(args.agent)
     with open(experiment_dir / "experiment_config.json", "w", encoding="utf-8") as f:

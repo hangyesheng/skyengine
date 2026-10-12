@@ -33,14 +33,14 @@ def initialize_env(config, agent):
     is_headless = bool(config.get(env_type).get('headless', False))
 
     # ---------- 创建回调管理器 ----------
-    callback_manager = CallbackManager()  # 调用对应的构造函数，使用时直接加括号就能使用
+    # 无界面训练/benchmark 不应构造 EnvVisualizer，因为其初始化会启动
+    # Pygame/SDL，并可能在 macOS 解释器退出时触发 SDL 摇杆清理崩溃。
+    callback_manager = CallbackManager(include_visualizer=not is_headless)
     callback_manager.register("load_graph", create_component_by_id(callback_config.get('graph_loader').get('name'),
                                                                    *callback_config.get('graph_loader').get('args')))
 
     if is_headless:
-        # CallbackManager 构造时已预置默认 EnvVisualizer 占位，headless 下需显式移除，
-        # 否则 refresh_status() 仍会安装它并每步触发渲染/帧率限速
-        callback_manager.unregister("initialize_visualizer")
+        # headless 下不注册可视化回调，避免每步渲染和 SDL 初始化。
         LOGGER.info("[Env] headless 模式：跳过可视化器注册")
     else:
         callback_manager.register("initialize_visualizer",

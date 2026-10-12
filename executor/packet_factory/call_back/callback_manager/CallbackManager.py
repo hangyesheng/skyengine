@@ -6,12 +6,20 @@ from executor.packet_factory.call_back.base_callback.EventQueue import EventQueu
 
 
 class CallbackManager:
-    def __init__(self):
+    def __init__(self, include_visualizer: bool = True):
+        """Create the callback registry.
+
+        The visualizer is optional because constructing ``EnvVisualizer``
+        initializes Pygame.  Benchmark and training workers run headlessly;
+        initializing SDL in those processes can trigger a macOS SIGTRAP while
+        Python is finalizing the Pygame atexit hook.
+        """
         self._callbacks: Dict[str, EnvCallback] = {
             'load_graph': EnvMapLoader("/brandimarte/simple_agv.txt"),
-            'initialize_visualizer': EnvVisualizer(),
             'event_queue': EventQueue()
         }
+        if include_visualizer:
+            self._callbacks['initialize_visualizer'] = EnvVisualizer()
 
     def register(self, name: str, callback: EnvCallback):
         """注册/替换一个回调"""

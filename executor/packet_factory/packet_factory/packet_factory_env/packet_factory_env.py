@@ -54,7 +54,10 @@ class PacketFactoryEnv(ParallelEnv):
         }
         self.status = EnvStatus.PAUSED
         # 回调管理
-        self.callback_manager: CallbackManager = CallbackManager()
+        # 实际回调管理器由 initialize_env 按运行模式注入。这里使用不含
+        # 可视化器的占位管理器，避免 headless benchmark 在环境构造阶段
+        # 无条件初始化 Pygame/SDL。
+        self.callback_manager: CallbackManager = CallbackManager(include_visualizer=False)
 
     # ---------- 自定义状态更新函数 ----------
     def set_env_timeline(self, env_timeline: float):

@@ -15,9 +15,11 @@ device: cuda
 # GNN 编码器
 hidden_dim: 64
 train_gnn: true
-# Ablation switches. Defaults reproduce the graph/composite method.
+# Ablation switches. The default reward is aligned with the scheduling objective;
+# ``makespan_delta`` and ``resource_bound_delta`` are objective-aligned alternatives.
+# ``composite`` and ``time_only`` remain available for controlled comparisons.
 state_encoder_mode: graph
-reward_mode: composite
+reward_mode: lower_bound_delta
 agv_selection_mode: policy
 # Strict mode is an explicit interface for future same-initial-state
 # multi-rollout collection. The default keeps the current decision-batch
@@ -25,10 +27,14 @@ agv_selection_mode: policy
 strict_group_sampling: false
 
 # GRPO 公共参数
-gamma: 0.99
+# With lower-bound-difference rewards, gamma=1 preserves the telescoping
+# relation between cumulative reward and the decrease of the state lower bound.
+gamma: 1.0
 
 # 学习率
-lr_gnn: 0.0001
+# Frozen after the validation screening on 2026-10-12.  The optimizer uses
+# separate parameter groups for the shared graph encoder and actor heads.
+lr_gnn: 0.0003
 lr_actor: 0.0003
 
 # GRPO 超参数

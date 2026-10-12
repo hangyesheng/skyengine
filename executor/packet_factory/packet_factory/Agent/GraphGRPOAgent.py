@@ -386,6 +386,10 @@ class GRPORolloutBuffer:
         self.rewards = []
         self.group_ids = []
         self.trajectory_ids = []
+        # A strict trajectory can emit several action transitions from one
+        # simulator state.  Keep a local decision-batch id so discounted
+        # returns count simulator decisions rather than individual heads.
+        self.decision_step_ids = []
         # Graph snapshots are kept on CPU and re-encoded during policy updates.
         # This preserves a gradient path to the shared GNN encoder without
         # retaining the original rollout computation graph.
@@ -418,6 +422,7 @@ class GRPORolloutBuffer:
     def push(self, state: np.ndarray, seq_features: np.ndarray,
              reward: float, done: bool, group_id: int,
              trajectory_id: Optional[int] = None,
+             decision_step_id: Optional[int] = None,
              graph_data: Optional[Data] = None,
              graph_node_type_offsets: Optional[Dict[str, Tuple[int, int]]] = None,
              # Sequencing
@@ -436,6 +441,7 @@ class GRPORolloutBuffer:
         self.rewards.append(reward)
         self.group_ids.append(group_id)
         self.trajectory_ids.append(trajectory_id)
+        self.decision_step_ids.append(decision_step_id)
         self.graph_data.append(graph_data)
         self.graph_node_type_offsets.append(graph_node_type_offsets)
 
@@ -567,8 +573,9 @@ class GRPORolloutBuffer:
         shared by those episodes while ``trajectory_id`` identifies one
         complete rollout. The normalized trajectory return is copied to all
         transitions in that trajectory, which matches a terminal-return
-        GRPO/REINFORCE-style update and keeps the semantics separate from the
-        decision-batch engineering variant.
+        GRPO/REINFORCE-style update.  Discounting is performed over simulator
+        decision batches; the sequence, routing and AGV transitions emitted
+        from one state therefore share one time step.
         """
         n = len(self.rewards)
         if n == 0:
@@ -580,21 +587,36 @@ class GRPORolloutBuffer:
         dones = np.asarray(self.dones, dtype=np.float32)
         trajectory_ids = np.asarray(self.trajectory_ids)
         group_ids = np.asarray(self.group_ids)
+        if any(step_id is None for step_id in self.decision_step_ids):
+            raise ValueError("strict group advantages require decision_step_id for every transition")
+        decision_step_ids = np.asarray(self.decision_step_ids)
         unique_trajectories = list(dict.fromkeys(self.trajectory_ids))
         trajectory_returns = {}
 
-        # Compute each trajectory's discounted return-to-go and use the first
-        # state return as its complete rollout score.
+        # Compute each trajectory's discounted return at the simulator
+        # decision level.  A decision can emit sequence, routing and AGV
+        # transitions, but those transitions share one reward and must count
+        # as one time step for gamma.
         for tid in unique_trajectories:
             idx = np.where(trajectory_ids == tid)[0]
+            batch_to_indices = {}
+            ordered_batches = []
+            for pos in idx.tolist():
+                batch_id = decision_step_ids[pos]
+                if batch_id not in batch_to_indices:
+                    batch_to_indices[batch_id] = []
+                    ordered_batches.append(batch_id)
+                batch_to_indices[batch_id].append(pos)
+            batch_rewards = [float(rewards[batch_to_indices[batch_id]].sum())
+                             for batch_id in ordered_batches]
+            batch_dones = [bool(np.any(dones[batch_to_indices[batch_id]]))
+                           for batch_id in ordered_batches]
             running = 0.0
-            first_return = 0.0
-            for pos in reversed(idx.tolist()):
-                if dones[pos]:
+            for batch_pos in reversed(range(len(ordered_batches))):
+                if batch_dones[batch_pos]:
                     running = 0.0
-                running = float(rewards[pos]) + gamma * running
-                first_return = running
-            trajectory_returns[tid] = first_return
+                running = batch_rewards[batch_pos] + gamma * running
+            trajectory_returns[tid] = running
 
         all_scores = np.asarray(list(trajectory_returns.values()), dtype=np.float32)
         global_mean = float(all_scores.mean())
@@ -631,6 +653,9 @@ class GRPORolloutBuffer:
             'strict': True,
             'group_count': int(len(np.unique(group_ids))),
             'trajectory_count': int(len(unique_trajectories)),
+            'decision_batch_count': int(len(set(
+                zip(self.trajectory_ids, self.decision_step_ids)
+            ))),
             'normalized_group_count': int(normalized_group_count),
             'fallback_group_count': int(fallback_group_count),
             'degenerate_group_count': int(degenerate_group_count),
@@ -821,7 +846,8 @@ class AGVSelectionActor(nn.Module):
 class GraphGRPOAgent(BaseAgent):
     """GNN-enhanced GRPO Agent for FJSP.
 
-    Combines GNN state encoding with GRPO (Group Relative Policy Optimization):
+    Combines GNN state encoding with a group-relative policy optimization
+    variant:
     1. GNN encodes factory graph -> global_state [256] + node_embs
     2. SequencingActor ranks READY operations by priority
     3. For each operation in priority order:
@@ -830,8 +856,9 @@ class GraphGRPOAgent(BaseAgent):
     4. Training: critic-free GRPO with group-relative advantage normalization,
        clipped surrogate, optional KL penalty, entropy bonus
 
-    Reward design references DualDRLAgent (load balance, makespan, utilization,
-    queue reduction, bottleneck relief) combined with graph-agent dense shaping.
+    Reward design supports objective-aligned time-difference and lower-bound
+    potential rewards.  The legacy composite reward is retained only for
+    controlled ablations.
     """
 
     def __init__(self, name=None, agent_id=None, context=None,
@@ -840,7 +867,7 @@ class GraphGRPOAgent(BaseAgent):
                  # Graph encoder
                  hidden_dim: int = 64,
                  # GRPO common
-                 gamma: float = 0.99,
+                 gamma: float = 1.0,
                  # Learning rates
                  lr_gnn: float = 1e-4,
                  lr_actor: float = 3e-4,
@@ -867,7 +894,7 @@ class GraphGRPOAgent(BaseAgent):
                  train_gnn: bool = True,
                  strict_group_sampling: bool = False,
                  state_encoder_mode: str = 'graph',
-                 reward_mode: str = 'composite',
+                 reward_mode: str = 'lower_bound_delta',
                  agv_selection_mode: str = 'policy',
                  device: Optional[str] = None,
                  **kwargs):
@@ -876,6 +903,8 @@ class GraphGRPOAgent(BaseAgent):
         self.hidden_dim = hidden_dim
         self.state_dim = hidden_dim * 4
         self.gamma = gamma
+        self.lr_gnn = lr_gnn
+        self.lr_actor = lr_actor
         self.clip_epsilon = clip_epsilon
         self.grpo_epochs = grpo_epochs
         self.grpo_batch_size = grpo_batch_size
@@ -896,8 +925,14 @@ class GraphGRPOAgent(BaseAgent):
         self.strict_group_sampling = strict_group_sampling
         if state_encoder_mode not in {'graph', 'flat'}:
             raise ValueError("state_encoder_mode must be 'graph' or 'flat'")
-        if reward_mode not in {'composite', 'time_only'}:
-            raise ValueError("reward_mode must be 'composite' or 'time_only'")
+        if reward_mode not in {
+            'composite', 'time_only', 'makespan_delta',
+            'lower_bound_delta', 'resource_bound_delta'
+        }:
+            raise ValueError(
+                "reward_mode must be 'composite', 'time_only', 'makespan_delta', "
+                "'lower_bound_delta', or 'resource_bound_delta'"
+            )
         if agv_selection_mode not in {'policy', 'first_available'}:
             raise ValueError("agv_selection_mode must be 'policy' or 'first_available'")
         self.state_encoder_mode = state_encoder_mode
@@ -905,6 +940,7 @@ class GraphGRPOAgent(BaseAgent):
         self.agv_selection_mode = agv_selection_mode
         self._strict_group_id: Optional[int] = None
         self._strict_trajectory_id: Optional[int] = None
+        self._strict_decision_step = 0
 
         # Device
         self.device = resolve_device(device, tag="GraphGRPOAgent")
@@ -948,6 +984,27 @@ class GraphGRPOAgent(BaseAgent):
         # DualDRLAgent-style queue tracking for reward
         self._prev_queue_len = 0
 
+        # Objective-aligned elapsed-time reward state.  The pending value is
+        # consumed by transition collection exactly once after env.step().
+        self._previous_makespan: Optional[float] = None
+        self._pending_step_reward: Optional[float] = None
+        self._makespan_reward_count = 0
+        self._makespan_reward_sum = 0.0
+        self._episode_initial_makespan: Optional[float] = None
+        self._episode_final_makespan: Optional[float] = None
+
+        # Objective-aligned lower-bound-difference reward state.  The
+        # environment calls ``reward`` after a step, while the rollout
+        # transition is committed at the next decision (or by the terminal
+        # flush hook).  Keep the computed value pending so the same state is
+        # not scored twice.
+        self._previous_lower_bound: Optional[float] = None
+        self._pending_lower_bound_reward: Optional[float] = None
+        self._lower_bound_reward_count = 0
+        self._lower_bound_reward_sum = 0.0
+        self._episode_initial_lower_bound: Optional[float] = None
+        self._episode_final_lower_bound: Optional[float] = None
+
         # Training statistics
         self.training_history: Dict[str, list] = {
             'episodes': [], 'policy_loss': [],
@@ -986,25 +1043,54 @@ class GraphGRPOAgent(BaseAgent):
 
         # Optimizers: actor + GNN for each sub-agent
         self.optimizer_seq = torch.optim.Adam(
-            list(self.gnn_encoder.parameters()) +
-            list(self.seq_actor.parameters()),
-            lr=lr_actor,
+            [
+                {'params': self.gnn_encoder.parameters(), 'lr': lr_gnn},
+                {'params': self.seq_actor.parameters(), 'lr': lr_actor},
+            ],
         )
         self.optimizer_route = torch.optim.Adam(
-            list(self.gnn_encoder.parameters()) +
-            list(self.route_actor.parameters()),
-            lr=lr_actor,
+            [
+                {'params': self.gnn_encoder.parameters(), 'lr': lr_gnn},
+                {'params': self.route_actor.parameters(), 'lr': lr_actor},
+            ],
         )
         self.optimizer_agv = torch.optim.Adam(
-            list(self.gnn_encoder.parameters()) +
-            list(self.agv_actor.parameters()),
-            lr=lr_actor,
+            [
+                {'params': self.gnn_encoder.parameters(), 'lr': lr_gnn},
+                {'params': self.agv_actor.parameters(), 'lr': lr_actor},
+            ],
         )
 
         # Separate GNN optimizer for save/load state and optional standalone use.
         self.optimizer_gnn = torch.optim.Adam(
             self.gnn_encoder.parameters(), lr=lr_gnn,
         )
+
+    def set_learning_rates(self, lr_gnn: Optional[float] = None,
+                           lr_actor: Optional[float] = None):
+        """Update effective learning rates for all training optimizers.
+
+        The shared GNN and each actor are stored as separate parameter groups.
+        Keeping this update in one place makes command-line screening and
+        checkpoint resume use the same effective values.
+        """
+        if lr_gnn is not None:
+            if lr_gnn <= 0:
+                raise ValueError("lr_gnn must be positive")
+            self.lr_gnn = float(lr_gnn)
+        if lr_actor is not None:
+            if lr_actor <= 0:
+                raise ValueError("lr_actor must be positive")
+            self.lr_actor = float(lr_actor)
+
+        for optimizer in (self.optimizer_seq, self.optimizer_route,
+                          self.optimizer_agv):
+            if lr_gnn is not None:
+                optimizer.param_groups[0]['lr'] = self.lr_gnn
+            if lr_actor is not None:
+                optimizer.param_groups[1]['lr'] = self.lr_actor
+        if lr_gnn is not None:
+            self.optimizer_gnn.param_groups[0]['lr'] = self.lr_gnn
 
     # ----------------------------------------------------------
     # Feature Extraction (unchanged from GraphPPOAgent)
@@ -1615,11 +1701,11 @@ class GraphGRPOAgent(BaseAgent):
         return decisions, DEFAULT_STEP_TIME
 
     # ----------------------------------------------------------
-    # Reward (references DualDRLAgent design + graph-agent dense shaping)
+    # Reward
     # ----------------------------------------------------------
 
     def reward(self, *args, **kwargs) -> float:
-        """Compute composite reward referencing DualDRLAgent design.
+        """Compute the environment-facing learning reward.
 
         Compatible with both calling patterns:
         - agent.reward({}) or agent.reward() — uses self.context
@@ -1638,47 +1724,52 @@ class GraphGRPOAgent(BaseAgent):
         return r
 
     def _compute_reward(self, env_info: Optional[Dict] = None) -> float:
-        """Pure reward computation without side effects.
+        """Compute one reward value.
 
-        Reward design references DualDRLAgent:
-        - Makespan/time penalty (DualDRLAgent routing reward)
-        - Machine load balance / CV penalty (DualDRLAgent routing reward)
-        - Machine utilization (DualDRLAgent routing reward)
-        - Queue reduction / bottleneck relief (DualDRLAgent sequencing reward)
-        Plus graph-agent dense shaping:
-        - Completed job ratio
-        - Waiting operations penalty
-        - Active AGV ratio
+        ``makespan_delta``, ``lower_bound_delta`` and
+        ``resource_bound_delta`` are objective-aligned differences. If
+        :math:`t` denotes the environment clock, ``makespan_delta`` uses
+        ``-(t_{k+1}-t_k)`` and therefore has cumulative raw return
+        ``-C_max`` when the episode starts at time zero. If
+        :math:`L(s)` denotes a lower bound on the remaining completion time,
+        the reward is ``L(s_t) - L(s_{t+1})``.  For ``gamma=1`` the raw
+        trajectory return telescopes to the decrease of this bound, while the
+        terminal performance is still evaluated by the actual ``C_max``.
+
+        The legacy ``composite`` and ``time_only`` modes remain available for
+        controlled reward ablations.
+
+        ``env_info`` is intentionally optional because the common environment
+        interface supplies the current environment through ``self.context``.
         """
-        reward = 0.0
+        makespan, machines, jobs, agvs = self._resolve_reward_state(env_info)
 
-        # Resolve state from env_info or self.context
-        makespan = 0.0
-        machines = None
-        jobs = None
-        agvs = None
+        if self.reward_mode in {'lower_bound_delta', 'resource_bound_delta'}:
+            reward = self._compute_lower_bound_delta(
+                jobs, makespan,
+                machines=machines if self.reward_mode == 'resource_bound_delta' else None,
+                agvs=agvs if self.reward_mode == 'resource_bound_delta' else None,
+            )
+            # ``reward`` is called by PacketFactory after every environment
+            # step.  The rollout transition consumes this value later.
+            self._pending_lower_bound_reward = reward
+            self._pending_step_reward = reward
+            return reward
 
-        if env_info and isinstance(env_info, dict):
-            makespan = env_info.get('makespan', 0.0)
-            machines = env_info.get('machines', None)
-            jobs = env_info.get('jobs', None)
-            agvs = env_info.get('agvs', None)
-
-        # Fallback to self.context if env_info is insufficient
-        if machines is None and self.context and hasattr(self.context, 'machines'):
-            machines = self.context.machines
-        if jobs is None and self.context and hasattr(self.context, 'jobs'):
-            jobs = self.context.jobs
-        if agvs is None and self.context and hasattr(self.context, 'agvs'):
-            agvs = self.context.agvs
-        if makespan == 0.0 and self.context and hasattr(self.context, 'env_timeline'):
-            makespan = self.context.env_timeline
+        if self.reward_mode == 'makespan_delta':
+            reward = self._compute_makespan_delta(makespan)
+            self._pending_step_reward = reward
+            return reward
 
         # Controlled reward ablation. This is a dense elapsed-time penalty;
         # call it ``time-only`` in the paper rather than exact terminal
         # C_max optimization.
         if self.reward_mode == 'time_only':
-            return -0.005 * makespan
+            reward = -0.005 * makespan
+            self._pending_step_reward = reward
+            return reward
+
+        reward = 0.0
 
         # ---- DualDRLAgent-style routing reward ----
         # Makespan penalty
@@ -1730,6 +1821,174 @@ class GraphGRPOAgent(BaseAgent):
             active = sum(1 for a in agvs if a.get_status() != AGVStatus.READY)
             reward += 1.5 * (active / total_a)
 
+        self._pending_step_reward = reward
+        return reward
+
+    def _compute_makespan_delta(self, current_time: float) -> float:
+        """Return the negative elapsed simulation time since the last step.
+
+        This is the standard undiscounted scheduling cost: with ``gamma=1``
+        and an episode beginning at time zero, the raw return is exactly
+        ``-C_max``.  It contains no manually selected reward weights.
+        """
+        current_time = float(current_time or 0.0)
+        if self._previous_makespan is None:
+            # The scheduling objective starts at clock time zero.  This
+            # fallback also handles reward() being called before the first
+            # transition is stored, so the first observed elapsed time is
+            # charged instead of silently omitted.
+            reward = -current_time
+            self._episode_initial_makespan = 0.0
+        else:
+            reward = float(self._previous_makespan - current_time)
+        self._previous_makespan = current_time
+        self._episode_final_makespan = current_time
+        self._makespan_reward_count += 1
+        self._makespan_reward_sum += reward
+        return reward
+
+    def _resolve_reward_state(self, env_info: Optional[Dict] = None):
+        """Resolve the scalar clock and entity lists used by reward modes."""
+        makespan = 0.0
+        machines = None
+        jobs = None
+        agvs = None
+
+        if env_info and isinstance(env_info, dict):
+            makespan = env_info.get('makespan', 0.0)
+            machines = env_info.get('machines')
+            jobs = env_info.get('jobs')
+            agvs = env_info.get('agvs')
+
+        if self.context is not None:
+            if machines is None and hasattr(self.context, 'machines'):
+                machines = self.context.machines
+            if jobs is None and hasattr(self.context, 'jobs'):
+                jobs = self.context.jobs
+            if agvs is None and hasattr(self.context, 'agvs'):
+                agvs = self.context.agvs
+            if (makespan is None or float(makespan) == 0.0) and hasattr(self.context, 'env_timeline'):
+                makespan = self.context.env_timeline
+
+        return float(makespan or 0.0), machines or [], jobs or [], agvs or []
+
+    @staticmethod
+    def _minimum_travel_time(graph, source_ids, target_ids, max_velocity: float) -> float:
+        """Return a conservative shortest transport-time lower bound."""
+        if graph is None or not source_ids or not target_ids or max_velocity <= 0:
+            return 0.0
+        best = float('inf')
+        for source_id in source_ids:
+            for target_id in target_ids:
+                if source_id == target_id:
+                    best = 0.0
+                    continue
+                try:
+                    path = graph.get_path(source_id, target_id)
+                    distance = graph.get_path_weight(path) if path else float('inf')
+                    best = min(best, float(distance) / max_velocity)
+                except (AttributeError, TypeError, ValueError, ZeroDivisionError):
+                    continue
+        return 0.0 if not math.isfinite(best) else max(best, 0.0)
+
+    @classmethod
+    def _remaining_processing_lower_bound(
+        cls, jobs: List[Job], machines=None, agvs=None, factory_graph=None,
+    ) -> float:
+        """Return a job-chain lower bound including unavoidable transport.
+
+        Each unfinished operation contributes its fastest eligible-machine
+        processing time.  For consecutive operations, the minimum possible
+        machine-to-machine transport time is added; for a first operation, the
+        minimum AGV-to-machine empty travel time is added when the route graph
+        is available.  The estimate remains optimistic because it ignores
+        contention, blocking and failures, while reflecting the transport
+        resource that dominates this simulator's makespan.
+        """
+        machines = list(machines or [])
+        agvs = list(agvs or [])
+        machine_by_id = {getattr(machine, 'id', None): machine for machine in machines}
+        machine_point_ids = {
+            machine_id: getattr(machine, 'point_id', None)
+            for machine_id, machine in machine_by_id.items()
+        }
+        max_velocity = max(
+            (float(getattr(agv, 'velocity', 0.0)) for agv in agvs),
+            default=0.0,
+        )
+        agv_source_ids = [
+            getattr(agv, 'point_id', None) for agv in agvs
+            if getattr(agv, 'point_id', None) is not None
+        ]
+
+        per_job = []
+        for job in jobs:
+            remaining = 0.0
+            for i in range(job.get_operation_count()):
+                op = job.get_operation(i)
+                if op.get_status() == OperationStatus.FINISHED:
+                    continue
+                if not op.durations:
+                    continue
+                fastest = min(float(duration) for _, duration in op.durations)
+                processed = max(float(getattr(op, 'process_time', 0.0)), 0.0)
+                remaining += max(fastest - processed, 0.0)
+
+                target_machine_ids = [machine_id for machine_id, _ in op.durations]
+                target_points = [
+                    machine_point_ids[machine_id]
+                    for machine_id in target_machine_ids
+                    if machine_id in machine_point_ids
+                    and machine_point_ids[machine_id] is not None
+                ]
+                if i > 0:
+                    previous_op = job.get_operation(i - 1)
+                    previous_points = [
+                        machine_point_ids[machine_id]
+                        for machine_id, _ in previous_op.durations
+                        if machine_id in machine_point_ids
+                        and machine_point_ids[machine_id] is not None
+                    ]
+                    remaining += cls._minimum_travel_time(
+                        factory_graph, previous_points, target_points, max_velocity,
+                    )
+                elif agv_source_ids:
+                    remaining += cls._minimum_travel_time(
+                        factory_graph, agv_source_ids, target_points, max_velocity,
+                    )
+            per_job.append(remaining)
+        return float(max(per_job) if per_job else 0.0)
+
+    def _estimate_makespan_lower_bound(
+        self, jobs: List[Job], current_time: float, machines=None, agvs=None,
+    ) -> float:
+        """Estimate ``L(s)`` from remaining processing and optional transport."""
+        factory_graph = self._get_factory_graph(agvs or [])
+        return float(
+            current_time
+            + self._remaining_processing_lower_bound(
+                jobs,
+                machines=machines,
+                agvs=agvs,
+                factory_graph=factory_graph,
+            )
+        )
+
+    def _compute_lower_bound_delta(
+        self, jobs: List[Job], current_time: float, machines=None, agvs=None,
+    ) -> float:
+        current_lb = self._estimate_makespan_lower_bound(
+            jobs, current_time, machines=machines, agvs=agvs,
+        )
+        if self._previous_lower_bound is None:
+            reward = 0.0
+            self._episode_initial_lower_bound = current_lb
+        else:
+            reward = float(self._previous_lower_bound - current_lb)
+        self._previous_lower_bound = current_lb
+        self._episode_final_lower_bound = current_lb
+        self._lower_bound_reward_count += 1
+        self._lower_bound_reward_sum += reward
         return reward
 
     # ----------------------------------------------------------
@@ -1759,13 +2018,76 @@ class GraphGRPOAgent(BaseAgent):
         # advancing the rollout horizon.
         self._rollout_step_count += 1
 
+        # Prime the lower-bound baseline from the pre-action state.  The
+        # environment reports the first post-action reward only after
+        # ``env.step``; initializing there would omit the first action from
+        # the telescoping trajectory return.
+        if (self.reward_mode == 'makespan_delta'
+                and self._previous_makespan is None):
+            # env.step() may already have advanced the clock before this
+            # hook runs.  The episode baseline is nevertheless time zero.
+            self._previous_makespan = 0.0
+            self._episode_initial_makespan = 0.0
+
+        if (self.reward_mode in {'lower_bound_delta', 'resource_bound_delta'}
+                and self._previous_lower_bound is None):
+            makespan, machines, jobs, agvs = self._resolve_reward_state()
+            self._compute_lower_bound_delta(
+                jobs,
+                makespan,
+                machines=machines if self.reward_mode == 'resource_bound_delta' else None,
+                agvs=agvs if self.reward_mode == 'resource_bound_delta' else None,
+            )
+
         # Collect transitions from previous step into rollout buffer
         if self._prev_global_state is not None and self._prev_decisions_info:
-            step_reward = self._compute_reward()
+            # PacketFactory has already evaluated the post-step reward in
+            # ``env.step``.  Consume that value exactly once so every reward
+            # mode records the transition for the preceding action.  This
+            # also keeps composite/time-only modes from recomputing a reward
+            # against the already-advanced state.
+            if self._pending_step_reward is not None:
+                step_reward = float(self._pending_step_reward)
+                self._pending_step_reward = None
+                self._pending_lower_bound_reward = None
+            elif self.reward_mode in {'lower_bound_delta', 'resource_bound_delta'}:
+                # Backward-compatible fallback for callers that bypass the
+                # environment reward callback.
+                if self._pending_lower_bound_reward is not None:
+                    step_reward = float(self._pending_lower_bound_reward)
+                    self._pending_lower_bound_reward = None
+                else:
+                    makespan, machines, jobs, agvs = self._resolve_reward_state()
+                    step_reward = self._compute_lower_bound_delta(
+                        jobs,
+                        makespan,
+                        machines=machines if self.reward_mode == 'resource_bound_delta' else None,
+                        agvs=agvs if self.reward_mode == 'resource_bound_delta' else None,
+                    )
+            elif self.reward_mode == 'makespan_delta':
+                makespan, _, _, _ = self._resolve_reward_state()
+                step_reward = self._compute_makespan_delta(makespan)
+            else:
+                step_reward = self._compute_reward()
+            self._pending_step_reward = None
 
             # Normalize reward
             self.reward_normalizer.update(np.array([step_reward]))
-            norm_reward = self.reward_normalizer.normalize(np.array([step_reward]))[0]
+            if self.reward_mode in {
+                    'makespan_delta', 'lower_bound_delta', 'resource_bound_delta'}:
+                # These rewards already have an objective-aligned scale and
+                # their undiscounted sums carry the scheduling meaning
+                # (respectively ``-C_max`` or a potential decrease).  Running
+                # per-step normalization would turn the mostly constant
+                # ``-1`` elapsed-time signal into nearly zero and destroy
+                # that relation before group returns are computed.  GRPO
+                # performs advantage standardization after return assembly,
+                # so an additional per-step normalization is unnecessary.
+                norm_reward = float(step_reward)
+            else:
+                norm_reward = self.reward_normalizer.normalize(
+                    np.array([step_reward])
+                )[0]
 
             done = bool(done_override) if done_override is not None else False
             if done_override is None and self.context and hasattr(self.context, 'jobs'):
@@ -1782,6 +2104,10 @@ class GraphGRPOAgent(BaseAgent):
                 if self.strict_group_sampling and self._strict_group_id is not None
                 else self._grpo_group_id
             )
+            decision_step_id = (
+                self._strict_decision_step
+                if self.strict_group_sampling else None
+            )
             for info in self._prev_decisions_info:
                 route_candidate_feats = info.get('route_all_candidate_features')
                 agv_candidate_feats = info.get('agv_all_candidate_features')
@@ -1796,6 +2122,7 @@ class GraphGRPOAgent(BaseAgent):
                         self._strict_trajectory_id
                         if self.strict_group_sampling else None
                     ),
+                    decision_step_id=decision_step_id,
                     graph_data=self._prev_graph_data,
                     graph_node_type_offsets=self._prev_graph_node_type_offsets,
                     # Sequencing
@@ -1812,7 +2139,9 @@ class GraphGRPOAgent(BaseAgent):
                     agv_all_candidate_feats=agv_candidate_feats,
                 )
 
-            if not self.strict_group_sampling:
+            if self.strict_group_sampling:
+                self._strict_decision_step += 1
+            else:
                 self._grpo_group_id += 1
 
         # Update previous state
@@ -2222,6 +2551,8 @@ class GraphGRPOAgent(BaseAgent):
                 'hyperparams': {
                     'hidden_dim': self.hidden_dim,
                     'gamma': self.gamma,
+                    'lr_gnn': self.lr_gnn,
+                    'lr_actor': self.lr_actor,
                     'clip_epsilon': self.clip_epsilon,
                     'grpo_epochs': self.grpo_epochs,
                     'grpo_batch_size': self.grpo_batch_size,
@@ -2248,6 +2579,17 @@ class GraphGRPOAgent(BaseAgent):
                     'mean': self.reward_normalizer.mean,
                     'var': self.reward_normalizer.var,
                     'count': self.reward_normalizer.count,
+                },
+                'reward_diagnostics': {
+                    'mode': self.reward_mode,
+                    'initial_lower_bound': self._episode_initial_lower_bound,
+                    'final_lower_bound': self._episode_final_lower_bound,
+                    'raw_reward_sum': self._lower_bound_reward_sum,
+                    'raw_reward_count': self._lower_bound_reward_count,
+                    'initial_makespan': self._episode_initial_makespan,
+                    'final_makespan': self._episode_final_makespan,
+                    'makespan_reward_sum': self._makespan_reward_sum,
+                    'makespan_reward_count': self._makespan_reward_count,
                 },
                 'training_history': self.training_history,
                 'train_step': self._train_step,
@@ -2281,10 +2623,22 @@ class GraphGRPOAgent(BaseAgent):
                 ('optimizer_agv', self.optimizer_agv),
             ]:
                 if opt_key in checkpoint:
-                    optimizer.load_state_dict(checkpoint[opt_key])
+                    try:
+                        optimizer.load_state_dict(checkpoint[opt_key])
+                    except (ValueError, RuntimeError) as exc:
+                        # Older checkpoints used one combined actor/GNN
+                        # parameter group.  Network weights remain valid even
+                        # when that optimizer state cannot be mapped to the
+                        # new, separately scheduled learning rates.
+                        LOGGER.warning(
+                            "[GraphGRPOAgent] Skipping incompatible %s state: %s",
+                            opt_key, exc,
+                        )
 
             hp = checkpoint.get('hyperparams', {})
             self.gamma = hp.get('gamma', self.gamma)
+            self.lr_gnn = hp.get('lr_gnn', self.lr_gnn)
+            self.lr_actor = hp.get('lr_actor', self.lr_actor)
             self.clip_epsilon = hp.get('clip_epsilon', self.clip_epsilon)
             self.grpo_epochs = hp.get('grpo_epochs', self.grpo_epochs)
             self.grpo_batch_size = hp.get('grpo_batch_size', self.grpo_batch_size)
@@ -2299,6 +2653,10 @@ class GraphGRPOAgent(BaseAgent):
             self.state_encoder_mode = hp.get('state_encoder_mode', self.state_encoder_mode)
             self.reward_mode = hp.get('reward_mode', self.reward_mode)
             self.agv_selection_mode = hp.get('agv_selection_mode', self.agv_selection_mode)
+
+            # Optimizer checkpoints may carry stale learning rates. Restore
+            # the effective values recorded with the model.
+            self.set_learning_rates(self.lr_gnn, self.lr_actor)
 
             if 'reward_normalizer' in checkpoint:
                 rn = checkpoint['reward_normalizer']
@@ -2331,7 +2689,30 @@ class GraphGRPOAgent(BaseAgent):
         metrics = {
             'episode_reward': self._episode_reward,
             'training_history': self.training_history,
+            'reward_mode': self.reward_mode,
         }
+        if self.reward_mode in {'lower_bound_delta', 'resource_bound_delta'}:
+            metrics.update({
+                'raw_reward_sum': float(self._lower_bound_reward_sum),
+                'raw_reward_count': int(self._lower_bound_reward_count),
+                'initial_lower_bound': self._episode_initial_lower_bound,
+                'final_lower_bound': self._episode_final_lower_bound,
+                'reward_normalizer_mean': float(self.reward_normalizer.mean),
+                'reward_normalizer_var': float(self.reward_normalizer.var),
+                'reward_normalizer_count': float(self.reward_normalizer.count),
+            })
+        if self.reward_mode == 'makespan_delta':
+            metrics.update({
+                'raw_reward_sum': float(self._makespan_reward_sum),
+                'raw_reward_count': int(self._makespan_reward_count),
+                'makespan_reward_sum': float(self._makespan_reward_sum),
+                'makespan_reward_count': int(self._makespan_reward_count),
+                'initial_makespan': self._episode_initial_makespan,
+                'final_makespan': self._episode_final_makespan,
+                'reward_normalizer_mean': float(self.reward_normalizer.mean),
+                'reward_normalizer_var': float(self.reward_normalizer.var),
+                'reward_normalizer_count': float(self.reward_normalizer.count),
+            })
         if self.training_history.get('policy_loss'):
             metrics['policy_loss'] = self.training_history['policy_loss'][-1]
         if self.training_history.get('entropy'):
@@ -2351,6 +2732,18 @@ class GraphGRPOAgent(BaseAgent):
         self._prev_graph_node_type_offsets = None
         self._prev_decisions_info = []
         self._prev_queue_len = 0
+        self._previous_makespan = None
+        self._pending_step_reward = None
+        self._makespan_reward_count = 0
+        self._makespan_reward_sum = 0.0
+        self._episode_initial_makespan = None
+        self._episode_final_makespan = None
+        self._previous_lower_bound = None
+        self._pending_lower_bound_reward = None
+        self._lower_bound_reward_count = 0
+        self._lower_bound_reward_sum = 0.0
+        self._episode_initial_lower_bound = None
+        self._episode_final_lower_bound = None
 
         # Record episode stats.
         if self.training_history['episodes']:
@@ -2375,6 +2768,7 @@ class GraphGRPOAgent(BaseAgent):
             raise RuntimeError("set strict_group_sampling=true before collecting strict rollouts")
         self._strict_group_id = int(group_id)
         self._strict_trajectory_id = int(trajectory_id)
+        self._strict_decision_step = 0
 
     def end_strict_rollout(self):
         """Stop attaching transitions to the current strict rollout."""

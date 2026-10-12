@@ -439,11 +439,11 @@ def build_config(agent_key: str, instance_config: dict, base_yaml_path: Optional
         config["simulation"]["agent"]["time_limit_seconds"] = time_limit
     if "model_path" in agent_cfg:
         config["simulation"]["agent"]["model_path"] = agent_cfg["model_path"]
-    if model_path is not None:
+    if model_path is not None and agent_key in DRL_AGENTS:
         config["simulation"]["agent"]["model_path"] = model_path
 
     # 计算设备覆盖：CLI --device 优先于 agent YAML 中的 device 配置
-    if device is not None:
+    if device is not None and agent_key in DRL_AGENTS:
         config["simulation"]["agent"]["device"] = device
 
     # OR-Tools 内部线程数：仅对 OR_TOOLS_AGENTS 注入，避免超额订阅 CPU（并行数×num_workers≈核数）
@@ -472,6 +472,26 @@ def build_model_metadata(config: dict) -> dict:
         "model_file_exists": exists,
         "model_sha256": hashlib.sha256(path.read_bytes()).hexdigest() if exists else None,
     }
+
+
+def validate_benchmark_models(args) -> dict:
+    """Reject missing inference checkpoints before creating experiment files."""
+    metadata = {}
+    empty_instance = {"job_config": {}, "map_config": {}, "event_config": {}}
+    for agent_key in args.agents:
+        config = build_config(
+            agent_key, empty_instance, base_yaml_path=args.config_yaml,
+            time_limit=args.time_limit, device=args.device,
+            model_path=args.model_path,
+        )
+        identity = build_model_metadata(config)
+        if agent_key in DRL_AGENTS and not identity["model_file_exists"]:
+            raise FileNotFoundError(
+                f"{agent_key}: 推理检查点不存在: {identity['model_path']}；"
+                "benchmark 不允许回退到随机初始化策略，请指定有效的 --model-path"
+            )
+        metadata[agent_key] = identity
+    return metadata
 
 
 def derive_trial_seed(base_seed: Optional[int], family: str, instance: str, run: int) -> Optional[int]:
@@ -527,6 +547,20 @@ def run_episode(config: dict, timeout: int = 600, bootstrap_lock: Optional[threa
     else:
         env, agent = bootstrap(config)
 
+    # Some agents silently tolerate a failed constructor-time load. Verify
+    # the load outcome explicitly before running a supposedly trained policy.
+    model_loaded = None
+    if config["simulation"]["agent"].get("name") in DRL_AGENTS:
+        path = Path(config["simulation"]["agent"]["model_path"])
+        if not path.is_absolute():
+            path = PROJECT_ROOT / path
+        if not path.is_file():
+            raise FileNotFoundError(f"推理检查点不存在: {path}")
+        load_result = agent.load_model(str(path))
+        if load_result is False:
+            raise RuntimeError(f"推理检查点加载失败，停止该 trial: {path}")
+        model_loaded = load_result is True
+
     # 重置环境（加载实例数据，初始化 jobs/machines/agvs）
     env.reset()
 
@@ -547,6 +581,7 @@ def run_episode(config: dict, timeout: int = 600, bootstrap_lock: Optional[threa
             "executed_event_types": sorted(set(executed_event_types)),
             "executed_event_type_counts": dict(sorted(Counter(executed_event_types).items())),
             "successful_event_count": len(event_history),
+            "model_loaded": model_loaded,
         }
 
     try:
@@ -628,6 +663,7 @@ def run_trial(task: dict) -> dict:
         "executed_event_types": result.get("executed_event_types"),
         "executed_event_type_counts": result.get("executed_event_type_counts"),
         "successful_event_count": result.get("successful_event_count"),
+        "model_loaded": result.get("model_loaded"),
         "timestamp": time.strftime("%Y-%m-%d %H:%M:%S"),
     }
     record.update(task.get("event_metadata", {}))
@@ -639,13 +675,16 @@ def run_trial(task: dict) -> dict:
 
 # ==================== 结果管理 ====================
 
-def load_completed_trials(results_path: Path) -> Set[Tuple[str, str, str, int]]:
-    """读取已有结果，返回 (agent, family, instance, run) 的集合。
+def load_completed_trials(results_path: Path) -> Set[Tuple[str, str, str, int, Optional[int]]]:
+    """读取已有结果，返回 (agent, family, instance, run, seed) 的集合。
 
     status 为 "error" 的记录视为未完成：不计入 completed 集合（重跑时会重新运行），
     并从 results.jsonl 中物理删除这些行，避免错误记录堆积。
+
+    测试随机种子必须纳入键，否则同一实验目录先运行 seed=601 后，
+    seed=602/603 会被错误地视为已完成。
     """
-    completed: Set[Tuple[str, str, str, int]] = set()
+    completed: Set[Tuple[str, str, str, int, Optional[int]]] = set()
     if not results_path.exists():
         return completed
 
@@ -665,7 +704,9 @@ def load_completed_trials(results_path: Path) -> Set[Tuple[str, str, str, int]]:
             if r.get("status") == "error":
                 error_count += 1
                 continue
-            completed.add((r["agent"], r["family"], r["instance"], r["run"]))
+            completed.add((
+                r["agent"], r["family"], r["instance"], r["run"], r.get("seed")
+            ))
             kept_lines.append(raw)
 
     # 若存在 error 记录，重写 JSONL（删除 error 行）
@@ -761,6 +802,8 @@ def run_benchmark(args):
     """运行完整的 benchmark 实验"""
     global _shutdown_requested
 
+    model_metadata_cache = validate_benchmark_models(args)
+
     # 确定实验 ID 和目录
     experiment_id = args.experiment_id or time.strftime("bench_%Y%m%d_%H%M%S")
     exp_dir = RESULTS_ROOT / experiment_id
@@ -823,7 +866,6 @@ def run_benchmark(args):
     # ---- 预解析 + 缓存每个实例的 instance_config（同一实例的多个 run 复用）----
     instance_config_cache: Dict[str, dict] = {}
     instance_event_metadata_cache: Dict[str, dict] = {}
-    model_metadata_cache: Dict[str, dict] = {}
 
     def get_instance_config(instance_file: Path) -> Optional[dict]:
         key = str(instance_file)
@@ -863,7 +905,8 @@ def run_benchmark(args):
                 if instance_config is None:
                     continue
                 for run in range(1, num_runs + 1):
-                    if (agent_key, family, instance_name, run) in completed:
+                    trial_seed = derive_trial_seed(args.seed, family, instance_name, run)
+                    if (agent_key, family, instance_name, run, trial_seed) in completed:
                         skipped += 1
                         continue
                     config = build_config(
@@ -884,7 +927,7 @@ def run_benchmark(args):
                         "instance": instance_name,
                         "run": run,
                         "num_runs": num_runs,
-                        "seed": derive_trial_seed(args.seed, family, instance_name, run),
+                        "seed": trial_seed,
                         "event_metadata": instance_event_metadata_cache[str(instance_file)],
                         "model_metadata": model_metadata_cache[agent_key],
                         "bootstrap_lock": None,  # 稍后按并行模式注入

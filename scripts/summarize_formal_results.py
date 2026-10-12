@@ -3,7 +3,7 @@
 
 该脚本把每个 benchmark 实验目录视为一个独立的测试批次，保留来源实验 ID，
 避免把不同训练 checkpoint 的结果误合并成同一个 run。配对模式要求 clean 和
-uncertain 实验 ID 一一对应，并按 ``(agent, family, instance, run)`` 在每一对
+uncertain 实验 ID 一一对应，并按 ``(agent, family, instance, run, seed)`` 在每一对
 实验内部配对。
 """
 
@@ -114,17 +114,17 @@ def paired_rows(clean_ids, uncertain_ids):
         for records in (clean_records, uncertain_records):
             seen = set()
             for record in records:
-                key = (record.get("agent"), record.get("family"), record.get("instance"), record.get("run"))
+                key = (record.get("agent"), record.get("family"), record.get("instance"), record.get("run"), record.get("seed"))
                 if key in seen:
                     raise ValueError(f"实验 {record['source_experiment_id']} 有重复配对键: {key}")
                 seen.add(key)
         clean_by_key = {
-            (r.get("agent"), r.get("family"), r.get("instance"), r.get("run")): r
+            (r.get("agent"), r.get("family"), r.get("instance"), r.get("run"), r.get("seed")): r
             for r in clean_records
             if r.get("status") == "completed" and r.get("makespan") is not None
         }
         uncertain_by_key = {
-            (r.get("agent"), r.get("family"), r.get("instance"), r.get("run")): r
+            (r.get("agent"), r.get("family"), r.get("instance"), r.get("run"), r.get("seed")): r
             for r in uncertain_records
             if r.get("status") == "completed" and r.get("makespan") is not None
         }

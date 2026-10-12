@@ -275,14 +275,26 @@ def generate_summary_csv(records: List[dict], output_dir: Path):
 
 
 def _paired_rows(clean_records: List[dict], uncertain_records: List[dict]) -> List[dict]:
-    """按 trial 键生成 clean/uncertain 配对记录。"""
+    """按 trial 键生成基础场景/动态事件场景配对记录。
+
+    The derived trial seed is part of the key whenever it is present.  This
+    prevents records from different repeated-measurement seeds being paired
+    merely because they share the same run number.
+    """
+    def trial_key(record: dict):
+        return (
+            record.get("agent"), record.get("family"),
+            record.get("instance"), record.get("run"),
+            record.get("seed"),
+        )
+
     clean_by_key = {
-        (r.get("agent"), r.get("family"), r.get("instance"), r.get("run")): r
+        trial_key(r): r
         for r in clean_records
         if r.get("status") == "completed" and r.get("makespan") is not None
     }
     uncertain_by_key = {
-        (r.get("agent"), r.get("family"), r.get("instance"), r.get("run")): r
+        trial_key(r): r
         for r in uncertain_records
         if r.get("status") == "completed" and r.get("makespan") is not None
     }
@@ -299,6 +311,7 @@ def _paired_rows(clean_records: List[dict], uncertain_records: List[dict]) -> Li
             "family": key[1],
             "instance": key[2],
             "run": key[3],
+            "seed": key[4],
             "clean_makespan": clean_makespan,
             "uncertain_makespan": uncertain_makespan,
             "delta_makespan": delta,
@@ -311,24 +324,25 @@ def _paired_rows(clean_records: List[dict], uncertain_records: List[dict]) -> Li
     return rows
 
 
-def generate_paired_summary_csv(clean_records: List[dict], uncertain_records: List[dict], output_dir: Path):
+def generate_paired_summary_csv(clean_records: List[dict], uncertain_records: List[dict], output_dir: Path,
+                                filename: str = "paired_summary.csv"):
     """生成 clean/uncertain 配对 makespan 与退化率汇总。"""
     import csv
 
     rows = _paired_rows(clean_records, uncertain_records)
 
-    csv_path = output_dir / "paired_summary.csv"
+    csv_path = output_dir / filename
     with open(csv_path, "w", newline="", encoding="utf-8") as f:
         writer = csv.writer(f)
         writer.writerow([
-            "agent", "family", "instance", "run", "clean_makespan",
+            "agent", "family", "instance", "run", "seed", "clean_makespan",
             "uncertain_makespan", "delta_makespan", "relative_degradation",
             "uncertain_scenario", "planned_event_count", "executed_event_count",
             "executed_event_types",
         ])
         for row in rows:
             writer.writerow([
-                row["agent"], row["family"], row["instance"], row["run"],
+                row["agent"], row["family"], row["instance"], row["run"], row["seed"],
                 row["clean_makespan"], row["uncertain_makespan"], row["delta_makespan"],
                 f"{row['relative_degradation']:.6f}" if row["relative_degradation"] is not None else "",
                 row["uncertain_scenario"], row["planned_event_count"], row["executed_event_count"],
@@ -461,14 +475,13 @@ def plot_paired_benchmark(args):
     if args.paired_output:
         output_path = Path(args.paired_output)
         output_path.parent.mkdir(parents=True, exist_ok=True)
-        rows = generate_paired_summary_csv(clean_records, uncertain_records, output_path.parent)
+        rows = generate_paired_summary_csv(
+            clean_records, uncertain_records, output_path.parent, output_path.name
+        )
         output_stem = output_path.stem
         generate_paired_stats_csv(rows, output_path.parent, f"{output_stem}_stats.csv")
         generate_status_summary_csv(clean_records + uncertain_records, output_path.parent, f"{output_stem}_status_summary.csv")
         generate_event_summary_csv(uncertain_records, output_path.parent, f"{output_stem}_event_summary.csv")
-        generated_path = output_path.parent / "paired_summary.csv"
-        if generated_path != output_path:
-            generated_path.replace(output_path)
         logger.info(f"配对汇总输出: {output_path}")
     else:
         output_dir = Path(args.output_dir) / f"pair_{args.clean_experiment_id}_vs_{args.uncertain_experiment_id}"
