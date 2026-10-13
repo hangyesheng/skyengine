@@ -107,7 +107,14 @@ def plot_generalization_degradation(rows: list[dict], output: Path) -> None:
 def plot_formal_main(comparison: list[dict], output: Path) -> None:
     families = ["brandimarte", "kacem"]
     labels = {"brandimarte": "Brandimarte", "kacem": "Kacem"}
-    lookup = {(r["method"], r["family"]): r for r in comparison}
+    def normalize_method(value: str) -> str:
+        if value.startswith("本文方法"):
+            return "本文方法"
+        if value.startswith("HGS"):
+            return "HGS适配实现"
+        return "OR-Tools"
+
+    lookup = {(normalize_method(r["method"]), r["family"]): r for r in comparison}
     fig, axes = plt.subplots(1, 2, figsize=(10.5, 4.8), sharey=False)
     x = np.arange(len(METHODS))
     for ax, family in zip(axes, families):
@@ -125,26 +132,6 @@ def plot_formal_main(comparison: list[dict], output: Path) -> None:
     axes[0].set_ylabel(r"总完工时间 $C_{\max}$")
     axes[1].legend(frameon=False, loc="upper left")
     fig.suptitle("正式测试集的基础场景与动态事件场景对比", y=1.02)
-    save(fig, output)
-
-
-def plot_generalization_overall(summary: list[dict], output: Path) -> None:
-    lookup = {(r["method"], r["scenario"]): r for r in summary if r["family"] in FAMILIES}
-    # Use the raw conditions to compute the overall mean instead of averaging
-    # family means, because families have equal size here but this remains
-    # explicit and reproducible.
-    fig, ax = plt.subplots(figsize=(7.8, 4.8))
-    x = np.arange(len(METHODS))
-    width = 0.35
-    base = [np.mean([float(lookup[(method, "base")]["makespan_mean"]) for _ in [0]]) for method in METHODS]
-    dynamic = [np.mean([float(lookup[(method, "dynamic")]["makespan_mean"]) for _ in [0]]) for method in METHODS]
-    ax.bar(x - width / 2, base, width, label="基础场景", color="#A9C4E4")
-    ax.bar(x + width / 2, dynamic, width, label="动态事件场景", color="#F4B183")
-    ax.set_xticks(x, [METHOD_LABELS[m] for m in METHODS])
-    ax.set_ylabel(r"平均总完工时间 $C_{\max}$")
-    ax.set_title("扩展测试的总体平均完工时间")
-    ax.grid(axis="y", alpha=0.25)
-    ax.legend(frameon=False)
     save(fig, output)
 
 
