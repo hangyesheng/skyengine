@@ -51,13 +51,17 @@ def main() -> None:
         assert value in text, f"current result missing: {value}"
 
     labels = re.findall(r"^\*\*表\s+([0-9]+-[0-9]+)", text, re.MULTILINE)
-    assert labels == ["5-1", "5-2", "5-3"], f"table labels are {labels}"
+    assert labels == ["5-1", "5-2", "5-3", "5-4", "5-5"], f"table labels are {labels}"
 
     evidence = [
         "benchmark_plots/formal_main_frozen_balanced_comparison_v2.csv",
         "benchmark_plots/formal_main_frozen_balanced_paired_statistics_v2.csv",
         "benchmark_plots/formal_main_frozen_balanced_paired_differences_v2.csv",
         "docs/thesis/formal_artifact_manifest_v1.json",
+        "benchmark_plots/generalization_frozen_lb_v1_summary.csv",
+        "benchmark_plots/generalization_frozen_lb_v1_comparisons.csv",
+        "benchmark_plots/generalization_frozen_lb_v1_degradation_summary.csv",
+        "benchmark_plots/generalization_frozen_lb_v1_artifact_manifest.json",
         "docs/thesis/literature/zotero_literature.bib",
     ]
     for relative in evidence:

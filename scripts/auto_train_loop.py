@@ -355,6 +355,14 @@ def parse_args():
     )
 
     parser.add_argument(
+        '--model-selection-metric',
+        choices=['val_makespan_gap', 'val_mean_makespan'],
+        default='val_makespan_gap',
+        help=('模型选择和早停指标；val_makespan_gap 保留历史默认行为，'
+              'val_mean_makespan 直接对齐本文的平均总完工时间目标 (默认: val_makespan_gap)')
+    )
+
+    parser.add_argument(
         '--no-progress-limit',
         type=int,
         default=NO_PROGRESS_LIMIT,
@@ -1309,9 +1317,10 @@ def compute_makespan_lower_bound(parsed_data: dict) -> float:
 
 # ==================== Epoch 级早停检测 ====================
 
-def should_early_stop(early_stopping_state: dict, current_val_gap: float,
+def should_early_stop(early_stopping_state: dict, current_val_metric: float,
                        tolerance: float, patience: int, min_epochs: int,
-                       current_epoch: int) -> Tuple[bool, str]:
+                       current_epoch: int,
+                       metric_name: str = 'val_makespan_gap') -> Tuple[bool, str]:
     """基于增量跟踪的早停判断
 
     此函数更新 early_stopping_state 并判断是否应早停。
@@ -1319,7 +1328,7 @@ def should_early_stop(early_stopping_state: dict, current_val_gap: float,
 
     Args:
         early_stopping_state: 早停状态字典（含 best_val_gap, best_epoch, patience_counter）
-        current_val_gap: 当前 epoch 的验证 makespan gap
+        current_val_metric: 当前 epoch 的模型选择指标
         tolerance: 相对容差阈值
         patience: 早停耐心度
         min_epochs: 最小 epoch 数
@@ -1328,17 +1337,17 @@ def should_early_stop(early_stopping_state: dict, current_val_gap: float,
     Returns:
         Tuple[bool, str]: (是否应早停, 原因描述)
     """
-    best_val_gap = early_stopping_state['best_val_gap']
+    best_val_metric = early_stopping_state['best_val_metric']
 
-    if current_val_gap < best_val_gap:
-        relative_improvement = (best_val_gap - current_val_gap) / max(abs(best_val_gap), 1e-8)
+    if current_val_metric < best_val_metric:
+        relative_improvement = (best_val_metric - current_val_metric) / max(abs(best_val_metric), 1e-8)
         if relative_improvement > tolerance:
             # 显著改善 → 重置耐心度
             early_stopping_state['patience_counter'] = 0
         else:
             # 边际改善 → 更新最佳，但增加耐心度
             early_stopping_state['patience_counter'] += 1
-        early_stopping_state['best_val_gap'] = current_val_gap
+        early_stopping_state['best_val_metric'] = current_val_metric
         early_stopping_state['best_epoch'] = current_epoch
     else:
         # 无改善 → 增加耐心度
@@ -1347,10 +1356,10 @@ def should_early_stop(early_stopping_state: dict, current_val_gap: float,
     # 判断早停
     if (early_stopping_state['patience_counter'] >= patience
             and current_epoch >= min_epochs):
-        return True, (f"验证集 makespan gap 连续 {patience} 个 epoch "
+        return True, (f"验证集 {metric_name} 连续 {patience} 个 epoch "
                       f"无显著改善 (相对容差 {tolerance:.1%}), "
-                      f"当前={current_val_gap:.4f}, "
-                      f"最佳={early_stopping_state['best_val_gap']:.4f} "
+                      f"当前={current_val_metric:.4f}, "
+                      f"最佳={early_stopping_state['best_val_metric']:.4f} "
                       f"(epoch {early_stopping_state['best_epoch']})")
 
     return False, ""
@@ -1601,7 +1610,8 @@ def save_epoch_result(experiment_dir: Path, record: dict):
         f.write(json.dumps(record, ensure_ascii=False) + "\n")
 
 
-def load_completed_epochs(experiment_dir: Path) -> Tuple[int, dict]:
+def load_completed_epochs(experiment_dir: Path,
+                          selection_metric: str = 'val_makespan_gap') -> Tuple[int, dict]:
     """读取已完成的 epoch 数和早停状态
 
     Args:
@@ -1612,10 +1622,15 @@ def load_completed_epochs(experiment_dir: Path) -> Tuple[int, dict]:
     """
     results_file = experiment_dir / "epoch_results.jsonl"
     if not results_file.exists():
-        return 0, {'best_val_gap': float('inf'), 'best_epoch': -1, 'patience_counter': 0}
+        return 0, {
+            'best_val_metric': float('inf'),
+            'best_val_metric_name': selection_metric,
+            'best_epoch': -1,
+            'patience_counter': 0,
+        }
 
     count = 0
-    best_val_gap = float('inf')
+    best_val_metric = float('inf')
     best_epoch = -1
     patience_counter = 0
 
@@ -1627,9 +1642,15 @@ def load_completed_epochs(experiment_dir: Path) -> Tuple[int, dict]:
             try:
                 record = json.loads(line)
                 count += 1
-                val_gap = record.get('val_makespan_gap')
-                if val_gap is not None and val_gap < best_val_gap:
-                    best_val_gap = val_gap
+                val_metric = record.get('selection_value')
+                if val_metric is None:
+                    val_metric = record.get(selection_metric)
+                # 兼容旧记录：若切换到新指标但旧记录没有该字段，
+                # 只能用历史 gap 重建状态；新的实验会从头开始。
+                if val_metric is None and selection_metric != 'val_makespan_gap':
+                    val_metric = record.get('val_makespan_gap')
+                if val_metric is not None and val_metric < best_val_metric:
+                    best_val_metric = val_metric
                     best_epoch = record.get('epoch', count - 1)
                 # 重建 patience_counter
                 patience_counter = record.get('patience_counter', 0)
@@ -1637,7 +1658,8 @@ def load_completed_epochs(experiment_dir: Path) -> Tuple[int, dict]:
                 continue
 
     return count, {
-        'best_val_gap': best_val_gap,
+        'best_val_metric': best_val_metric,
+        'best_val_metric_name': selection_metric,
         'best_epoch': best_epoch,
         'patience_counter': patience_counter,
     }
@@ -1677,6 +1699,9 @@ def save_best_checkpoint(agent: object, experiment_dir: Path,
     meta = {
         'epoch': epoch,
         'val_makespan_gap': epoch_metrics.get('val_makespan_gap'),
+        'val_mean_makespan': epoch_metrics.get('val_mean_makespan'),
+        'selection_metric': epoch_metrics.get('selection_metric'),
+        'selection_value': epoch_metrics.get('selection_value'),
         'train_mean_reward': epoch_metrics.get('train_mean_reward'),
         'train_mean_makespan_gap': epoch_metrics.get('train_mean_makespan_gap'),
         'epsilon': epoch_metrics.get('epsilon'),
@@ -1689,7 +1714,8 @@ def save_best_checkpoint(agent: object, experiment_dir: Path,
         json.dump(meta, f, indent=2, ensure_ascii=False)
 
     logger.info(f"检查点元数据已保存: {meta_path} (epoch={epoch}, "
-                f"val_gap={epoch_metrics.get('val_makespan_gap', 'N/A'):.4f})")
+                f"{epoch_metrics.get('selection_metric', 'val_makespan_gap')}="
+                f"{epoch_metrics.get('selection_value', epoch_metrics.get('val_makespan_gap', float('inf'))):.4f})")
 
 
 def save_training_result(agent, env, result: dict, experiment_dir: Path):
@@ -1880,6 +1906,7 @@ def main():
         "split_seed": args.split_seed,
         "seed": args.seed,
         "val_interval": args.val_interval,
+        "model_selection_metric": args.model_selection_metric,
         "relative_tolerance": args.relative_tolerance,
         "early_stop_patience": args.early_stop_patience,
         "train_interval": args.train_interval,
@@ -1985,10 +2012,13 @@ def main():
         json.dump(config_snapshot, f, indent=2, ensure_ascii=False)
 
     # === 加载已完成的 epoch（续跑支持）===
-    start_epoch, early_stopping_state = load_completed_epochs(experiment_dir)
+    start_epoch, early_stopping_state = load_completed_epochs(
+        experiment_dir, selection_metric=args.model_selection_metric
+    )
     if start_epoch > 0:
         logger.info(f"检测到已完成的 {start_epoch} 个 epoch，将从第 {start_epoch} 个 epoch 继续")
-        logger.info(f"早停状态: best_val_gap={early_stopping_state['best_val_gap']:.4f}, "
+        logger.info(f"早停状态: {args.model_selection_metric}="
+                    f"{early_stopping_state['best_val_metric']:.4f}, "
                     f"best_epoch={early_stopping_state['best_epoch']}, "
                     f"patience_counter={early_stopping_state['patience_counter']}")
 
@@ -2251,6 +2281,13 @@ def main():
             if strict_seed_records:
                 epoch_metrics['strict_trajectory_seeds'] = strict_seed_records
 
+            # 模型选择指标显式记录在每个 epoch 中。历史默认使用相对
+            # 下界差距；论文目标对齐实验可改用验证集平均 Cmax。
+            selection_metric = args.model_selection_metric
+            selection_value = epoch_metrics.get(selection_metric, float('inf'))
+            epoch_metrics['selection_metric'] = selection_metric
+            epoch_metrics['selection_value'] = selection_value
+
             # ========== 早停检测 ==========
             # 仅在真正执行了验证的 epoch 更新早停状态。非验证 epoch 的
             # val_makespan_gap 为 inf，若参与计数会把"跳过验证"误判为"无改善"，
@@ -2258,40 +2295,49 @@ def main():
             # 因此 patience 现在按"验证 epoch"计数（而非所有 epoch）。
             did_validate = bool(val_results)
             if did_validate:
-                current_val_gap = epoch_metrics.get('val_makespan_gap', float('inf'))
-                best_val_gap = early_stopping_state['best_val_gap']
+                current_val_metric = selection_value
+                best_val_metric = early_stopping_state['best_val_metric']
 
                 stop, reason = should_early_stop(
-                    early_stopping_state, current_val_gap,
+                    early_stopping_state, current_val_metric,
                     tolerance=args.relative_tolerance,
                     patience=args.early_stop_patience,
                     min_epochs=args.min_epochs,
                     current_epoch=epoch,
+                    metric_name=selection_metric,
                 )
 
                 # 日志输出
-                if current_val_gap < best_val_gap:
-                    relative_improvement = (best_val_gap - current_val_gap) / max(abs(best_val_gap), 1e-8)
+                if current_val_metric < best_val_metric:
+                    relative_improvement = (best_val_metric - current_val_metric) / max(abs(best_val_metric), 1e-8)
                     if relative_improvement > args.relative_tolerance:
-                        logger.info(f"  验证指标显著改善: {best_val_gap:.4f} → {current_val_gap:.4f} "
+                        logger.info(f"  验证指标显著改善 ({selection_metric}): "
+                                    f"{best_val_metric:.4f} → {current_val_metric:.4f} "
                                     f"(改善 {relative_improvement:.1%})")
                     else:
-                        logger.info(f"  验证指标边际改善: {best_val_gap:.4f} → {current_val_gap:.4f} "
+                        logger.info(f"  验证指标边际改善 ({selection_metric}): "
+                                    f"{best_val_metric:.4f} → {current_val_metric:.4f} "
                                     f"(改善 {relative_improvement:.1%} < 容差 {args.relative_tolerance:.1%})")
                     # 保存最佳模型检查点
                     save_best_checkpoint(agent, experiment_dir, epoch, epoch_metrics)
                 else:
-                    logger.info(f"  验证指标无改善: {current_val_gap:.4f} >= 最佳 {best_val_gap:.4f} "
+                    logger.info(f"  验证指标无改善 ({selection_metric}): "
+                                f"{current_val_metric:.4f} >= 最佳 {best_val_metric:.4f} "
                                 f"(耐心度 {early_stopping_state['patience_counter']}"
                                 f"/{args.early_stop_patience})")
             else:
-                current_val_gap = epoch_metrics.get('val_makespan_gap', float('inf'))
                 stop, reason = False, ""
                 logger.info(f"  本 epoch 跳过验证（val_interval={args.val_interval}），"
                             f"早停状态保持 (耐心度 {early_stopping_state['patience_counter']}"
                             f"/{args.early_stop_patience})")
 
-            epoch_metrics['best_val_gap'] = early_stopping_state['best_val_gap']
+            epoch_metrics['best_val_metric'] = early_stopping_state['best_val_metric']
+            # 保留历史字段，便于旧统计脚本读取；它不再代表新指标。
+            epoch_metrics['best_val_gap'] = (
+                early_stopping_state['best_val_metric']
+                if selection_metric == 'val_makespan_gap'
+                else epoch_metrics.get('val_makespan_gap')
+            )
             epoch_metrics['best_epoch'] = early_stopping_state['best_epoch']
             epoch_metrics['patience_counter'] = early_stopping_state['patience_counter']
             epoch_metrics_list.append(epoch_metrics)
@@ -2300,7 +2346,7 @@ def main():
             if stop:
                 logger.info(f"\n=== 早停触发 ===")
                 logger.info(f"原因: {reason}")
-                logger.info(f"最佳验证 makespan gap: {early_stopping_state['best_val_gap']:.4f} "
+                logger.info(f"最佳验证 {selection_metric}: {early_stopping_state['best_val_metric']:.4f} "
                             f"(epoch {early_stopping_state['best_epoch']})")
                 # 保存当前 epoch 结果后退出
                 epoch_elapsed = time.time() - epoch_start_time
@@ -2350,7 +2396,8 @@ def main():
                         f"训练 reward={train_mean_reward:.4f}, "
                         f"训练 gap={train_mean_gap:.1%}, "
                         f"验证 gap={val_mean_gap:.1%}, "
-                        f"最佳验证 gap={early_stopping_state['best_val_gap']:.4f}, "
+                        f"最佳验证 {args.model_selection_metric}="
+                        f"{early_stopping_state['best_val_metric']:.4f}, "
                         f"epsilon={epsilon}, "
                         f"耗时={epoch_elapsed:.1f}s")
 
@@ -2368,7 +2415,8 @@ def main():
             logger.info(f"最终训练 reward: {final.get('train_mean_reward', 0.0):.4f}")
             logger.info(f"最终训练 makespan gap: {final.get('train_mean_makespan_gap', float('inf')):.1%}")
             logger.info(f"最终验证 makespan gap: {final.get('val_makespan_gap', float('inf')):.1%}")
-            logger.info(f"最佳验证 makespan gap: {best['best_val_gap']:.4f} "
+            logger.info(f"最佳验证 {args.model_selection_metric}: "
+                        f"{best['best_val_metric']:.4f} "
                         f"(epoch {best['best_epoch']})")
             logger.info(f"结果保存在: {experiment_dir}")
             logger.info("=" * 60)
