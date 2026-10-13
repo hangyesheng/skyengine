@@ -1,0 +1,30 @@
+{
+  "name": "thesis_generalization_candidates_v1",
+  "purpose": "扩展数据族兼容性验收；通过前不进入正式主表",
+  "training_use": false,
+  "event_scenario": "default",
+  "candidates": {
+    "dauzere": ["01a"],
+    "fattahi": ["mfjs01"],
+    "barnes": ["mt10c1"],
+    "behnke": ["lar01_1"]
+  },
+  "methods": [
+    "GraphGRPOAgent",
+    "HGSAdaptedAgent",
+    "ORToolsAgent"
+  ],
+  "acceptance_fields": [
+    "status",
+    "makespan",
+    "planned_event_count",
+    "executed_event_count",
+    "executed_event_types",
+    "elapsed"
+  ],
+  "notes": [
+    "所有方法使用相同实例和事件时间线。",
+    "该清单只用于链路验收，不用于调参或模型选择。",
+    "未完成三方法一致性验收的数据族不得写入扩展正式结论。"
+  ]
+}

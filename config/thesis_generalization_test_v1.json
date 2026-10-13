@@ -1,0 +1,33 @@
+{
+  "name": "thesis_generalization_test_v1",
+  "purpose": "在冻结 v1 划分之外进行跨数据族泛化测试",
+  "training_use": false,
+  "event_scenario": "default",
+  "test_random_seeds": [601, 602, 603],
+  "instances": {
+    "dauzere": ["01a", "02a", "03a", "04a", "05a"],
+    "fattahi": ["mfjs01", "mfjs02", "mfjs03", "mfjs04", "mfjs05"],
+    "barnes": ["mt10c1", "mt10cc", "mt10x", "mt10xx", "mt10xxx"],
+    "behnke": ["lar01_1", "lar01_2", "lar01_3", "lar01_4", "lar01_5"]
+  },
+  "methods": [
+    "GraphGRPOAgent",
+    "HGSAdaptedAgent",
+    "ORToolsAgent"
+  ],
+  "scenarios": [
+    "基础场景",
+    "动态事件场景"
+  ],
+  "acceptance": {
+    "minimum_families": 4,
+    "minimum_instances": 20,
+    "required_status": "completed",
+    "require_planned_equals_executed_events": true
+  },
+  "notes": [
+    "这些实例不参与现有检查点训练、验证或模型选择。",
+    "四个数据族目前只有默认混合事件时间线，专项故障事件不作为本批次必需条件。",
+    "跨数据族结果单独报告为泛化分析，不回写冻结 v1 主表。"
+  ]
+}
